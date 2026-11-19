@@ -1,6 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/cn'
-import { renderMarkdown } from '@/lib/markdown'
 
 // Badge ---------------------------------------------------------------------------
 type Tone = 'neutral' | 'gold' | 'success' | 'warning' | 'danger' | 'dark'
@@ -83,11 +82,6 @@ export function EmptyState({
       {action && <div className="mt-5">{action}</div>}
     </div>
   )
-}
-
-// Markdown ------------------------------------------------------------------------
-export function Markdown({ source, className }: { source: string | null | undefined; className?: string }) {
-  return <div className={cn('prose-nm', className)} dangerouslySetInnerHTML={{ __html: renderMarkdown(source) }} />
 }
 
 // Section heading -----------------------------------------------------------------
