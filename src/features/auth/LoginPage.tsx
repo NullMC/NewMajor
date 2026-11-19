@@ -5,11 +5,11 @@ import { errorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/Button'
 import { Field, FormError, Input } from '@/components/ui/Form'
 import { useAuth } from './AuthProvider'
-import { AuthCard, isEmail } from './AuthLayout'
+import { AuthCard } from './AuthLayout'
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const { signIn } = useAuth()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,11 +17,11 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!isEmail(email)) return setError('Inserisci un indirizzo email valido.')
+    if (!identifier.trim()) return setError('Inserisci nome utente o email.')
     if (!password) return setError('Inserisci la password.')
     setLoading(true)
     try {
-      await signIn(email, password)
+      await signIn(identifier, password)
       onSuccess()
     } catch (err) {
       setError(errorMessage(err))
@@ -32,7 +32,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <Field label="Email" required><Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+      <Field label="Nome utente o email" required><Input autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} onChange={(e) => setIdentifier(e.target.value)} /></Field>
       <Field label="Password" required><Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
       <div className="text-right text-sm">
         <Link to="/password-dimenticata" className="font-medium text-ink-600 underline-offset-4 hover:text-ink-900 hover:underline">Password dimenticata?</Link>

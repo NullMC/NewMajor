@@ -68,7 +68,7 @@ export default function UserDetailPage() {
     <div className="space-y-6">
       <Link to="/admin/utenti" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-900"><ArrowLeft className="h-4 w-4" /> Utenti</Link>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">{profile.full_name ?? profile.email}</h1>
+        <h1 className="text-2xl font-bold">{profile.full_name ?? profile.username ?? profile.email}</h1>
         {profile.role === 'admin' && <Badge tone="dark">Admin</Badge>}
         {!profile.is_active && <Badge tone="danger">Disattivato</Badge>}
       </div>
@@ -78,6 +78,7 @@ export default function UserDetailPage() {
             <CardHeader title="Dati" />
             <div className="p-5">
               <DataList items={[
+                { label: 'Nome utente', value: profile.username ?? '—' },
                 { label: 'Email', value: profile.email ? <a href={`mailto:${profile.email}`} className="inline-flex items-center gap-1.5 hover:underline"><Mail className="h-4 w-4 text-ink-400" />{profile.email}</a> : '—' },
                 { label: 'Telefono', value: profile.phone ? <a href={`tel:${profile.phone.replace(/[^\d+]/g, '')}`} className="inline-flex items-center gap-1.5 hover:underline"><Phone className="h-4 w-4 text-ink-400" />{profile.phone}</a> : '—' },
                 { label: 'Società', value: profile.company_name ?? '—' },

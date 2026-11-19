@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { Profile } from '@/types/db'
+import { normalizeUsername, usernameToEmail } from './username'
 
 interface AuthContextValue {
   session: Session | null
@@ -11,8 +12,9 @@ interface AuthContextValue {
   loading: boolean
   /** true se l'account è stato disattivato da un amministratore */
   disabled: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (data: { email: string; password: string; fullName: string; phone?: string }) => Promise<{ needsConfirmation: boolean }>
+  /** identifier: nome utente oppure email */
+  signIn: (identifier: string, password: string) => Promise<void>
+  signUp: (data: { username: string; email?: string; password: string; fullName: string; phone?: string }) => Promise<{ needsConfirmation: boolean }>
   signOut: () => Promise<void>
   sendPasswordReset: (email: string) => Promise<void>
   updatePassword: (password: string) => Promise<void>
@@ -65,18 +67,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [loadProfile])
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (identifier: string, password: string) => {
     setDisabled(false)
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-    if (error) throw error
+    const id = identifier.trim()
+    const byEmail = id.includes('@')
+    const { error } = await supabase.auth.signInWithPassword({ email: byEmail ? id : usernameToEmail(id), password })
+    if (error) {
+      if (!byEmail && error.message === 'Invalid login credentials') throw new Error('username_login_failed')
+      throw error
+    }
   }, [])
 
-  const signUp = useCallback<AuthContextValue['signUp']>(async ({ email, password, fullName, phone }) => {
+  const signUp = useCallback<AuthContextValue['signUp']>(async ({ username, email, password, fullName, phone }) => {
+    const name = normalizeUsername(username)
+    const { data: available, error: availError } = await supabase.rpc('username_available', { p_username: name })
+    if (availError) throw availError
+    if (!available) throw new Error('username_taken')
+    const realEmail = email?.trim()
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
+      // Senza email: indirizzo tecnico derivato dal nome utente (vedi ./username.ts)
+      email: realEmail || usernameToEmail(name),
       password,
       options: {
-        data: { full_name: fullName.trim(), phone: phone?.trim() || null },
+        data: { username: name, full_name: fullName.trim(), phone: phone?.trim() || null },
         emailRedirectTo: `${window.location.origin}/accedi`,
       },
     })

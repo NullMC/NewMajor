@@ -15,7 +15,7 @@ Un ruolo `staff` separato non è stato introdotto: non necessario per i requisit
 ## Tabelle
 
 ### Utenti
-- **profiles** – 1:1 con `auth.users` (creato dal trigger `handle_new_user`). Ruolo, stato attivo, dati fiscali. Il trigger `protect_profile_fields` impedisce ai clienti di cambiare ruolo/stato/email e agli admin di togliersi il ruolo.
+- **profiles** – 1:1 con `auth.users` (creato dal trigger `handle_new_user`). Nome utente di accesso (univoco), email di contatto (facoltativa: vuota per chi si registra solo con il nome utente; l’indirizzo tecnico `@utenti.newmajor.invalid` di Supabase Auth non viene copiato), ruolo, stato attivo, dati fiscali. Il trigger `protect_profile_fields` impedisce ai clienti di cambiare ruolo/stato, a chiunque dall’app di cambiare il nome utente e agli admin di togliersi il ruolo.
 - **addresses** – indirizzi salvati del cliente (predefinito di spedizione).
 
 ### Catalogo
@@ -59,8 +59,9 @@ Un ruolo `staff` separato non è stato introdotto: non necessario per i requisit
 
 | Funzione | Chi | Descrizione |
 | --- | --- | --- |
-| `place_order(payment_method, shipping, billing, customer, notes)` | cliente | Crea l’ordine dal carrello: valida, **ricalcola prezzi**, materializza personalizzazioni e roster, svuota il carrello, notifica cliente e admin, crea un promemoria |
+| `place_order(payment_method, shipping, billing, customer, notes)` | cliente | Crea l’ordine dal carrello: richiede email e telefono (dal modulo o dal profilo, poi salvati nel profilo se mancanti), valida, **ricalcola prezzi**, materializza personalizzazioni e roster, svuota il carrello, notifica cliente e admin, crea un promemoria |
 | `request_order_update(order, message)` | cliente | Richiesta di aggiornamento (max 1 ogni 12 ore) → promemoria + notifica admin |
+| `username_available(username)` | tutti | Verifica formato e disponibilità del nome utente in registrazione |
 | `compute_unit_price(product, config)` / `compute_line_total(product, config, qty)` | tutti | Prezzo unitario e totale riga (stessa logica di `src/lib/pricing.ts`) |
 | `admin_set_order_status(order, status, note, notify, reminder)` | admin | Cambio stato + storico + notifica cliente + promemoria “contatta il cliente” |
 | `admin_set_payment_status(order, status, notify)` | admin | Conferma manuale bonifico/pagamento |
@@ -98,4 +99,4 @@ Quando l’admin sostituisce o elimina un’immagine (prodotto, categoria, hero,
 
 ## Test
 
-`npm run test:db` applica le migration su PGlite con stub degli schemi `auth` e `storage` e verifica 55 scenari: creazione profili, bootstrap admin, protezione ruoli, visibilità catalogo, checkout con prezzo ricalcolato e sconto, quantità minima, taglie, percorsi file di altri utenti, isolamento tra clienti, note e promemoria riservati, notifiche, contatti, cambio stato, richieste di aggiornamento, pagamento, preventivi manuali, duplicazione, statistiche, audit log, contenuti pubblici, seed dimostrativo.
+`npm run test:db` applica le migration su PGlite con stub degli schemi `auth` e `storage` e verifica 68 scenari: creazione profili, bootstrap admin, protezione ruoli, visibilità catalogo, checkout con prezzo ricalcolato e sconto, quantità minima, taglie, percorsi file di altri utenti, isolamento tra clienti, note e promemoria riservati, notifiche, contatti, cambio stato, richieste di aggiornamento, pagamento, preventivi manuali, duplicazione, statistiche, audit log, contenuti pubblici, registrazione con nome utente (email facoltativa, email e telefono obbligatori all’ordine), seed dimostrativo.

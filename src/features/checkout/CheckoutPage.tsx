@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, FormError, Input, Textarea } from '@/components/ui/Form'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { isEmail } from '@/features/auth/AuthLayout'
 import { useCart } from '@/features/cart/CartProvider'
 import { hasPendingAssets } from '@/features/cart/assets'
 import { ShippingNote, useCartDetails } from '@/features/cart/CartPage'
@@ -30,7 +31,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function CheckoutPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const cart = useCart()
   const { settings } = useSettings()
   const navigate = useNavigate()
@@ -38,7 +39,7 @@ export default function CheckoutPage() {
   const { data: addresses, loading: addrLoading } = useQuery(user ? `addresses:${user.id}` : null, listAddresses)
   useMeta({ title: 'Checkout', noindex: true })
 
-  const [customer, setCustomer] = useState({ name: '', phone: '' })
+  const [customer, setCustomer] = useState({ name: '', email: '', phone: '' })
   const [addressId, setAddressId] = useState<string | 'new'>('new')
   const [newAddress, setNewAddress] = useState<AddressInput>(emptyAddress())
   const [saveNew, setSaveNew] = useState(true)
@@ -54,7 +55,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (profile) {
-      setCustomer((c) => ({ name: c.name || profile.full_name || '', phone: c.phone || profile.phone || '' }))
+      setCustomer((c) => ({ name: c.name || profile.full_name || '', email: c.email || profile.email || '', phone: c.phone || profile.phone || '' }))
       setBilling((b) => ({ ...b, company: b.company || profile.company_name || '', vat_number: b.vat_number || profile.vat_number || '', fiscal_code: b.fiscal_code || profile.fiscal_code || '' }))
       setNewAddress((a) => ({ ...a, full_name: a.full_name || profile.full_name || '', phone: a.phone || profile.phone || '' }))
     }
@@ -73,7 +74,8 @@ export default function CheckoutPage() {
     e.preventDefault()
     setError(null)
     if (!customer.name.trim()) return setError('Inserisci il tuo nome.')
-    if (!customer.phone.trim()) return setError('Inserisci un numero di telefono per le comunicazioni sull’ordine.')
+    if (!isEmail(customer.email)) return setError('Inserisci un indirizzo email valido per le comunicazioni sull’ordine.')
+    if (customer.phone.replace(/\D/g, '').length < 6) return setError('Inserisci un numero di telefono valido per le comunicazioni sull’ordine.')
     let ship: AddressSnapshot
     if (addressId === 'new') {
       const err = validateAddress(newAddress)
@@ -107,10 +109,11 @@ export default function CheckoutPage() {
         paymentMethod: method,
         shipping: ship,
         billing: bill,
-        customer: { name: customer.name.trim(), email: profile?.email ?? user?.email ?? '', phone: customer.phone.trim() },
+        customer: { name: customer.name.trim(), email: customer.email.trim(), phone: customer.phone.trim() },
         notes,
       })
       await cart.reload()
+      void refreshProfile()
       invalidate('orders:')
       navigate(`/ordine-confermato/${res.order_id}`, { replace: true })
     } catch (err) {
@@ -129,7 +132,7 @@ export default function CheckoutPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nome e cognome" required><Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} autoComplete="name" /></Field>
               <Field label="Telefono" required><Input type="tel" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} autoComplete="tel" /></Field>
-              <Field label="Email" className="sm:col-span-2" hint="L’email del tuo account"><Input value={profile?.email ?? user?.email ?? ''} readOnly disabled /></Field>
+              <Field label="Email" required className="sm:col-span-2" hint="Per le comunicazioni sull’ordine. Se il tuo profilo non ha un’email, verrà salvata."><Input type="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} autoComplete="email" /></Field>
             </div>
           </Section>
 

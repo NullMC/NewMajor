@@ -25,12 +25,16 @@ const CODES: Record<string, (arg?: string, arg2?: string) => string> = {
   empty_items: () => 'Aggiungi almeno un articolo.',
   customer_name_required: () => 'Il nome del cliente è obbligatorio.',
   invalid_price: () => 'Prezzo non valido.',
+  email_required: () => 'Inserisci un indirizzo email valido: è necessario per inviare l’ordine.',
+  phone_required: () => 'Inserisci un numero di telefono valido: è necessario per inviare l’ordine.',
+  username_taken: () => 'Nome utente non disponibile: scegline un altro.',
+  username_login_failed: () => 'Nome utente o password non corretti. Se in registrazione hai indicato l’email, prova ad accedere con quella.',
 }
 
 const AUTH: Record<string, string> = {
-  'Invalid login credentials': 'Email o password non corretti.',
+  'Invalid login credentials': 'Credenziali non corrette.',
   'Email not confirmed': 'Conferma il tuo indirizzo email prima di accedere.',
-  'User already registered': 'Esiste già un account con questa email.',
+  'User already registered': 'Esiste già un account con questa email o questo nome utente.',
   'Password should be at least 6 characters': 'La password deve contenere almeno 6 caratteri.',
 }
 

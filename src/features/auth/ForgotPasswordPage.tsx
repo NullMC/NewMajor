@@ -45,6 +45,9 @@ export default function ForgotPasswordPage() {
           <Field label="Email" required><Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
           <FormError message={error} />
           <Button type="submit" size="lg" className="w-full" loading={loading}>Invia link</Button>
+          <p className="text-sm text-ink-500">
+            Hai creato l’account solo con il nome utente? <Link to="/contatti" className="font-medium text-ink-900 underline underline-offset-4">Contattaci</Link> per reimpostare la password.
+          </p>
         </form>
       )}
     </AuthCard>

@@ -27,7 +27,7 @@ function Composer() {
   const debounced = useDebounce(search.trim(), 300)
   const { data: results } = useQuery(debounced.length >= 2 ? `admin:user-search:${debounced}` : null, async () => {
     const s = debounced.replace(/[,()%*\\]/g, ' ')
-    const { data, error } = await supabase.from('profiles').select('*').or(`email.ilike.%${s}%,full_name.ilike.%${s}%`).limit(8)
+    const { data, error } = await supabase.from('profiles').select('*').or(`username.ilike.%${s}%,email.ilike.%${s}%,full_name.ilike.%${s}%`).limit(8)
     if (error) throw error
     return data as Profile[]
   })
@@ -82,7 +82,7 @@ function Composer() {
               {!!results?.length && search && (
                 <ul className="absolute inset-x-0 top-12 z-10 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-pop">
                   {results.filter((r) => !selected.some((s) => s.id === r.id)).map((p) => (
-                    <li key={p.id}><button type="button" className="w-full px-4 py-2.5 text-left text-sm hover:bg-ink-50" onClick={() => { setSelected([...selected, p]); setSearch('') }}>{p.full_name ?? '—'} · {p.email}</button></li>
+                    <li key={p.id}><button type="button" className="w-full px-4 py-2.5 text-left text-sm hover:bg-ink-50" onClick={() => { setSelected([...selected, p]); setSearch('') }}>{p.full_name ?? '—'} · {p.email ?? `@${p.username}`}</button></li>
                   ))}
                 </ul>
               )}
@@ -90,8 +90,8 @@ function Composer() {
             <div className="flex flex-wrap gap-2">
               {selected.map((p) => (
                 <span key={p.id} className="inline-flex items-center gap-1 rounded-full bg-ink-100 py-1 pl-3 pr-1 text-xs font-medium">
-                  {p.full_name ?? p.email}
-                  <button type="button" onClick={() => setSelected(selected.filter((s) => s.id !== p.id))} className="rounded-full p-1 hover:bg-ink-200" aria-label={`Rimuovi ${p.email}`}><X className="h-3 w-3" /></button>
+                  {p.full_name ?? p.username ?? p.email}
+                  <button type="button" onClick={() => setSelected(selected.filter((s) => s.id !== p.id))} className="rounded-full p-1 hover:bg-ink-200" aria-label={`Rimuovi ${p.full_name ?? p.username ?? p.email}`}><X className="h-3 w-3" /></button>
                 </span>
               ))}
             </div>

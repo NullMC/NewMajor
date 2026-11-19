@@ -6,12 +6,13 @@ import { Card, CardHeader } from '@/components/ui/Display'
 import { Field, FormError, Input } from '@/components/ui/Form'
 import { useUi } from '@/components/ui/Toast'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { isEmail } from '@/features/auth/AuthLayout'
 import { updateProfile } from './api'
 
 export default function ProfilePage() {
   const { profile, user, refreshProfile, updatePassword } = useAuth()
   const { toast } = useUi()
-  const [form, setForm] = useState({ full_name: '', phone: '', company_name: '', vat_number: '', fiscal_code: '' })
+  const [form, setForm] = useState({ full_name: '', email: '', phone: '', company_name: '', vat_number: '', fiscal_code: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pwd, setPwd] = useState({ password: '', confirm: '' })
@@ -22,7 +23,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (profile) {
       setForm({
-        full_name: profile.full_name ?? '', phone: profile.phone ?? '', company_name: profile.company_name ?? '',
+        full_name: profile.full_name ?? '', email: profile.email ?? '', phone: profile.phone ?? '', company_name: profile.company_name ?? '',
         vat_number: profile.vat_number ?? '', fiscal_code: profile.fiscal_code ?? '',
       })
     }
@@ -35,10 +36,11 @@ export default function ProfilePage() {
     if (!user) return
     setError(null)
     if (form.full_name.trim().length < 2) return setError('Inserisci nome e cognome.')
+    if (form.email.trim() && !isEmail(form.email)) return setError('Indirizzo email non valido.')
     setSaving(true)
     try {
       await updateProfile(user.id, {
-        full_name: form.full_name.trim(), phone: form.phone.trim() || null, company_name: form.company_name.trim() || null,
+        full_name: form.full_name.trim(), email: form.email.trim().toLowerCase() || null, phone: form.phone.trim() || null, company_name: form.company_name.trim() || null,
         vat_number: form.vat_number.trim() || null, fiscal_code: form.fiscal_code.trim().toUpperCase() || null,
       })
       await refreshProfile()
@@ -70,10 +72,11 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader title="Dati personali" description={`Email account: ${profile?.email ?? user?.email ?? ''}`} />
+        <CardHeader title="Dati personali" description={profile?.username ? `Nome utente: ${profile.username}` : undefined} />
         <form onSubmit={save} className="space-y-4 p-5" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome e cognome" required><Input value={form.full_name} onChange={set('full_name')} autoComplete="name" maxLength={120} /></Field>
+            <Field label="Email" hint="Recapito per gli ordini"><Input type="email" value={form.email} onChange={set('email')} autoComplete="email" maxLength={254} /></Field>
             <Field label="Telefono"><Input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" maxLength={40} /></Field>
             <Field label="Società / squadra"><Input value={form.company_name} onChange={set('company_name')} maxLength={160} /></Field>
             <Field label="Partita IVA"><Input value={form.vat_number} onChange={set('vat_number')} maxLength={32} /></Field>

@@ -24,7 +24,7 @@ export default function UsersPage() {
     if (role) query = query.eq('role', role)
     if (search) {
       const s = search.replace(/[,()%*\\]/g, ' ')
-      query = query.or(`email.ilike.%${s}%,full_name.ilike.%${s}%,phone.ilike.%${s}%,company_name.ilike.%${s}%`)
+      query = query.or(`username.ilike.%${s}%,email.ilike.%${s}%,full_name.ilike.%${s}%,phone.ilike.%${s}%,company_name.ilike.%${s}%`)
     }
     const { data: rows, error, count } = await query
     if (error) throw error
@@ -53,7 +53,7 @@ export default function UsersPage() {
           onRowClick={(u) => navigate(`/admin/utenti/${u.id}`)}
           empty={<EmptyState title="Nessun utente" />}
           columns={[
-            { key: 'name', header: 'Utente', cell: (u) => <div className="min-w-0"><p className="truncate font-medium">{u.full_name ?? '—'}</p><p className="truncate text-xs text-ink-500">{u.email}</p></div> },
+            { key: 'name', header: 'Utente', cell: (u) => <div className="min-w-0"><p className="truncate font-medium">{u.full_name ?? '—'}</p><p className="truncate text-xs text-ink-500">{[u.username && `@${u.username}`, u.email].filter(Boolean).join(' · ')}</p></div> },
             { key: 'phone', header: 'Telefono', hideBelow: 'md', cell: (u) => u.phone ?? '—' },
             { key: 'company', header: 'Società', hideBelow: 'lg', cell: (u) => u.company_name ?? '—' },
             { key: 'created', header: 'Registrato', hideBelow: 'sm', cell: (u) => formatDate(u.created_at) },

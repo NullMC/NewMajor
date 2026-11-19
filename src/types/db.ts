@@ -18,7 +18,10 @@ export type AssetKind = 'logo' | 'sponsor' | 'pattern' | 'graphic'
 
 export interface Profile {
   id: string
+  /** Recapito email del cliente (facoltativo in registrazione, obbligatorio per ordinare) */
   email: string | null
+  /** Nome utente di accesso */
+  username: string | null
   full_name: string | null
   phone: string | null
   company_name: string | null

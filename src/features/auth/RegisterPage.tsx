@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, FormError, Input } from '@/components/ui/Form'
 import { useAuth } from './AuthProvider'
 import { AuthCard, isEmail } from './AuthLayout'
+import { USERNAME_HINT, USERNAME_RE, normalizeUsername } from './username'
 
 export default function RegisterPage() {
   const { signUp, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/account'
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ fullName: '', username: '', email: '', phone: '', password: '', confirm: '' })
   const [terms, setTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,13 +31,14 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
     if (form.fullName.trim().length < 2) return setError('Inserisci nome e cognome.')
-    if (!isEmail(form.email)) return setError('Inserisci un indirizzo email valido.')
+    if (!USERNAME_RE.test(normalizeUsername(form.username))) return setError(`Nome utente non valido. ${USERNAME_HINT}`)
+    if (form.email.trim() && !isEmail(form.email)) return setError('L’indirizzo email non è valido. Puoi anche lasciarlo vuoto.')
     if (form.password.length < 8) return setError('La password deve contenere almeno 8 caratteri.')
     if (form.password !== form.confirm) return setError('Le password non coincidono.')
     if (!terms) return setError('Accetta i termini e prendi visione dell’informativa privacy.')
     setLoading(true)
     try {
-      const { needsConfirmation } = await signUp({ email: form.email, password: form.password, fullName: form.fullName, phone: form.phone })
+      const { needsConfirmation } = await signUp({ username: form.username, email: form.email, password: form.password, fullName: form.fullName, phone: form.phone })
       if (needsConfirmation) setConfirmEmail(true)
     } catch (err) {
       setError(errorMessage(err))
@@ -67,8 +69,11 @@ export default function RegisterPage() {
     >
       <form onSubmit={submit} className="space-y-4" noValidate>
         <Field label="Nome e cognome" required><Input autoComplete="name" value={form.fullName} onChange={set('fullName')} maxLength={120} /></Field>
-        <Field label="Email" required><Input type="email" autoComplete="email" value={form.email} onChange={set('email')} /></Field>
-        <Field label="Telefono" hint="Utile per comunicazioni sull’ordine"><Input type="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} maxLength={40} /></Field>
+        <Field label="Nome utente" required hint={USERNAME_HINT}>
+          <Input autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={30} value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))} />
+        </Field>
+        <Field label="Email" hint="Facoltativa. Con l’email puoi accedere anche con quella e recuperare la password in autonomia. Sarà comunque richiesta al primo ordine."><Input type="email" autoComplete="email" value={form.email} onChange={set('email')} /></Field>
+        <Field label="Telefono" hint="Facoltativo. Sarà richiesto al primo ordine."><Input type="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} maxLength={40} /></Field>
         <Field label="Password" required hint="Almeno 8 caratteri"><Input type="password" autoComplete="new-password" value={form.password} onChange={set('password')} /></Field>
         <Field label="Conferma password" required><Input type="password" autoComplete="new-password" value={form.confirm} onChange={set('confirm')} /></Field>
         <Checkbox

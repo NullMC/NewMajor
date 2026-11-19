@@ -194,7 +194,7 @@ export default function ManualOrderPage() {
   const debounced = useDebounce(userSearch.trim(), 300)
   const { data: userResults } = useQuery(debounced.length >= 2 ? `admin:user-search:${debounced}` : null, async () => {
     const s = debounced.replace(/[,()%*\\]/g, ' ')
-    const { data, error } = await supabase.from('profiles').select('*').or(`email.ilike.%${s}%,full_name.ilike.%${s}%,phone.ilike.%${s}%`).limit(8)
+    const { data, error } = await supabase.from('profiles').select('*').or(`username.ilike.%${s}%,email.ilike.%${s}%,full_name.ilike.%${s}%,phone.ilike.%${s}%`).limit(8)
     if (error) throw error
     return data as Profile[]
   })
@@ -273,7 +273,7 @@ export default function ManualOrderPage() {
             <div className="space-y-4 p-5">
               {user ? (
                 <div className="flex items-center justify-between rounded-xl bg-ink-50 p-3 text-sm">
-                  <span><strong>{user.full_name ?? user.email}</strong> · {user.email}</span>
+                  <span><strong>{user.full_name ?? user.username ?? user.email}</strong> · {user.email ?? `@${user.username}`}</span>
                   <button type="button" onClick={() => setUser(null)} className="rounded-lg p-1.5 hover:bg-white" aria-label="Scollega utente"><X className="h-4 w-4" /></button>
                 </div>
               ) : (
@@ -283,7 +283,7 @@ export default function ManualOrderPage() {
                   {!!userResults?.length && userSearch && (
                     <ul className="absolute inset-x-0 top-12 z-10 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-pop">
                       {userResults.map((p) => (
-                        <li key={p.id}><button type="button" onClick={() => void selectUser(p)} className="w-full px-4 py-2.5 text-left text-sm hover:bg-ink-50"><strong>{p.full_name ?? '—'}</strong> · {p.email}</button></li>
+                        <li key={p.id}><button type="button" onClick={() => void selectUser(p)} className="w-full px-4 py-2.5 text-left text-sm hover:bg-ink-50"><strong>{p.full_name ?? '—'}</strong> · {p.email ?? `@${p.username}`}</button></li>
                       ))}
                     </ul>
                   )}

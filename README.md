@@ -52,7 +52,7 @@ Il sito è disponibile su `http://localhost:5173`. Senza variabili Supabase l’
 | `npm run build` | Type-check + build di produzione in `dist/` |
 | `npm run preview` | Anteprima della build |
 | `npm run typecheck` | Solo controllo TypeScript |
-| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (55 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
+| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (68 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
 | `npm run sitemap` | Genera `public/sitemap.xml` e `public/robots.txt` dai contenuti pubblicati |
 
 ## 2. Configurazione Supabase
@@ -67,6 +67,7 @@ Esegui le migration **in ordine** (cartella `supabase/migrations`):
 4. `20261119000004_storage.sql` – bucket e policy di Storage
 5. `20261119000005_seed_base.sql` – stati ordine, tipologie capo (Smarcata, adidas, Mizuno), impostazioni con i dati aziendali, testi strutturali, pagine legali in bozza
 6. `20261119000006_api_grants.sql` – privilegi espliciti per i ruoli `anon` e `authenticated` (i progetti Supabase recenti non li concedono più in automatico sulle nuove tabelle; senza questo file l’API risponde 401)
+7. `20261119000007_username_signup.sql` – registrazione con nome utente ed email facoltativa; email e telefono obbligatori al momento dell’ordine
 
 Due modi:
 
@@ -88,21 +89,30 @@ Facoltativo: `supabase/seed_demo.sql` crea un **prodotto dimostrativo non pubbli
 Dashboard → Authentication:
 
 - **URL Configuration** → *Site URL*: l’URL del sito; *Redirect URLs*: aggiungi `https://TUO-DOMINIO/accedi`, `https://TUO-DOMINIO/reimposta-password` e, in sviluppo, `http://localhost:5173/**`.
-- **Providers → Email**: abilitato. “Confirm email” attivo è consigliato (l’app gestisce entrambi i casi).
-- Le email di conferma e recupero password sono inviate dal servizio Auth nativo di Supabase. Per la produzione è consigliato configurare un SMTP proprio (Authentication → Emails → SMTP) per evitare i limiti del mittente predefinito.
+- **Providers → Email**: abilitato, con **“Confirm email” disattivato**. È obbligatorio: la registrazione non richiede l’email, quindi chi si registra solo con il nome utente non potrebbe confermarla e non riuscirebbe ad accedere.
+- **Come funziona l’accesso**: chi si registra senza email riceve in Supabase Auth un indirizzo tecnico `nomeutente@utenti.newmajor.invalid` (dominio riservato `.invalid`: nessuna email può esservi recapitata) e accede con il nome utente. Chi indica l’email accede con l’email e può recuperare la password da solo. Email e telefono vengono comunque richiesti al primo ordine e salvati nel profilo.
+- L’email di recupero password è inviata dal servizio Auth nativo di Supabase. Per la produzione è consigliato configurare un SMTP proprio (Authentication → Emails → SMTP) per evitare i limiti del mittente predefinito.
 
 ### 2.3 Primo account amministratore
 
-1. Registrati dal sito (`/registrati`) con l’email dell’amministratore e conferma l’account.
-2. In Supabase → SQL Editor esegui (sostituendo l’email):
+1. Registrati dal sito (`/registrati`): bastano nome utente e password.
+2. In Supabase → SQL Editor esegui (sostituendo il nome utente):
 
 ```sql
-update public.profiles set role = 'admin' where email = 'admin@tuodominio.it';
+update public.profiles set role = 'admin' where username = 'nomeutente';
 ```
 
 3. Accedi al backoffice su `/admin` (oppure `/admin/accedi`).
 
 Gli amministratori successivi si nominano dal backoffice: **Utenti → scheda utente → Ruolo**.
+
+**Password dimenticata da un utente registrato senza email**: il recupero via email non è possibile. Un amministratore può impostarne una nuova da SQL Editor (comunicandola poi al cliente):
+
+```sql
+update auth.users
+set encrypted_password = extensions.crypt('NuovaPasswordProvvisoria', extensions.gen_salt('bf'))
+where email = 'nomeutente@utenti.newmajor.invalid';
+```
 
 ## 3. Deploy
 

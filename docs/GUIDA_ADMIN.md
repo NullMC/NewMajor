@@ -1,6 +1,6 @@
 # Guida rapida per l’amministratore
 
-Accesso: **/admin** con email e password di un account amministratore.
+Accesso: **/admin** con nome utente (o email) e password di un account amministratore.
 
 ## Primi passi
 
@@ -57,7 +57,9 @@ Creati automaticamente per ogni nuovo ordine, cambio stato (se richiesto) e rich
 
 ## Utenti
 
-Ricerca, scheda con ordini e indirizzi, cambio ruolo (cliente/amministratore), disattivazione account (l’utente viene disconnesso e non può ordinare).
+Ricerca (nome utente, nome, email, telefono), scheda con ordini e indirizzi, cambio ruolo (cliente/amministratore), disattivazione account (l’utente viene disconnesso e non può ordinare).
+
+I clienti si registrano con nome utente e password; email e telefono sono facoltativi in registrazione ma obbligatori per inviare un ordine. Chi si è registrato senza email non può recuperare la password da solo: vedi il README (sezione *Primo account amministratore*) per reimpostarla da SQL Editor.
 
 ## Impostazioni e sistema
 

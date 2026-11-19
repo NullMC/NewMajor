@@ -144,7 +144,7 @@ export default function AdminLayout() {
               <Bell className="h-5 w-5" />
               {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-gold-500" />}
             </Link>
-            <span className="hidden max-w-[12rem] truncate pl-2 text-sm font-medium md:inline">{profile?.full_name || profile?.email}</span>
+            <span className="hidden max-w-[12rem] truncate pl-2 text-sm font-medium md:inline">{profile?.full_name || profile?.username || profile?.email}</span>
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">

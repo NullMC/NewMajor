@@ -37,7 +37,7 @@ export async function deleteAddress(id: string) {
   if (error) throw error
 }
 
-export async function updateProfile(id: string, p: Partial<Pick<Profile, 'full_name' | 'phone' | 'company_name' | 'vat_number' | 'fiscal_code'>>) {
+export async function updateProfile(id: string, p: Partial<Pick<Profile, 'full_name' | 'email' | 'phone' | 'company_name' | 'vat_number' | 'fiscal_code'>>) {
   const { error } = await supabase.from('profiles').update(p).eq('id', id)
   if (error) throw error
 }
