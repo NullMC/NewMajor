@@ -211,5 +211,10 @@ await expectError('anonimo non modifica impostazioni', async () => {
 const [{ unit }] = await as(null, () => q(`select compute_unit_price($1, $2) unit`, [prod.id, JSON.stringify(config)]))
 Number(unit) === 31.5 ? ok('compute_unit_price coerente con il client (31.50)') : fail(unit)
 
+console.log('\nSeed dimostrativo')
+await db.exec(fs.readFileSync(path.join(dir, '..', 'seed_demo.sql'), 'utf8'))
+const [demo] = await q(`select p.is_published, (select count(*)::int from customization_areas a where a.product_id = p.id) areas from products p where slug = 'prodotto-dimostrativo'`)
+demo && !demo.is_published && demo.areas === 5 ? ok('seed_demo.sql: prodotto di prova non pubblicato con 5 aree') : fail(JSON.stringify(demo))
+
 console.log(failures ? `\n${failures} TEST FALLITI` : '\nTutti i test superati')
 process.exit(failures ? 1 : 0)
