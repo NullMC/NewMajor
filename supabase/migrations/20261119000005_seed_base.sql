@@ -123,9 +123,7 @@ on conflict do nothing;
 insert into public.pages (slug, kind, title, excerpt, content, is_published, sort_order) values
 ('chi-siamo', 'page', 'Chi siamo',
  'New Major si occupa di personalizzazione e vendita di divise, abbigliamento e kit da gara sportivi.',
-$md$New Major si occupa di **personalizzazione e vendita di divise, abbigliamento e kit da gara sportivi**.
-
-Su questa piattaforma puoi scegliere il capo, configurarlo con colori, loghi, sponsor, nomi e numeri e verificare il risultato in anteprima 3D prima di ordinare.
+$md$Su questa piattaforma puoi scegliere il capo, configurarlo con colori, loghi, sponsor, nomi e numeri e verificare il risultato in anteprima 3D prima di ordinare.
 
 ## Dove siamo
 
