@@ -33,7 +33,7 @@ Compila `.env`:
 | Variabile | Dove trovarla | Note |
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | Supabase → Project Settings → API → Project URL | |
-| `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon` `public` key | Chiave pubblica: la sicurezza è garantita dalle policy RLS |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → *Publishable key* (`sb_publishable_…`) | Chiave pubblica: la sicurezza è garantita dalle policy RLS. Per progetti con chiavi legacy si può usare `VITE_SUPABASE_ANON_KEY` |
 | `VITE_SITE_URL` | URL pubblico del sito (es. `https://www.dominio.it`) | Canonical, Open Graph, sitemap |
 
 > **Non inserire mai la `service_role` key nel frontend o nel file `.env` del sito.** Non serve a nessuna funzione della piattaforma.
@@ -52,7 +52,7 @@ Il sito è disponibile su `http://localhost:5173`. Senza variabili Supabase l’
 | `npm run build` | Type-check + build di produzione in `dist/` |
 | `npm run preview` | Anteprima della build |
 | `npm run typecheck` | Solo controllo TypeScript |
-| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (55 controlli) |
+| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (55 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
 | `npm run sitemap` | Genera `public/sitemap.xml` e `public/robots.txt` dai contenuti pubblicati |
 
 ## 2. Configurazione Supabase
@@ -66,6 +66,7 @@ Esegui le migration **in ordine** (cartella `supabase/migrations`):
 3. `20261119000003_functions.sql` – checkout, prezzi, funzioni admin, audit log
 4. `20261119000004_storage.sql` – bucket e policy di Storage
 5. `20261119000005_seed_base.sql` – stati ordine, tipologie capo (Smarcata, adidas, Mizuno), impostazioni con i dati aziendali, testi strutturali, pagine legali in bozza
+6. `20261119000006_api_grants.sql` – privilegi espliciti per i ruoli `anon` e `authenticated` (i progetti Supabase recenti non li concedono più in automatico sulle nuove tabelle; senza questo file l’API risponde 401)
 
 Due modi:
 
@@ -186,7 +187,6 @@ Nessuna libreria di stato globale, form o data-fetching: sono coperti da context
 
 ## 8. Semplificazioni e punti da completare
 
-- **Verifica su un progetto Supabase reale**: le migration e le policy sono testate su PGlite con stub di `auth`/`storage` (`npm run test:db`); il flusso completo va verificato una volta collegato il progetto Supabase definitivo.
 - **Modelli 3D**: le sagome (maglia manica corta/lunga, canotta, pantaloncino) sono generate proceduralmente; non è previsto il caricamento di modelli 3D specifici per brand.
 - **Spedizione**: costo fisso (con soglia di gratuità) oppure “da definire” alla conferma; nessun calcolo per zona o peso.
 - **Immagini responsive**: ottimizzazione lato browser al caricamento (WebP, lato max 2000 px); le trasformazioni server di Supabase richiedono il piano Pro.

@@ -83,6 +83,10 @@ totale   = unitario × quantità × (1 − sconto scaglione massimo raggiunto)
 
 Il client mostra un’anteprima; il valore salvato nell’ordine è sempre quello calcolato dal database.
 
+## Privilegi dei ruoli API
+
+`20261119000006_api_grants.sql` concede `SELECT` a `anon` e `authenticated` su tutte le tabelle di `public`, `INSERT/UPDATE/DELETE` solo a `authenticated` e, per i visitatori, solo `INSERT` su `contact_requests`. Le righe effettivamente accessibili restano decise dalle policy RLS. Le funzioni interne (`materialize_order_item`, `next_order_reference`, `notify_admins`) non sono eseguibili dai client; `place_order` e `request_order_update` solo da utenti autenticati; le funzioni `admin_*` verificano il ruolo al loro interno.
+
 ## Storage
 
 | Bucket | Visibilità | Contenuto | Scrittura |
