@@ -1,5 +1,5 @@
 // Genera public/sitemap.xml leggendo da Supabase prodotti, categorie e pagine pubblicati.
-// Uso: npm run sitemap  (richiede VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY e VITE_SITE_URL in .env)
+// Uso: npm run sitemap  (richiede VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY (o VITE_SUPABASE_ANON_KEY) e VITE_SITE_URL in .env)
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -17,10 +17,10 @@ function loadEnv() {
 
 const env = loadEnv()
 const url = env.VITE_SUPABASE_URL
-const key = env.VITE_SUPABASE_ANON_KEY
+const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY
 const site = (env.VITE_SITE_URL || '').replace(/\/$/, '')
 if (!url || !key || !site) {
-  console.error('Imposta VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY e VITE_SITE_URL.')
+  console.error('Imposta VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY e VITE_SITE_URL.')
   process.exit(1)
 }
 

@@ -7,7 +7,7 @@ export function SetupNotice() {
         <h1 className="mt-6 text-2xl font-bold">Configurazione richiesta</h1>
         <p className="mt-3 text-ink-600">
           Imposta <code className="rounded bg-ink-100 px-1.5 py-0.5 text-sm">VITE_SUPABASE_URL</code> e{' '}
-          <code className="rounded bg-ink-100 px-1.5 py-0.5 text-sm">VITE_SUPABASE_ANON_KEY</code> in un file{' '}
+          <code className="rounded bg-ink-100 px-1.5 py-0.5 text-sm">VITE_SUPABASE_PUBLISHABLE_KEY</code> in un file{' '}
           <code className="rounded bg-ink-100 px-1.5 py-0.5 text-sm">.env</code> (vedi <code>.env.example</code>) e riavvia il server.
         </p>
         <p className="mt-3 text-sm text-ink-500">Le istruzioni complete sono nel README.</p>
