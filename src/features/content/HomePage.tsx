@@ -40,7 +40,7 @@ export default function HomePage() {
         <div className="absolute -right-40 top-1/3 h-[32rem] w-[32rem] rounded-full bg-gold-500/10 blur-3xl" aria-hidden />
         <div className="container relative grid items-center gap-10 py-16 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:py-28">
           <div className="animate-slide-up">
-            <h1 className="display-xl text-[2.6rem] text-white sm:text-6xl xl:text-7xl">
+            <h1 lang="it" className="display-xl text-[clamp(1.75rem,8vw,3.5rem)] text-white [hyphens:auto] [overflow-wrap:break-word] lg:text-[clamp(2.4rem,3.9vw,4.25rem)]" style={{ fontStretch: '108%' }}>
               {hero?.title ?? 'Divise e kit da gara personalizzati'}
             </h1>
             {hero?.subtitle && <p className="mt-6 max-w-xl text-lg leading-8 text-ink-300">{hero.subtitle}</p>}

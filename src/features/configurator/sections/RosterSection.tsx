@@ -151,7 +151,7 @@ export function RosterSection({ api }: { api: ConfiguratorApi }) {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_minmax(6rem,auto)_auto]">
               {nameArea && (
                 <Input
                   aria-label={`Nome riga ${i + 1}`}

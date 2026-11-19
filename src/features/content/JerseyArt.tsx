@@ -17,7 +17,7 @@ export function JerseyArt({ className }: { className?: string }) {
   const back = pathFrom(s.back)
   const front = pathFrom(s.front)
   return (
-    <svg viewBox={`-40 -30 ${W + 200} ${h + 120}`} className={className} role="img" aria-label="Maglie personalizzate con nome e numero">
+    <svg viewBox={`-10 -10 ${W * 0.85 + 270} ${h * 0.85 + 110}`} className={className} role="img" aria-label="Maglie personalizzate con nome e numero">
       <defs>
         <linearGradient id="nm-shade" x1="0" x2="1">
           <stop offset="0" stopColor="#000" stopOpacity=".18" />
@@ -27,7 +27,7 @@ export function JerseyArt({ className }: { className?: string }) {
         <clipPath id="nm-front"><path d={front} /></clipPath>
       </defs>
       {/* Retro: nome e numero */}
-      <g transform="translate(150 40)">
+      <g transform="translate(250 0) scale(0.85)">
         <path d={back} fill="#F4F4F2" />
         <path d={back} fill="url(#nm-shade)" />
         {s.trims.back.map((t, i) => <path key={i} d={pathFrom(t, false)} fill="none" stroke="#C2A063" strokeWidth="14" strokeLinecap="round" />)}
@@ -39,16 +39,16 @@ export function JerseyArt({ className }: { className?: string }) {
         </text>
       </g>
       {/* Fronte */}
-      <g>
-        <path d={front} fill="#0E0E10" />
+      <g transform="translate(0 90) scale(0.85)">
+        <path d={front} fill="#C2A063" />
         <g clipPath="url(#nm-front)">
-          <path d={`M ${W * 0.62} -20 L ${W + 40} -20 L ${W + 40} ${h} L ${W * 0.2} ${h} Z`} fill="#1A1A1E" />
-          <path d={`M ${W * 0.78} -20 L ${W * 0.86} -20 L ${W * 0.44} ${h} L ${W * 0.36} ${h} Z`} fill="#C2A063" opacity=".9" />
+          <path d={`M ${W * 0.62} -20 L ${W + 40} -20 L ${W + 40} ${h} L ${W * 0.2} ${h} Z`} fill="#B3925A" />
+          <path d={`M ${W * 0.78} -20 L ${W * 0.86} -20 L ${W * 0.44} ${h} L ${W * 0.36} ${h} Z`} fill="#0E0E10" opacity=".92" />
         </g>
         <path d={front} fill="url(#nm-shade)" />
-        {s.trims.front.map((t, i) => <path key={i} d={pathFrom(t, false)} fill="none" stroke="#C2A063" strokeWidth="14" strokeLinecap="round" />)}
-        <rect x={W * 0.6} y={h * 0.27} width={W * 0.11} height={W * 0.11} rx="10" fill="none" stroke="#C2A063" strokeWidth="5" />
-        <text x={W * 0.33} y={h * 0.5} textAnchor="middle" fontFamily='"Archivo Variable", Archivo, sans-serif' fontWeight="800" fontSize="92" fill="#F8F7F4" style={{ fontStretch: '110%' }}>
+        {s.trims.front.map((t, i) => <path key={i} d={pathFrom(t, false)} fill="none" stroke="#0E0E10" strokeWidth="14" strokeLinecap="round" />)}
+        <rect x={W * 0.6} y={h * 0.27} width={W * 0.11} height={W * 0.11} rx="10" fill="none" stroke="#0E0E10" strokeWidth="5" />
+        <text x={W * 0.33} y={h * 0.5} textAnchor="middle" fontFamily='"Archivo Variable", Archivo, sans-serif' fontWeight="800" fontSize="92" fill="#0E0E10" style={{ fontStretch: '110%' }}>
           10
         </text>
       </g>

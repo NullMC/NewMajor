@@ -42,7 +42,7 @@ export interface GarmentShape {
 }
 
 function tshirt(longSleeve: boolean, neckDepth: number): { outline: Pt[]; trims: Pt[][] } {
-  const b = new PathBuilder().move(27, 0).quad(30, 26, 29, 50)
+  const b = new PathBuilder().move(27.5, -10).quad(30.5, 22, 29, 50)
   let cuff: Pt[]
   if (longSleeve) {
     b.line(50, 6).line(60, 11)

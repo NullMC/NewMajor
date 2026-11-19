@@ -87,10 +87,10 @@ function Garment({ shape, front, back, version, view }: {
   return (
     <group ref={group} position={[0, -0.08, 0]}>
       <mesh geometry={frontGeo} castShadow>
-        <meshStandardMaterial map={frontTex} alphaTest={0.5} side={THREE.DoubleSide} roughness={0.82} metalness={0} />
+        <meshStandardMaterial map={frontTex} alphaTest={0.5} alphaToCoverage side={THREE.DoubleSide} roughness={0.82} metalness={0} />
       </mesh>
       <mesh geometry={backGeo} rotation={[0, Math.PI, 0]}>
-        <meshStandardMaterial map={backTex} alphaTest={0.5} side={THREE.DoubleSide} roughness={0.82} metalness={0} />
+        <meshStandardMaterial map={backTex} alphaTest={0.5} alphaToCoverage side={THREE.DoubleSide} roughness={0.82} metalness={0} />
       </mesh>
     </group>
   )
@@ -104,8 +104,8 @@ function Controls({ resetKey }: { resetKey: string }) {
     c.enablePan = false
     c.enableDamping = true
     c.dampingFactor = 0.08
-    c.minDistance = 2
-    c.maxDistance = 5.5
+    c.minDistance = 2.2
+    c.maxDistance = 6
     c.minPolarAngle = Math.PI * 0.28
     c.maxPolarAngle = Math.PI * 0.72
     c.addEventListener('change', () => invalidate())
@@ -114,7 +114,7 @@ function Controls({ resetKey }: { resetKey: string }) {
   }, [camera, gl, invalidate])
   useEffect(() => {
     // Cambio vista: riporta la camera in posizione frontale
-    camera.position.set(0, 0.1, 3.4)
+    camera.position.set(0, 0.1, 3.9)
     ref.current?.target.set(0, 0, 0)
     ref.current?.update()
     invalidate()
@@ -141,7 +141,7 @@ export default function GarmentViewer({ shape, front, back, version, view, reset
       className={className}
       frameloop="demand"
       dpr={[1, 2]}
-      camera={{ position: [0, 0.1, 3.4], fov: 35 }}
+      camera={{ position: [0, 0.1, 3.9], fov: 35 }}
       gl={{ antialias: true, preserveDrawingBuffer: false, alpha: true }}
       aria-label="Anteprima 3D del prodotto configurato"
       role="img"

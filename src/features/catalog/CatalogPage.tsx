@@ -60,7 +60,7 @@ export default function CatalogPage() {
     sort: (params.get('ordina') as ProductFilters['sort']) || 'default',
   }
   const key = categorySlug && !categories ? null : `catalog:products:${JSON.stringify(filters)}`
-  const { data: products, loading } = useQuery(key, () => listProducts(filters))
+  const { data: products, loading, error, reload } = useQuery(key, () => listProducts(filters))
 
   // Valori disponibili per gli attributi configurati dall'admin
   const { data: allProducts } = useQuery(attributeFilters.length ? 'catalog:products:all' : null, () => listProducts({}))
@@ -205,9 +205,15 @@ export default function CatalogPage() {
         </aside>
         <div>
           <p className="mb-4 text-sm text-ink-500" aria-live="polite">
-            {loading ? 'Caricamento…' : `${products?.length ?? 0} ${products?.length === 1 ? 'prodotto' : 'prodotti'}`}
+            {loading && !error ? 'Caricamento…' : products ? `${products.length} ${products.length === 1 ? 'prodotto' : 'prodotti'}` : ''}
           </p>
-          {loading && !products ? (
+          {error && !products ? (
+            <EmptyState
+              title="Impossibile caricare il catalogo"
+              description="Controlla la connessione e riprova."
+              action={<Button variant="secondary" onClick={() => void reload()}>Riprova</Button>}
+            />
+          ) : loading && !products ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <ProductCardSkeleton key={i} />)}</div>
           ) : products?.length ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3">

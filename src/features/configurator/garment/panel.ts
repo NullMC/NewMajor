@@ -181,6 +181,8 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
       const filled = !!l.image || !!l.text
       const hl = spec.highlightId === l.area.id
       if (filled && !hl) continue
+      // L'area all-over copre l'intero pannello: mostrala solo quando è evidenziata
+      if (l.area.area_type === 'all_over' && !hl) continue
       const [x, y, rw, rh] = rect(l.area)
       ctx.setLineDash([unit * 1.2, unit * 0.9])
       ctx.lineWidth = unit * (hl ? 0.55 : 0.35)

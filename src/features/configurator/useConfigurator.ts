@@ -129,19 +129,19 @@ export function useConfigurator(
   )
 
   useEffect(() => {
-    let raf = 0
     let cancelled = false
-    ensureFonts().then(() => {
-      if (cancelled) return
-      raf = requestAnimationFrame(() => {
+    // Le modifiche ravvicinate (es. digitazione) vengono raggruppate: si disegna solo l'ultimo stato
+    const timer = setTimeout(() => {
+      void ensureFonts().then(() => {
+        if (cancelled) return
         const layers = buildLayers(areas)
         const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides, highlightId: highlightArea }
         drawPanel(frontCanvas, { ...common, side: 'front' })
         drawPanel(backCanvas, { ...common, side: 'back' })
         setVersion((v) => v + 1)
       })
-    })
-    return () => { cancelled = true; cancelAnimationFrame(raf) }
+    }, 16)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas])
 
   // Azioni --------------------------------------------------------------------------
