@@ -71,7 +71,7 @@ export function Hero({ hero }: { hero: HeroContent | null }) {
   return (
     <section
       data-surface="dark"
-      className="relative mx-2 -mt-16 flex flex-col overflow-hidden rounded-b-[2rem] bg-ink-950 text-white sm:mx-3 sm:rounded-b-[2.5rem]"
+      className="relative -mt-16 flex flex-col overflow-hidden bg-ink-950 text-white"
     >
       <ShaderBackdrop anchor={[0.5, 0.35]} />
       <Grain />
