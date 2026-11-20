@@ -36,6 +36,11 @@ export default {
         'slide-up': { from: { opacity: '0', transform: 'translateY(8px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
         'slide-in-right': { from: { transform: 'translateX(100%)' }, to: { transform: 'translateX(0)' } },
         shimmer: { '100%': { transform: 'translateX(100%)' } },
+        // galleggiamento della foto nelle schede prodotto (mantiene lo zoom dell'hover)
+        float: { '0%, 100%': { transform: 'scale(1.07) translateY(0) rotate(0)' }, '50%': { transform: 'scale(1.07) translateY(-1.6%) rotate(.5deg)' } },
+        'stage-float': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
+        'stage-reflect': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(10px)' } },
+        'stage-shadow': { '0%, 100%': { transform: 'scale(1)', opacity: '1' }, '50%': { transform: 'scale(.86)', opacity: '.65' } },
         'word-up': { from: { transform: 'translateY(105%)' }, to: { transform: 'translateY(0)' } },
         'scene-in': { from: { opacity: '0', transform: 'scale(.94)', filter: 'blur(14px)' }, to: { opacity: '1', transform: 'none', filter: 'blur(0)' } },
         grain: {
