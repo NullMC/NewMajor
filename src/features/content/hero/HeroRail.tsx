@@ -6,7 +6,7 @@
 //   spinge l'altra e, rilasciata, oscilla e torna al suo posto.
 // · Il tessuto segue il movimento con un ritardo calcolato nel vertex shader (l'orlo
 //   "resta indietro" quando la gruccia oscilla) e una leggera corrente d'aria.
-// · Al passaggio la maglia si gira verso chi guarda; un clic la solleva e mostra il retro.
+// · Al passaggio la maglia si gira verso chi guarda.
 // · Il bagliore che segue il puntatore è disegnato solo sul tessuto.
 // Caricata in lazy: three.js non entra nel bundle iniziale.
 
@@ -97,8 +97,7 @@ interface HangerState {
   swing: number; vswing: number
   tilt: number; vtilt: number
   yaw: number; vyaw: number
-  lift: number; vlift: number
-  hovered: boolean; flipped: boolean; dragging: boolean
+  hovered: boolean; dragging: boolean
 }
 
 /** Stender sospeso: asta con terminali e due tiranti verso il soffitto. */
@@ -179,9 +178,9 @@ function Jersey({ data, state, index, layout, hanger = true }: { data: Loaded; s
     if (layout) {
       // sospesa a mezz'aria: leggero galleggiamento attorno al punto assegnato
       const bob = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.9 + index * 2.1) * 0.035
-      g.position.set(layout.x, layout.y + (state.lift + bob) * layout.scale, 0)
+      g.position.set(layout.x, layout.y + bob * layout.scale, 0)
       g.scale.setScalar(layout.scale)
-    } else g.position.set(state.s, RAIL_Y + state.lift, 0)
+    } else g.position.set(state.s, RAIL_Y, 0)
     euler.set(state.tilt, state.yaw, state.swing)
     g.quaternion.setFromEuler(euler)
     const p = pointer.current
@@ -241,10 +240,10 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
   const states = useRef<HangerState[]>(
     HERO_JERSEYS.map((j, i) => {
       const slot = (i - (HERO_JERSEYS.length - 1) / 2) * SPACING
-      return { s: slot, vs: 0, slot, dragTo: slot, swing: 0, vswing: 0, tilt: 0, vtilt: 0, yaw: j.restYaw, vyaw: 0, lift: 0, vlift: 0, hovered: false, flipped: false, dragging: false }
+      return { s: slot, vs: 0, slot, dragTo: slot, swing: 0, vswing: 0, tilt: 0, vtilt: 0, yaw: j.restYaw, vyaw: 0, hovered: false, dragging: false }
     }),
   )
-  const drag = useRef<{ index: number; startX: number; startS: number; moved: boolean } | null>(null)
+  const drag = useRef<{ index: number; startX: number; startS: number } | null>(null)
 
   useEffect(() => {
     const el = gl.domElement
@@ -252,7 +251,7 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
     const down = (ev: Event) => {
       const { index, x, id } = (ev as CustomEvent).detail
       const st = states.current[index]
-      drag.current = { index, startX: x, startS: st.s, moved: false }
+      drag.current = { index, startX: x, startS: st.s }
       st.dragging = true
       st.dragTo = st.s
       try { el.setPointerCapture(id) } catch { /* puntatore già rilasciato */ }
@@ -262,7 +261,6 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
       const d = drag.current
       if (!d) return
       const dx = e.clientX - d.startX
-      if (Math.abs(dx) > 5) d.moved = true
       states.current[d.index].dragTo = THREE.MathUtils.clamp(d.startS + dx * worldPerPx(), -3, 3)
     }
     const up = () => {
@@ -270,10 +268,6 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
       if (!d) return
       const st = states.current[d.index]
       st.dragging = false
-      if (!d.moved) {
-        st.flipped = !st.flipped
-        st.vlift += 1.2
-      }
       drag.current = null
       el.style.cursor = st.hovered ? 'grab' : ''
     }
@@ -312,12 +306,9 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
       const breeze = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.55 + i * 2) * 0.03
       st.vtilt += ((breeze - st.tilt) * 10 - st.vtilt * 2.4) * dt
       st.tilt += st.vtilt * dt
-      const yawTarget = (st.flipped ? Math.PI : 0) + (st.hovered || st.dragging || st.flipped ? 0 : HERO_JERSEYS[i].restYaw)
+      const yawTarget = st.hovered || st.dragging ? 0 : HERO_JERSEYS[i].restYaw
       st.vyaw += ((yawTarget - st.yaw) * 12 - st.vyaw * 5) * dt
       st.yaw += st.vyaw * dt
-      const liftTarget = st.flipped ? 0.1 : 0
-      st.vlift += ((liftTarget - st.lift) * 40 - st.vlift * 7) * dt
-      st.lift += st.vlift * dt
     })
     // le grucce si spingono lungo l'asta
     for (let i = 0; i < list.length - 1; i++) {
@@ -346,15 +337,15 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
 
 /**
  * Mobile e tablet: niente stender. Ogni maglia resta sospesa in un punto dell'hero,
- * allineata a un segnaposto nel testo; si ruota trascinando, un tocco mostra il retro.
+ * allineata a un segnaposto nel testo; si ruota trascinando e torna di fronte.
  */
 function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<HTMLElement | null>[] }) {
   const { gl } = useThree()
   const [layouts, setLayouts] = useState<(FloatLayout | null)[]>([])
   const states = useRef<HangerState[]>(
-    HERO_JERSEYS.map((j) => ({ s: 0, vs: 0, slot: 0, dragTo: 0, swing: 0, vswing: 0, tilt: 0, vtilt: 0, yaw: j.restYaw * 0.6, vyaw: 0, lift: 0, vlift: 0, hovered: false, flipped: false, dragging: false })),
+    HERO_JERSEYS.map((j) => ({ s: 0, vs: 0, slot: 0, dragTo: 0, swing: 0, vswing: 0, tilt: 0, vtilt: 0, yaw: j.restYaw * 0.6, vyaw: 0, hovered: false, dragging: false })),
   )
-  const drag = useRef<{ index: number; lastX: number; lastT: number; moved: boolean; total: number } | null>(null)
+  const drag = useRef<{ index: number; lastX: number; lastT: number } | null>(null)
 
   // Allinea ogni maglia al suo segnaposto
   useEffect(() => {
@@ -380,12 +371,12 @@ function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<
     return () => ro.disconnect()
   }, [gl, anchors, jerseys])
 
-  // Trascinamento orizzontale = rotazione con inerzia; tocco = retro
+  // Trascinamento orizzontale = rotazione con inerzia
   useEffect(() => {
     const el = gl.domElement
     const down = (ev: Event) => {
       const { index, x } = (ev as CustomEvent).detail
-      drag.current = { index, lastX: x, lastT: performance.now(), moved: false, total: 0 }
+      drag.current = { index, lastX: x, lastT: performance.now() }
       states.current[index].dragging = true
     }
     const move = (e: PointerEvent) => {
@@ -393,8 +384,6 @@ function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<
       if (!d) return
       const dx = e.clientX - d.lastX
       const now = performance.now()
-      d.total += Math.abs(dx)
-      if (d.total > 6) d.moved = true
       const st = states.current[d.index]
       st.yaw += dx * 0.013
       st.vyaw = (dx * 0.013) / Math.max(0.008, (now - d.lastT) / 1000)
@@ -406,10 +395,6 @@ function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<
       if (!d) return
       const st = states.current[d.index]
       st.dragging = false
-      if (!d.moved) {
-        st.flipped = !st.flipped
-        st.vlift += 1.2
-      }
       drag.current = null
     }
     window.addEventListener('nm:hanger-down', down)
@@ -428,8 +413,8 @@ function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<
     const dt = Math.min(delta, 1 / 30)
     states.current.forEach((st, i) => {
       if (!st.dragging) {
-        // torna alla posa più vicina (fronte o retro) dopo aver girato per inerzia
-        const base = HERO_JERSEYS[i].restYaw * 0.6 + (st.flipped ? Math.PI : 0)
+        // dopo aver girato per inerzia torna di fronte (il giro completo più vicino)
+        const base = HERO_JERSEYS[i].restYaw * 0.6
         const target = base + Math.PI * 2 * Math.round((st.yaw - base) / (Math.PI * 2))
         st.vyaw += ((target - st.yaw) * 5 - st.vyaw * 2.6) * dt
         st.yaw += st.vyaw * dt
@@ -440,8 +425,6 @@ function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<
       const tiltTarget = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.5 + i) * 0.04
       st.vtilt += ((tiltTarget - st.tilt) * 8 - st.vtilt * 2.2) * dt
       st.tilt += st.vtilt * dt
-      st.vlift += (((st.flipped ? 0.08 : 0) - st.lift) * 40 - st.vlift * 7) * dt
-      st.lift += st.vlift * dt
     })
   })
 
@@ -512,7 +495,7 @@ export default function HeroRail({ className, onReady, anchors }: {
           })
         }}
         className="touch-pan-y"
-        aria-label={anchors ? 'Due maglie da gara personalizzate in 3D: trascina per ruotarle, tocca per vedere il retro' : 'Due maglie da gara personalizzate appese a uno stender: trascina per spostarle, clic per vedere il retro'}
+        aria-label={anchors ? 'Due maglie da gara personalizzate in 3D: trascina per ruotarle' : 'Due maglie da gara personalizzate appese a uno stender: trascina per spostarle'}
         role="img"
       >
         <Studio />
