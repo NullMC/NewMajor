@@ -49,6 +49,7 @@ const AdminContent = lazy(() => import('@/features/admin/content/HomeContentPage
 const AdminPages = lazy(() => import('@/features/admin/content/PagesPage'))
 const AdminPageEdit = lazy(() => import('@/features/admin/content/PageEditPage'))
 const AdminFaqs = lazy(() => import('@/features/admin/content/FaqsPage'))
+const AdminPortfolio = lazy(() => import('@/features/admin/content/PortfolioPage'))
 const AdminMedia = lazy(() => import('@/features/admin/content/MediaPage'))
 const AdminUsers = lazy(() => import('@/features/admin/users/UsersPage'))
 const AdminUserDetail = lazy(() => import('@/features/admin/users/UserDetailPage'))
@@ -127,6 +128,7 @@ const router = createBrowserRouter([
           { path: 'pagine', element: <AdminPages /> },
           { path: 'pagine/:id', element: <AdminPageEdit /> },
           { path: 'faq', element: <AdminFaqs /> },
+          { path: 'portfolio', element: <AdminPortfolio /> },
           { path: 'media', element: <AdminMedia /> },
           { path: 'utenti', element: <AdminUsers /> },
           { path: 'utenti/:id', element: <AdminUserDetail /> },

@@ -360,6 +360,23 @@ export interface Faq {
   is_active: boolean
 }
 
+export type PortfolioPlatform = 'instagram' | 'facebook' | 'tiktok' | 'altro'
+
+export interface PortfolioPost {
+  id: string
+  team_name: string
+  title: string | null
+  caption: string | null
+  image_path: string
+  image_alt: string | null
+  post_url: string | null
+  platform: PortfolioPlatform | null
+  posted_on: string | null
+  is_published: boolean
+  sort_order: number
+  created_at: string
+}
+
 export interface AdminReminder {
   id: string
   order_id: string | null

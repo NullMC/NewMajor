@@ -205,7 +205,7 @@ export default function HomeContentPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {([['quality', 'Sezione qualità grafiche'], ['catalog_cta', 'Box catalogo'], ['contact_cta', 'Box contatti']] as const).map(([k, label]) => (
+        {([['portfolio', 'Sezione portfolio'], ['catalog_cta', 'Box catalogo'], ['contact_cta', 'Box contatti']] as const).map(([k, label]) => (
           <Card key={k}>
             <CardHeader title={label} />
             <div className="space-y-4 p-5">

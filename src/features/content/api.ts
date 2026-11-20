@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Faq, Page } from '@/types/db'
+import type { Faq, Page, PortfolioPlatform, PortfolioPost } from '@/types/db'
 
 export interface HeroContent {
   title: string
@@ -12,7 +12,7 @@ export interface HeroContent {
 export interface HomeSections {
   personalization?: { title: string; text: string; points: string[] }
   process?: { title: string; steps: { title: string; text: string }[] }
-  quality?: { title: string; text: string }
+  portfolio?: { title: string; text: string }
   catalog_cta?: { title: string; text: string }
   contact_cta?: { title: string; text: string }
 }
@@ -53,6 +53,14 @@ export async function listFaqs(): Promise<Faq[]> {
   const { data, error } = await supabase.from('faqs').select('*').eq('is_active', true).order('sort_order')
   if (error) throw error
   return data as Faq[]
+}
+
+export const PLATFORM_LABEL: Record<PortfolioPlatform, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', altro: 'Altro' }
+
+export async function listPortfolio(): Promise<PortfolioPost[]> {
+  const { data, error } = await supabase.from('portfolio_posts').select('*').eq('is_published', true).order('sort_order').order('created_at', { ascending: false })
+  if (error) throw error
+  return data as PortfolioPost[]
 }
 
 export async function sendContactRequest(input: {

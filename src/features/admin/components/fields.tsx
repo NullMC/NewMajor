@@ -10,7 +10,7 @@ import { Dropzone } from '@/components/ui/Dropzone'
 import { Spinner } from '@/components/ui/Spinner'
 import { useUi } from '@/components/ui/Toast'
 
-export type FieldType = 'text' | 'textarea' | 'markdown' | 'number' | 'boolean' | 'select' | 'color' | 'slug' | 'image' | 'tags'
+export type FieldType = 'text' | 'textarea' | 'markdown' | 'number' | 'boolean' | 'select' | 'color' | 'slug' | 'image' | 'tags' | 'date' | 'url'
 
 export interface FieldDef {
   key: string
@@ -153,6 +153,10 @@ export function FieldInput({ def, values, onChange, id, ...aria }: {
           )}
         </div>
       )
+    case 'date':
+      return <Input {...a} type="date" value={(v as string) ?? ''} onChange={(e) => set(e.target.value || null)} className="font-mono" />
+    case 'url':
+      return <Input {...a} type="url" inputMode="url" value={(v as string) ?? ''} onChange={(e) => set(e.target.value.trim() || null)} placeholder="https://" />
     case 'image':
       return <ImageInput value={(v as string) ?? null} onChange={set} folder={def.folder} />
     case 'tags':
@@ -186,6 +190,7 @@ export function validateFields(fields: FieldDef[], values: Values): string | nul
     const v = values[f.key]
     if (f.required && (v === null || v === undefined || v === '')) return `Il campo "${f.label}" è obbligatorio.`
     if (f.type === 'slug' && v && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v))) return `Slug non valido in "${f.label}".`
+    if (f.type === 'url' && v && !/^https:\/\/\S+$/.test(String(v))) return `Il link in "${f.label}" deve iniziare con https://`
     if (f.type === 'color' && v && !/^#[0-9A-Fa-f]{6}$/.test(String(v))) return `Colore non valido in "${f.label}" (usa #RRGGBB).`
   }
   return null

@@ -8,18 +8,19 @@ import { listCategories, listFeatured } from '@/features/catalog/api'
 import { ProductCard, ProductCardSkeleton } from '@/features/catalog/ProductCard'
 import { Reveal, AccentTitle } from '@/components/fx/Reveal'
 import { Grain } from '@/components/fx/ShaderBackdrop'
-import { getSiteContents, type HeroContent, type HomeSections } from './api'
+import { getSiteContents, listPortfolio, type HeroContent, type HomeSections } from './api'
 import { Hero } from './hero/Hero'
 import { CurvedCarousel } from './home/CurvedCarousel'
 import { KineticWall } from './home/KineticWall'
 import { ProcessStory } from './home/ProcessStory'
-import { QualityLab } from './home/QualityLab'
+import { PortfolioShowcase } from './home/PortfolioShowcase'
 
 export default function HomePage() {
   const { settings } = useSettings()
   const { data: content } = useQuery('content:home', () => getSiteContents(['home.hero', 'home.sections', 'home.featured']), { staleMs: 5 * 60_000 })
   const { data: featured, loading: featuredLoading } = useQuery('catalog:featured', listFeatured)
   const { data: categories } = useQuery('catalog:categories', listCategories, { staleMs: 5 * 60_000 })
+  const { data: portfolio } = useQuery('portfolio:home', listPortfolio, { staleMs: 5 * 60_000 })
 
   const hero = (content?.['home.hero'] ?? null) as HeroContent | null
   const sections = (content?.['home.sections'] ?? {}) as HomeSections
@@ -82,9 +83,9 @@ export default function HomePage() {
         <ProcessStory title={sections.process.title} steps={sections.process.steps} />
       )}
 
-      {/* Qualità grafiche */}
-      {sections.quality && (
-        <QualityLab title={sections.quality.title} text={sections.quality.text} quality={settings.quality} />
+      {/* Portfolio dei progetti realizzati (post caricati dal backoffice) */}
+      {sections.portfolio?.title && portfolio && portfolio.length > 0 && (
+        <PortfolioShowcase title={sections.portfolio.title} text={sections.portfolio.text} posts={portfolio} />
       )}
 
       {/* CTA finali */}

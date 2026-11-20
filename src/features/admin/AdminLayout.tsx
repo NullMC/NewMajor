@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  Bell, ClipboardList, ExternalLink, FileText, FolderTree, Gauge, HelpCircle, Image, Images, Inbox, LayoutTemplate,
+  Bell, ClipboardList, ExternalLink, FileText, FolderTree, GalleryHorizontalEnd, Gauge, HelpCircle, Image, Images, Inbox, LayoutTemplate,
   ListChecks, LogOut, Menu, Package, Settings, Shirt, ShoppingCart, Users, UserCog, Workflow, } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { supabase } from '@/lib/supabase'
@@ -34,6 +34,7 @@ const GROUPS = [
     items: [
       { to: '/admin/contenuti', label: 'Home e banner', icon: LayoutTemplate },
       { to: '/admin/pagine', label: 'Pagine', icon: FileText },
+      { to: '/admin/portfolio', label: 'Portfolio', icon: GalleryHorizontalEnd },
       { to: '/admin/faq', label: 'FAQ', icon: HelpCircle },
       { to: '/admin/media', label: 'Media', icon: Image },
     ],
