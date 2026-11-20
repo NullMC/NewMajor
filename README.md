@@ -91,7 +91,7 @@ Dashboard → Authentication:
 - **URL Configuration** → *Site URL*: l’URL del sito; *Redirect URLs*: aggiungi `https://TUO-DOMINIO/accedi`, `https://TUO-DOMINIO/reimposta-password` e, in sviluppo, `http://localhost:5173/**`.
 - **Providers → Email**: abilitato, con **“Confirm email” disattivato**. È obbligatorio: la registrazione non richiede l’email, quindi chi si registra solo con il nome utente non potrebbe confermarla e non riuscirebbe ad accedere.
 - **Come funziona l’accesso**: chi si registra senza email riceve in Supabase Auth un indirizzo tecnico `nomeutente@utenti.newmajor.invalid` (dominio riservato `.invalid`: nessuna email può esservi recapitata) e accede con il nome utente. Chi indica l’email accede con l’email e può recuperare la password da solo. Email e telefono vengono comunque richiesti al primo ordine e salvati nel profilo.
-- L’email di recupero password è inviata dal servizio Auth nativo di Supabase. Per la produzione è consigliato configurare un SMTP proprio (Authentication → Emails → SMTP) per evitare i limiti del mittente predefinito.
+- **Email di Supabase Auth (recupero password)**: il mittente predefinito di Supabase recapita solo agli indirizzi dei membri del team del progetto. Per far arrivare il link di recupero password ai clienti va configurato un SMTP proprio (Authentication → Emails → SMTP Settings); senza, il recupero va fatto dall’amministratore (vedi sotto). Per la produzione è consigliato configurare un SMTP proprio (Authentication → Emails → SMTP) per evitare i limiti del mittente predefinito.
 
 ### 2.3 Primo account amministratore
 

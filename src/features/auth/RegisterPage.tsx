@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { MailCheck } from 'lucide-react'
 import { useMeta } from '@/hooks/useMeta'
+import { useQuery } from '@/hooks/useQuery'
+import { fetchAuthSettings } from '@/lib/supabase'
 import { errorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, FormError, Input } from '@/components/ui/Form'
@@ -20,6 +22,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [confirmEmail, setConfirmEmail] = useState(false)
   useMeta({ title: 'Registrati', noindex: true })
+  // Con "Confirm email" attivo in Supabase la registrazione senza email non può funzionare
+  const { data: authSettings } = useQuery('auth:settings', fetchAuthSettings, { staleMs: 300_000 })
+  const emailRequired = authSettings?.mailer_autoconfirm === false
 
   useEffect(() => {
     if (!authLoading && user) navigate(from, { replace: true })
@@ -32,7 +37,8 @@ export default function RegisterPage() {
     setError(null)
     if (form.fullName.trim().length < 2) return setError('Inserisci nome e cognome.')
     if (!USERNAME_RE.test(normalizeUsername(form.username))) return setError(`Nome utente non valido. ${USERNAME_HINT}`)
-    if (form.email.trim() && !isEmail(form.email)) return setError('L’indirizzo email non è valido. Puoi anche lasciarlo vuoto.')
+    if (emailRequired && !form.email.trim()) return setError('Inserisci un indirizzo email.')
+    if (form.email.trim() && !isEmail(form.email)) return setError(emailRequired ? 'Inserisci un indirizzo email valido.' : 'L’indirizzo email non è valido. Puoi anche lasciarlo vuoto.')
     if (form.password.length < 8) return setError('La password deve contenere almeno 8 caratteri.')
     if (form.password !== form.confirm) return setError('Le password non coincidono.')
     if (!terms) return setError('Accetta i termini e prendi visione dell’informativa privacy.')
@@ -72,7 +78,13 @@ export default function RegisterPage() {
         <Field label="Nome utente" required hint={USERNAME_HINT}>
           <Input autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={30} value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))} />
         </Field>
-        <Field label="Email" hint="Facoltativa. Con l’email puoi accedere anche con quella e recuperare la password in autonomia. Sarà comunque richiesta al primo ordine."><Input type="email" autoComplete="email" value={form.email} onChange={set('email')} /></Field>
+        <Field
+          label="Email"
+          required={emailRequired}
+          hint={emailRequired
+            ? 'Riceverai un link per confermare l’account.'
+            : 'Facoltativa. Con l’email puoi accedere anche con quella e recuperare la password in autonomia. Sarà comunque richiesta al primo ordine.'}
+        ><Input type="email" autoComplete="email" value={form.email} onChange={set('email')} /></Field>
         <Field label="Telefono" hint="Facoltativo. Sarà richiesto al primo ordine."><Input type="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} maxLength={40} /></Field>
         <Field label="Password" required hint="Almeno 8 caratteri"><Input type="password" autoComplete="new-password" value={form.password} onChange={set('password')} /></Field>
         <Field label="Conferma password" required><Input type="password" autoComplete="new-password" value={form.confirm} onChange={set('confirm')} /></Field>

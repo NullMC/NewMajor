@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Inbox, Landmark, ListChecks, Package, ShoppingCart, Users } from 'lucide-react'
 import type { AdminReminder, Order } from '@/types/db'
-import { supabase } from '@/lib/supabase'
+import { fetchAuthSettings, supabase } from '@/lib/supabase'
 import { formatDate, formatDateTime, formatPrice } from '@/lib/format'
 import { useQuery } from '@/hooks/useQuery'
 import { useMeta } from '@/hooks/useMeta'
@@ -72,11 +72,18 @@ export default function DashboardPage() {
     return data as AdminReminder[]
   })
 
+  const { data: authSettings } = useQuery('auth:settings', fetchAuthSettings, { staleMs: 300_000 })
+
   const maxStatus = Math.max(1, ...(stats?.orders_by_status ?? []).map((s) => s.count))
 
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" description="Panoramica di ordini, clienti e attività da svolgere." />
+      {authSettings?.mailer_autoconfirm === false && (
+        <p role="alert" className="rounded-xl bg-warning-50 p-4 text-sm text-warning-700">
+          In Supabase è attiva la conferma email (Authentication → Sign In / Providers → Email → <strong>Confirm email</strong>): finché resta attiva i clienti devono indicare l’email per registrarsi. Disattivala per consentire la registrazione con il solo nome utente.
+        </p>
+      )}
       {loading && !stats ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-24" />)}</div>
       ) : stats && (
