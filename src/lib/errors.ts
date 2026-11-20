@@ -54,6 +54,7 @@ export function errorMessage(err: unknown): string {
   if (/maximum allowed size|Payload too large/i.test(raw)) return 'Il file è troppo grande per essere caricato.'
   if (/mime type .* is not supported|invalid_mime_type/i.test(raw)) return 'Formato file non supportato.'
   if (/Email address not authorized|error sending (confirmation|recovery) email/i.test(raw)) return 'Non è stato possibile inviare l’email. Contattaci per assistenza.'
+  if (/Email (signups|logins) are disabled|email_provider_disabled/i.test(raw)) return 'Registrazione e accesso sono momentaneamente non disponibili. Contattaci per assistenza.'
   if (/rate limit/i.test(raw)) return 'Troppi tentativi in poco tempo. Riprova tra qualche minuto.'
   if (/Database error saving new user/i.test(raw)) return 'Registrazione non riuscita: il nome utente potrebbe essere già in uso. Riprova con un altro.'
   const [code, a, b] = raw.split(':')
