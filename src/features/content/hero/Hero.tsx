@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/cn'
@@ -25,9 +25,9 @@ function RailStill() {
 function HeroCta({ href, label, primary }: { href?: string; label?: string; primary?: boolean }) {
   if (!href || !label) return null
   const internal = href.startsWith('/')
-  const cls = 'group inline-flex h-14 items-center gap-3 rounded-full pl-7 pr-2 text-[15px] font-semibold transition-transform active:scale-[.98]'
+  const cls = 'group inline-flex h-12 items-center gap-2.5 whitespace-nowrap rounded-full pl-4 pr-1.5 text-sm font-semibold transition-transform active:scale-[.98] sm:h-14 sm:gap-3 sm:pl-7 sm:pr-2 sm:text-[15px]'
   const icon = (
-    <span className={cn('flex h-10 w-10 items-center justify-center rounded-full transition-transform group-hover:translate-x-0.5', primary ? 'bg-ink-950 text-gold-400' : 'bg-white/15')}>
+    <span className={cn('flex h-9 w-9 items-center sm:h-10 sm:w-10 justify-center rounded-full transition-transform group-hover:translate-x-0.5', primary ? 'bg-ink-950 text-gold-400' : 'bg-white/15')}>
       <ArrowRight className="h-4 w-4" aria-hidden />
     </span>
   )
@@ -41,11 +41,32 @@ function HeroCta({ href, label, primary }: { href?: string; label?: string; prim
     : <LiquidGlass as="a" href={href} className={cls}>{label}{icon}</LiquidGlass>
 }
 
+function useWide() {
+  const query = '(min-width: 1024px)'
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const on = () => setWide(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return wide
+}
+
 export function Hero({ hero }: { hero: HeroContent | null }) {
   const image = publicUrl(hero?.image_path)
   const [webgl] = useState(supportsWebGL)
   const [ready, setReady] = useState(false)
+  const wide = useWide()
+  const anchorA = useRef<HTMLDivElement>(null)
+  const anchorB = useRef<HTMLDivElement>(null)
+  const anchors = useMemo(() => [anchorA, anchorB], [])
   const title = hero?.title ?? 'Divise e kit da gara personalizzati'
+  // Su mobile e tablet le maglie fluttuano tra i contenuti (niente stender)
+  const floating = !wide && !image
+  const sceneClass = cn('absolute inset-0 transition-[opacity,filter] duration-[1400ms] ease-[cubic-bezier(.2,.75,.15,1)]', ready ? 'opacity-100 blur-0' : 'opacity-0 blur-md')
+
+  const still = (src: string) => !webgl && <img src={src} alt="" className="h-full w-full object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,0.5)]" />
 
   return (
     <section
@@ -57,24 +78,31 @@ export function Hero({ hero }: { hero: HeroContent | null }) {
       {/* Velo per la leggibilità del testo sul lato sinistro */}
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_12%_62%,rgba(8,8,10,.8),transparent_58%)]" />
 
-      {/* Scena: metà destra da desktop, sotto il testo su mobile */}
-      <div className="relative order-2 h-[min(122vw,36rem)] lg:absolute lg:inset-y-0 lg:left-[44%] lg:right-0 lg:h-auto lg:pt-16">
-        {image ? (
-          <img src={image} alt="" className="absolute inset-0 h-full w-full animate-scene-in object-cover" fetchPriority="high" />
-        ) : webgl ? (
-          <Suspense fallback={null}>
-            <HeroRail
-              onReady={() => setReady(true)}
-              className={cn('absolute inset-0 transition-[opacity,transform,filter] duration-[1400ms] ease-[cubic-bezier(.2,.75,.15,1)]', ready ? 'opacity-100 blur-0' : '-translate-y-6 opacity-0 blur-md')}
-            />
-          </Suspense>
-        ) : (
-          <RailStill />
-        )}
-      </div>
+      {/* Scena 3D: da desktop metà destra con lo stender, su mobile dietro ai contenuti */}
+      {floating ? (
+        webgl && (
+          <div className="absolute inset-0">
+            <Suspense fallback={null}>
+              <HeroRail anchors={anchors} onReady={() => setReady(true)} className={sceneClass} />
+            </Suspense>
+          </div>
+        )
+      ) : (
+        <div className="relative order-2 h-[min(100vw,30rem)] lg:absolute lg:inset-y-0 lg:left-[44%] lg:right-0 lg:h-auto lg:pt-16">
+          {image ? (
+            <img src={image} alt="" className="absolute inset-0 h-full w-full animate-scene-in object-cover" fetchPriority="high" />
+          ) : webgl ? (
+            <Suspense fallback={null}>
+              <HeroRail onReady={() => setReady(true)} className={sceneClass} />
+            </Suspense>
+          ) : (
+            <RailStill />
+          )}
+        </div>
+      )}
 
-      <div className="container pointer-events-none relative order-1 flex items-center pb-2 pt-28 lg:min-h-[min(100svh,60rem)] lg:pb-24 lg:pt-28">
-        <div className="pointer-events-auto relative z-10 max-w-xl lg:max-w-[min(46%,36rem)]">
+      <div className="container pointer-events-none relative z-10 order-1 flex items-center pb-10 pt-28 sm:pb-14 lg:min-h-[min(100svh,60rem)] lg:pb-24">
+        <div className="relative w-full max-w-2xl lg:max-w-[min(46%,36rem)]">
           <h1
             lang="it"
             className="display-xl text-[clamp(2rem,10vw,4rem)] text-white [overflow-wrap:break-word] lg:text-[clamp(3rem,5vw,5.4rem)]"
@@ -82,12 +110,22 @@ export function Hero({ hero }: { hero: HeroContent | null }) {
           >
             <AccentTitle text={title} animate accentClassName="text-gold-400" />
           </h1>
-          {hero?.subtitle && (
-            <p className="mt-7 max-w-lg animate-slide-up text-lg leading-8 text-ink-300 [animation-delay:.45s]">{hero.subtitle}</p>
-          )}
-          <div className="mt-10 flex animate-slide-up flex-wrap gap-3 [animation-delay:.6s]">
-            <HeroCta primary href={hero?.cta_primary?.href ?? '/catalogo'} label={hero?.cta_primary?.label ?? 'Personalizza ora'} />
-            <HeroCta href={hero?.cta_secondary?.href} label={hero?.cta_secondary?.label} />
+
+          {/* Sottotitolo e prima maglia affiancati (solo mobile/tablet) */}
+          <div className={cn('mt-6 sm:mt-8', floating && 'grid grid-cols-[minmax(0,1fr)_42%] items-center gap-3 sm:gap-6')}>
+            {hero?.subtitle ? (
+              <p className="max-w-lg animate-slide-up text-base leading-7 text-ink-300 [animation-delay:.45s] sm:text-lg sm:leading-8">{hero.subtitle}</p>
+            ) : <span />}
+            {floating && <div ref={anchorA} aria-hidden className="pointer-events-none aspect-[7/8]">{still('/hero/splash-front.webp')}</div>}
+          </div>
+
+          {/* Seconda maglia e pulsanti */}
+          <div className={cn('mt-6 sm:mt-10', floating && 'grid grid-cols-[40%_minmax(0,1fr)] items-center gap-3 sm:gap-6')}>
+            {floating && <div ref={anchorB} aria-hidden className="pointer-events-none aspect-[7/8]">{still('/hero/lupo-front.webp')}</div>}
+            <div className={cn('pointer-events-auto flex animate-slide-up gap-3 [animation-delay:.6s]', floating ? 'flex-col items-start' : 'flex-wrap')}>
+              <HeroCta primary href={hero?.cta_primary?.href ?? '/catalogo'} label={hero?.cta_primary?.label ?? 'Personalizza ora'} />
+              <HeroCta href={hero?.cta_secondary?.href} label={hero?.cta_secondary?.label} />
+            </div>
           </div>
         </div>
       </div>

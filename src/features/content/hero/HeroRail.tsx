@@ -10,7 +10,7 @@
 // · Il bagliore che segue il puntatore è disegnato solo sul tessuto.
 // Caricata in lazy: three.js non entra nel bundle iniziale.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
@@ -156,7 +156,10 @@ function Hanger({ volume }: { volume: JerseyVolume }) {
   )
 }
 
-function Jersey({ data, state, index }: { data: Loaded; state: HangerState; index: number }) {
+/** Posizione libera (mobile): centro della maglia e scala, in coordinate del mondo. */
+interface FloatLayout { x: number; y: number; scale: number }
+
+function Jersey({ data, state, index, layout, hanger = true }: { data: Loaded; state: HangerState; index: number; layout?: FloatLayout | null; hanger?: boolean }) {
   const motion = useMemo<Motion>(() => ({
     glowPos: { value: new THREE.Vector2(0, -99) }, glow: { value: 0 }, sway: { value: new THREE.Vector2() }, time: { value: 0 },
   }), [])
@@ -173,7 +176,12 @@ function Jersey({ data, state, index }: { data: Loaded; state: HangerState; inde
   useFrame(({ clock }, delta) => {
     const g = ref.current
     if (!g) return
-    g.position.set(state.s, RAIL_Y + state.lift, 0)
+    if (layout) {
+      // sospesa a mezz'aria: leggero galleggiamento attorno al punto assegnato
+      const bob = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.9 + index * 2.1) * 0.035
+      g.position.set(layout.x, layout.y + (state.lift + bob) * layout.scale, 0)
+      g.scale.setScalar(layout.scale)
+    } else g.position.set(state.s, RAIL_Y + state.lift, 0)
     euler.set(state.tilt, state.yaw, state.swing)
     g.quaternion.setFromEuler(euler)
     const p = pointer.current
@@ -202,7 +210,7 @@ function Jersey({ data, state, index }: { data: Loaded; state: HangerState; inde
 
   return (
     <group ref={ref}>
-      <Hanger volume={volume} />
+      {hanger && <Hanger volume={volume} />}
       <mesh geometry={volume.front} material={front} />
       <mesh geometry={volume.back} material={back} />
       <mesh
@@ -336,6 +344,116 @@ function Rig({ jerseys }: { jerseys: Loaded[] }) {
   )
 }
 
+/**
+ * Mobile e tablet: niente stender. Ogni maglia resta sospesa in un punto dell'hero,
+ * allineata a un segnaposto nel testo; si ruota trascinando, un tocco mostra il retro.
+ */
+function Floaters({ jerseys, anchors }: { jerseys: Loaded[]; anchors: RefObject<HTMLElement | null>[] }) {
+  const { gl } = useThree()
+  const [layouts, setLayouts] = useState<(FloatLayout | null)[]>([])
+  const states = useRef<HangerState[]>(
+    HERO_JERSEYS.map((j) => ({ s: 0, vs: 0, slot: 0, dragTo: 0, swing: 0, vswing: 0, tilt: 0, vtilt: 0, yaw: j.restYaw * 0.6, vyaw: 0, lift: 0, vlift: 0, hovered: false, flipped: false, dragging: false })),
+  )
+  const drag = useRef<{ index: number; lastX: number; lastT: number; moved: boolean; total: number } | null>(null)
+
+  // Allinea ogni maglia al suo segnaposto
+  useEffect(() => {
+    const visibleH = 2 * CAM.z * Math.tan((CAM.fov / 2) * (Math.PI / 180))
+    const measure = () => {
+      const c = gl.domElement.getBoundingClientRect()
+      if (!c.width || !c.height) return
+      const visibleW = visibleH * (c.width / c.height)
+      setLayouts(anchors.map((ref, i) => {
+        const r = ref.current?.getBoundingClientRect()
+        if (!r || !r.width || !r.height) return null
+        const { width: w, height: h } = jerseys[i].volume
+        const scale = Math.min(((r.height / c.height) * visibleH) / h, ((r.width / c.width) * visibleW) / w)
+        const cx = (r.left + r.width / 2 - c.left) / c.width
+        const cy = (r.top + r.height / 2 - c.top) / c.height
+        return { x: (cx - 0.5) * visibleW, y: (0.5 - cy) * visibleH + CAM.y + (-NECK_Y + h / 2) * scale, scale }
+      }))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(gl.domElement)
+    anchors.forEach((a) => a.current && ro.observe(a.current))
+    return () => ro.disconnect()
+  }, [gl, anchors, jerseys])
+
+  // Trascinamento orizzontale = rotazione con inerzia; tocco = retro
+  useEffect(() => {
+    const el = gl.domElement
+    const down = (ev: Event) => {
+      const { index, x } = (ev as CustomEvent).detail
+      drag.current = { index, lastX: x, lastT: performance.now(), moved: false, total: 0 }
+      states.current[index].dragging = true
+    }
+    const move = (e: PointerEvent) => {
+      const d = drag.current
+      if (!d) return
+      const dx = e.clientX - d.lastX
+      const now = performance.now()
+      d.total += Math.abs(dx)
+      if (d.total > 6) d.moved = true
+      const st = states.current[d.index]
+      st.yaw += dx * 0.013
+      st.vyaw = (dx * 0.013) / Math.max(0.008, (now - d.lastT) / 1000)
+      d.lastX = e.clientX
+      d.lastT = now
+    }
+    const up = () => {
+      const d = drag.current
+      if (!d) return
+      const st = states.current[d.index]
+      st.dragging = false
+      if (!d.moved) {
+        st.flipped = !st.flipped
+        st.vlift += 1.2
+      }
+      drag.current = null
+    }
+    window.addEventListener('nm:hanger-down', down)
+    el.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('nm:hanger-down', down)
+      el.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [gl])
+
+  useFrame(({ clock }, delta) => {
+    const dt = Math.min(delta, 1 / 30)
+    states.current.forEach((st, i) => {
+      if (!st.dragging) {
+        // torna alla posa più vicina (fronte o retro) dopo aver girato per inerzia
+        const base = HERO_JERSEYS[i].restYaw * 0.6 + (st.flipped ? Math.PI : 0)
+        const target = base + Math.PI * 2 * Math.round((st.yaw - base) / (Math.PI * 2))
+        st.vyaw += ((target - st.yaw) * 5 - st.vyaw * 2.6) * dt
+        st.yaw += st.vyaw * dt
+      }
+      const breeze = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.7 + i * 1.7) * 0.05
+      st.vswing += ((breeze - st.swing) * 8 - st.vswing * 2) * dt
+      st.swing += st.vswing * dt
+      const tiltTarget = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.5 + i) * 0.04
+      st.vtilt += ((tiltTarget - st.tilt) * 8 - st.vtilt * 2.2) * dt
+      st.tilt += st.vtilt * dt
+      st.vlift += (((st.flipped ? 0.08 : 0) - st.lift) * 40 - st.vlift * 7) * dt
+      st.lift += st.vlift * dt
+    })
+  })
+
+  return (
+    <>
+      {jerseys.map((j, i) => layouts[i] && (
+        <Jersey key={HERO_JERSEYS[i].id} data={j} state={states.current[i]} index={i} layout={layouts[i]} hanger={false} />
+      ))}
+    </>
+  )
+}
+
 function Studio() {
   const { gl, scene } = useThree()
   useEffect(() => {
@@ -359,7 +477,12 @@ function Studio() {
   )
 }
 
-export default function HeroRail({ className, onReady }: { className?: string; onReady?: () => void }) {
+export default function HeroRail({ className, onReady, anchors }: {
+  className?: string
+  onReady?: () => void
+  /** Su mobile: segnaposto nel testo dove far fluttuare le maglie (niente stender). */
+  anchors?: RefObject<HTMLElement | null>[]
+}) {
   const [jerseys, setJerseys] = useState<Loaded[] | null>(null)
   const [active, setActive] = useState(true)
   const wrap = useRef<HTMLDivElement>(null)
@@ -389,11 +512,11 @@ export default function HeroRail({ className, onReady }: { className?: string; o
           })
         }}
         className="touch-pan-y"
-        aria-label="Due maglie da gara personalizzate appese a uno stender: trascina per spostarle, clic per vedere il retro"
+        aria-label={anchors ? 'Due maglie da gara personalizzate in 3D: trascina per ruotarle, tocca per vedere il retro' : 'Due maglie da gara personalizzate appese a uno stender: trascina per spostarle, clic per vedere il retro'}
         role="img"
       >
         <Studio />
-        {jerseys && <Rig jerseys={jerseys} />}
+        {jerseys && (anchors ? <Floaters jerseys={jerseys} anchors={anchors} /> : <Rig jerseys={jerseys} />)}
       </Canvas>
     </div>
   )
