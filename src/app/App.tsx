@@ -51,6 +51,7 @@ const AdminPageEdit = lazy(() => import('@/features/admin/content/PageEditPage')
 const AdminFaqs = lazy(() => import('@/features/admin/content/FaqsPage'))
 const AdminPortfolio = lazy(() => import('@/features/admin/content/PortfolioPage'))
 const AdminMedia = lazy(() => import('@/features/admin/content/MediaPage'))
+const AdminNotFound = lazy(() => import('@/features/admin/AdminNotFoundPage'))
 const AdminUsers = lazy(() => import('@/features/admin/users/UsersPage'))
 const AdminUserDetail = lazy(() => import('@/features/admin/users/UserDetailPage'))
 const AdminNotifications = lazy(() => import('@/features/admin/comms/NotificationsPage'))
@@ -139,6 +140,7 @@ const router = createBrowserRouter([
           { path: 'impostazioni', element: <AdminSettings /> },
           { path: 'registro', element: <AdminAudit /> },
           { path: 'account', element: <AdminAccount /> },
+          { path: '*', element: <AdminNotFound /> },
         ],
       },
     ],

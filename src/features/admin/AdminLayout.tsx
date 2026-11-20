@@ -33,7 +33,6 @@ const GROUPS = [
     label: 'Contenuti',
     items: [
       { to: '/admin/contenuti', label: 'Home e banner', icon: LayoutTemplate },
-      { to: '/admin/pagine', label: 'Pagine', icon: FileText },
       { to: '/admin/portfolio', label: 'Portfolio', icon: GalleryHorizontalEnd },
       { to: '/admin/faq', label: 'FAQ', icon: HelpCircle },
       { to: '/admin/media', label: 'Media', icon: Image },
@@ -50,6 +49,7 @@ const GROUPS = [
     label: 'Sistema',
     items: [
       { to: '/admin/stati', label: 'Stati ordine', icon: Workflow },
+      { to: '/admin/pagine', label: 'Pagine', icon: FileText },
       { to: '/admin/impostazioni', label: 'Impostazioni', icon: Settings },
       { to: '/admin/registro', label: 'Registro attività', icon: ClipboardList },
     ],
