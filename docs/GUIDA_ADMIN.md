@@ -9,7 +9,7 @@ Gli amministratori non usano l’area cliente: accedendo dal sito, dall’icona 
 1. **Impostazioni → Dati aziendali**: verifica i dati (sede, P. IVA, REA, telefoni). Controlla l’email precompilata.
 2. **Impostazioni → Bonifico bancario**: inserisci intestatario e IBAN (mostrati al cliente dopo l’ordine con bonifico).
 3. **Impostazioni → Spedizione**: “da definire alla conferma” oppure costo fisso (con soglia di gratuità).
-4. **Pagine**: rivedi “Chi siamo” e le pagine legali (bozze da far verificare a un consulente).
+4. **Sistema → Pagine**: rivedi “Chi siamo” e le pagine legali (bozze da far verificare a un consulente).
 5. **Categorie** e **Tipologie capo**: crea la struttura del catalogo.
 6. **Prodotti → Nuovo prodotto**: crea il primo prodotto (vedi sotto) e pubblicalo.
 7. **Home e banner**: testi della home, immagine hero facoltativa, prodotti in evidenza.
@@ -17,7 +17,7 @@ Gli amministratori non usano l’area cliente: accedendo dal sito, dall’icona 
 ## Creare un prodotto personalizzabile
 
 1. **Generale**: nome, slug, categoria, tipo (capo singolo o kit), prezzo base, quantità minima, disponibilità, **modello 3D**, taglie, descrizioni, SEO. Salva.
-2. **Immagini**: trascina le foto; la prima è la principale (stella per cambiarla), frecce per l’ordine, testo alternativo per accessibilità/SEO. *Sostituisci* elimina automaticamente il file precedente.
+2. **Immagini**: trascina le foto; la prima è la principale (stella per cambiarla), frecce per l’ordine, testo alternativo per accessibilità/SEO. *Sostituisci* elimina automaticamente il file precedente. Le stesse foto si gestiscono anche da **Contenuti → Media**. Nel catalogo la principale fa da copertina e, passando il mouse sulla scheda, si sfogliano le prime 5; nella pagina prodotto si cambiano con frecce e miniature e si ingrandiscono tenendo premuto.
 3. **Tipologie, colori, opzioni**: spunta le tipologie disponibili (sovrapprezzo specifico facoltativo), aggiungi i colori (principale + profili) e le opzioni con i relativi valori e sovrapprezzi.
 4. **Aree personalizzazione**: aggiungi le aree (logo cuore, sponsor, all-over, nome retro, numero…). Indica sempre la **dimensione di stampa in cm**: serve a calcolare i DPI effettivi delle grafiche dei clienti. Posiziona le aree trascinandole nell’anteprima.
 5. **Componenti kit** (solo kit): maglia, pantaloncino, calzettoni… con taglie e modello 3D. Nelle aree puoi indicare a quale componente si riferiscono.
@@ -53,9 +53,8 @@ Creati automaticamente per ogni nuovo ordine, cambio stato (se richiesto) e rich
 
 - **Home e banner**: banner annunci in cima al sito, hero, sezioni, prodotti in evidenza. Una sezione senza titolo non viene mostrata. Senza immagine hero, la home mostra due maglie 3D appese a uno stender (si trascinano lungo l’asta; su mobile fluttuano tra i contenuti e si ruotano trascinandole); caricando un’immagine, questa le sostituisce. I file delle maglie sono in `public/hero/`. L’ultima parola dei titoli della home è resa in corsivo; i punti di “Personalizzazione” scorrono a tutta larghezza, “Come funziona” avanza con lo scroll. Con almeno 3 prodotti in evidenza, la home li mostra su un nastro curvo. Le soglie DPI di **Impostazioni → Controllo qualità grafiche** non compaiono in home: il configuratore le usa per avvisare il cliente dopo il caricamento di una grafica.
 - **Portfolio**: i progetti realizzati, cioè i post in cui le squadre mostrano divise e kit. Per ogni post: squadra, immagine (obbligatorie), titolo, didascalia, link al post originale, piattaforma e data (facoltativi). Usa solo immagini che la squadra ha autorizzato a ripubblicare. I post pubblicati compaiono in home nell’ordine dell’elenco (frecce per spostarli), come polaroid a ventaglio; il post al centro si apre come la pagina di un diario. La sezione compare solo con almeno un post pubblicato e un titolo (da **Home e banner → Sezione portfolio**).
-- **Pagine**: testo in Markdown (`## Titolo`, `**grassetto**`, `- elenco`, `[link](/catalogo)`), con anteprima. Le pagine di sistema (Chi siamo e legali) non si eliminano ma si possono mettere in bozza.
 - **FAQ**: domande ordinabili, attivabili e raggruppabili per categoria.
-- **Media**: carica immagini e copia il codice da incollare nelle pagine.
+- **Media**: le foto dei prodotti, raggruppate per prodotto (filtri: pubblicati, tutti, senza foto). Aprendo un prodotto puoi caricare foto, cambiarne l’ordine, scegliere la principale (copertina in catalogo), scrivere il testo alternativo, sostituirle o eliminarle: è lo stesso elenco della scheda **Immagini** del prodotto.
 - **Libreria grafiche**: loghi, sponsor e pattern selezionabili dai clienti (file originali ad alta risoluzione).
 
 ## Utenti
@@ -66,6 +65,7 @@ I clienti si registrano con nome utente e password; email e telefono sono facolt
 
 ## Impostazioni e sistema
 
+- **Pagine** (Chi siamo e pagine legali): testo in Markdown (`## Titolo`, `**grassetto**`, `- elenco`, `[link](/catalogo)`), con anteprima. Le pagine di sistema (Chi siamo e legali) non si eliminano ma si possono mettere in bozza.
 - **Stati ordine**: etichette, descrizioni per il cliente, percentuale di avanzamento, ordine, stato iniziale/finale/annullato.
 - **Controllo qualità grafiche**: soglie DPI e dimensione massima dei file.
 - **Filtri del catalogo**: attributi extra (es. Sport) il cui valore si imposta nella scheda prodotto.
