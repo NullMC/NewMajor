@@ -65,15 +65,19 @@ export function SiteFooter() {
       <div className="relative px-3 pb-2 sm:px-6">
         <StretchWordmark
           text="New Major"
-          className="text-[16.8vw]"
+          className="text-[15vw]"
           letterClassName="bg-gradient-to-b from-ink-200 via-ink-500 to-ink-900 bg-clip-text pb-[.04em] text-transparent"
         />
       </div>
       <div className="relative border-t border-white/10">
         <div className="container flex flex-col gap-4 py-6 text-xs text-ink-500 md:flex-row md:items-center md:justify-between">
-          <p>
-            <span className="font-mono">© {new Date().getFullYear()} {c.name} · P. IVA {c.vat_number} · REA {c.rea}</span>
-          </p>
+          <div className="flex flex-col gap-1.5">
+            <p className="font-mono">© {new Date().getFullYear()} {c.name} · P. IVA {c.vat_number} · REA {c.rea}</p>
+            <p>
+              made with <span role="img" aria-label="amore">❤️</span> by{' '}
+              <a href="https://franksitez.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-ink-300 underline-offset-4 hover:text-gold-400 hover:underline">FrankSitez</a>
+            </p>
+          </div>
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
             {(legal ?? []).map((p) => (
               <li key={p.slug}><Link to={`/${p.slug}`} className="hover:text-white">{p.title}</Link></li>
