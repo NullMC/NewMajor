@@ -40,7 +40,7 @@ function Step({ n, title, children, issues }: { n: number; title: string; childr
   )
 }
 
-function Configurator({ product, editLine }: { product: ProductDetail; editLine: { id: string; configuration: Configuration; quantity: number } | null }) {
+function Configurator({ product, editLine, initialVariantId }: { product: ProductDetail; editLine: { id: string; configuration: Configuration; quantity: number } | null; initialVariantId?: string | null }) {
   const { user } = useAuth()
   const { settings } = useSettings()
   const cart = useCart()
@@ -50,6 +50,7 @@ function Configurator({ product, editLine }: { product: ProductDetail; editLine:
   const api = useConfigurator(product, {
     initial: editLine?.configuration ?? null,
     initialQuantity: editLine?.quantity,
+    initialVariantId,
     userId: user?.id ?? null,
     quality: settings.quality,
   })
@@ -190,5 +191,5 @@ export default function ConfiguratorPage() {
       </div>
     )
   }
-  return <Configurator key={editLine?.id ?? 'new'} product={product} editLine={editLine} />
+  return <Configurator key={editLine?.id ?? 'new'} product={product} editLine={editLine} initialVariantId={params.get('colore')} />
 }

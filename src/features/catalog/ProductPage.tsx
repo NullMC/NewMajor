@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Brush, Layers, Ruler, Shirt, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { formatPrice, AVAILABILITY_LABEL } from '@/lib/format'
+import { AVAILABILITY_LABEL } from '@/lib/format'
 import { publicUrl } from '@/lib/storage'
 import { stripMarkdown } from '@/lib/markdown'
 import { useQuery } from '@/hooks/useQuery'
@@ -13,6 +13,7 @@ import { ButtonLink } from '@/components/ui/Button'
 import { SHAPE_LABEL } from '@/features/configurator/garment/shapes'
 import { getProductBySlug, listRelated } from './api'
 import { ProductCard } from './ProductCard'
+import { AnimatedPrice, ProductStage } from './ProductStage'
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL || '').replace(/\/$/, '')
 
@@ -20,11 +21,10 @@ export default function ProductPage() {
   const { slug = '' } = useParams()
   const { data: product, loading } = useQuery(`product:${slug}`, () => getProductBySlug(slug))
   const { data: related } = useQuery(product ? `related:${product.id}` : null, () => listRelated(product!.id))
-  const [active, setActive] = useState(0)
+  const [color, setColor] = useState<string | null>(null)
 
   const images = product?.product_images ?? []
-  const img = images[Math.min(active, Math.max(0, images.length - 1))]
-  const imageUrl = publicUrl(img?.storage_path)
+  const imageUrl = publicUrl(images[0]?.storage_path)
 
   useMeta({
     title: product?.seo_title || product?.name,
@@ -86,35 +86,10 @@ export default function ProductPage() {
       </nav>
 
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-14">
-        {/* Galleria */}
-        <div className="space-y-3">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-ink-100">
-            {imageUrl ? (
-              <img src={imageUrl} alt={img?.alt || product.name} className="h-full w-full object-cover" width={img?.width ?? 1000} height={img?.height ?? 1250} />
-            ) : (
-              <div className="flex h-full items-center justify-center text-ink-300"><Shirt className="h-20 w-20" aria-hidden /></div>
-            )}
-          </div>
-          {images.length > 1 && (
-            <div className="no-scrollbar flex gap-2 overflow-x-auto" role="tablist" aria-label="Immagini prodotto">
-              {images.map((im, i) => (
-                <button
-                  key={im.id}
-                  role="tab"
-                  aria-selected={i === active}
-                  aria-label={`Immagine ${i + 1}`}
-                  onClick={() => setActive(i)}
-                  className={cn('h-20 w-16 shrink-0 overflow-hidden rounded-xl border-2', i === active ? 'border-ink-900' : 'border-transparent opacity-70 hover:opacity-100')}
-                >
-                  <img src={publicUrl(im.storage_path) ?? ''} alt="" loading="lazy" className="h-full w-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductStage images={images} name={product.name} word={product.categories?.name} />
 
         {/* Info */}
-        <div className="lg:pt-4">
+        <div className="lg:pt-6">
           <div className="flex flex-wrap gap-2">
             {product.product_type === 'kit' && <Badge tone="dark">Kit da gara</Badge>}
             {product.is_configurable && <Badge tone="gold">Personalizzabile</Badge>}
@@ -122,24 +97,84 @@ export default function ProductPage() {
               {AVAILABILITY_LABEL[product.availability]}
             </Badge>
           </div>
-          <h1 className="display-lg mt-4 text-3xl sm:text-4xl">{product.name}</h1>
-          {product.short_description && <p className="mt-3 text-lg text-ink-600">{product.short_description}</p>}
-          <p className="mt-5 text-ink-500">
-            {Number(product.base_price) > 0
-              ? <>A partire da <span className="text-2xl font-bold text-ink-900">{formatPrice(product.base_price)}</span> <span className="text-sm">/ capo</span></>
-              : 'Prezzo su richiesta'}
-          </p>
+          {product.categories?.name && <p className="mt-5 font-mono text-xs uppercase tracking-[.2em] text-ink-500">{product.categories.name}</p>}
+          <h1 className="mt-2 font-display text-[clamp(2.1rem,5.4vw,3.6rem)] font-black uppercase leading-[.92] text-ink-950" style={{ fontStretch: '112%' }}>{product.name}</h1>
+          {product.short_description && <p className="mt-4 max-w-lg text-lg leading-8 text-ink-600">{product.short_description}</p>}
+
+          <div className="mt-6 flex flex-wrap items-end gap-x-3 gap-y-1">
+            {Number(product.base_price) > 0 ? (
+              <>
+                <span className="pb-1.5 text-sm text-ink-500">a partire da</span>
+                <AnimatedPrice value={Number(product.base_price)} className="font-mono text-4xl font-semibold tabular-nums tracking-tight text-ink-950 sm:text-5xl" />
+                <span className="pb-1.5 text-sm text-ink-500">/ capo</span>
+              </>
+            ) : (
+              <span className="text-lg font-semibold text-ink-700">Prezzo su richiesta</span>
+            )}
+          </div>
           {product.price_tiers.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-2">
               {product.price_tiers.map((t) => (
-                <li key={t.id} className="rounded-lg bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700">
+                <li key={t.id} className="rounded-full bg-success-50 px-3 py-1 font-mono text-xs font-semibold text-success-700">
                   da {t.min_quantity} pz −{Number(t.discount_percent)}%
                 </li>
               ))}
             </ul>
           )}
 
-          <div className="mt-8 space-y-5 border-y border-ink-200 py-6">
+          {/* Colori: la scelta viene passata al configuratore */}
+          {variants.length > 0 && (
+            <fieldset className="mt-7">
+              <legend className="text-sm font-semibold text-ink-900">
+                Colore <span className="font-normal text-ink-500">· {(variants.find((v) => v.id === color) ?? variants[0]).name}</span>
+              </legend>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                {variants.map((v) => {
+                  const on = (color ?? variants[0].id) === v.id
+                  return (
+                    <label key={v.id} className="relative cursor-pointer" title={v.name}>
+                      <input type="radio" name="colore" value={v.id} checked={on} onChange={() => setColor(v.id)} className="peer sr-only" />
+                      <span
+                        aria-hidden
+                        className={cn('block h-10 w-10 rounded-full ring-1 ring-ink-900/15 transition peer-focus-visible:ring-2 peer-focus-visible:ring-gold-500', on ? 'outline outline-2 outline-offset-[3px] outline-ink-900' : 'scale-90 hover:scale-100')}
+                        style={{ background: v.secondary_hex ? `linear-gradient(135deg, ${v.color_hex} 0 58%, ${v.secondary_hex} 58%)` : v.color_hex }}
+                      />
+                      <span className="sr-only">{v.name}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+          )}
+
+          {product.sizes.length > 0 && (
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-ink-900">Taglie disponibili</p>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {product.sizes.map((s) => (
+                  <li key={s} className="flex h-10 min-w-[2.75rem] items-center justify-center rounded-xl px-3 font-mono text-sm ring-1 ring-ink-200">{s}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-ink-500">Taglie e quantità per ogni giocatore si indicano nel passaggio successivo.</p>
+            </div>
+          )}
+
+          <div className="mt-8">
+            {unavailable ? (
+              <p className="rounded-xl bg-ink-100 p-4 text-sm text-ink-600">Prodotto al momento non disponibile. <Link to="/contatti" className="font-semibold text-ink-900 underline">Contattaci</Link> per informazioni.</p>
+            ) : (
+              <ButtonLink
+                to={`/prodotti/${product.slug}/personalizza${color ? `?colore=${encodeURIComponent(color)}` : ''}`}
+                size="lg"
+                className="h-14 w-full rounded-full text-base sm:w-auto sm:px-8"
+                icon={<Brush className="h-5 w-5" />}
+              >
+                {product.is_configurable ? 'Personalizza con anteprima 3D' : 'Scegli taglie e quantità'}
+              </ButtonLink>
+            )}
+          </div>
+
+          <div className="mt-10 space-y-5 border-t border-ink-200 pt-6">
             {product.product_type === 'kit' && product.kit_items.length > 0 && (
               <Info icon={<Layers className="h-4 w-4" />} label="Composizione kit">
                 {product.kit_items.map((k) => `${k.quantity > 1 ? `${k.quantity}× ` : ''}${k.label}`).join(' · ')}
@@ -153,33 +188,13 @@ export default function ProductPage() {
             {product.product_type === 'simple' && (
               <Info icon={<Shirt className="h-4 w-4" />} label="Modello">{SHAPE_LABEL[product.model_shape]}</Info>
             )}
-            {variants.length > 0 && (
-              <Info icon={<Brush className="h-4 w-4" />} label={`${variants.length} ${variants.length === 1 ? 'colore' : 'colori'}`}>
-                <span className="mt-1 flex flex-wrap gap-1.5">
-                  {variants.map((v) => (
-                    <span key={v.id} title={v.name} className="h-6 w-6 rounded-full border border-ink-200" style={{ background: v.secondary_hex ? `linear-gradient(135deg, ${v.color_hex} 0 60%, ${v.secondary_hex} 60%)` : v.color_hex }} />
-                  ))}
-                </span>
-              </Info>
-            )}
-            {product.sizes.length > 0 && (
-              <Info icon={<Ruler className="h-4 w-4" />} label="Taglie">{product.sizes.join(' · ')}</Info>
-            )}
             {(graphicAreas.length > 0 || hasRoster) && (
               <Info icon={<Users className="h-4 w-4" />} label="Personalizzazioni">
                 {[...graphicAreas.map((a) => a.name), ...(hasRoster ? ['Nomi e numeri'] : [])].join(' · ')}
               </Info>
             )}
-            {product.min_quantity > 1 && <p className="text-sm text-ink-500">Ordine minimo: {product.min_quantity} pezzi.</p>}
-          </div>
-
-          <div className="mt-6">
-            {unavailable ? (
-              <p className="rounded-xl bg-ink-100 p-4 text-sm text-ink-600">Prodotto al momento non disponibile. <Link to="/contatti" className="font-semibold text-ink-900 underline">Contattaci</Link> per informazioni.</p>
-            ) : (
-              <ButtonLink to={`/prodotti/${product.slug}/personalizza`} size="lg" className="w-full sm:w-auto" icon={<Brush className="h-5 w-5" />}>
-                {product.is_configurable ? 'Personalizza con anteprima 3D' : 'Scegli taglie e quantità'}
-              </ButtonLink>
+            {product.min_quantity > 1 && (
+              <Info icon={<Ruler className="h-4 w-4" />} label="Ordine minimo">{product.min_quantity} pezzi</Info>
             )}
           </div>
 

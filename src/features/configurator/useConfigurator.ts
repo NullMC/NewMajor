@@ -43,14 +43,16 @@ export interface ValidationIssue { section: string; message: string }
 
 export function useConfigurator(
   product: ProductDetail,
-  opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number },
+  opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number; initialVariantId?: string | null },
 ) {
   const roster = usesRoster(product)
   const [config, setConfig] = useState<Configuration>(() => {
     if (opts.initial) return { ...emptyConfiguration(), ...opts.initial }
     const c = emptyConfiguration()
     c.garmentTypeId = product.product_garment_types?.[0]?.garment_type_id ?? null
-    c.variantId = product.product_variants.find((v) => v.is_active)?.id ?? null
+    // colore scelto nella pagina prodotto (se valido), altrimenti il primo attivo
+    c.variantId = product.product_variants.find((v) => v.is_active && v.id === opts.initialVariantId)?.id
+      ?? product.product_variants.find((v) => v.is_active)?.id ?? null
     for (const o of product.product_options) {
       if (o.is_required && o.product_option_values?.[0]) c.optionValueIds.push(o.product_option_values[0].id)
     }
