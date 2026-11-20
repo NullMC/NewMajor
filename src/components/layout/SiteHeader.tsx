@@ -41,7 +41,6 @@ function IconLink({ to, label, count, dark, children }: { to: string; label: str
 function useDarkSurface(header: React.RefObject<HTMLElement | null>, pathname: string) {
   const [dark, setDark] = useState(false)
   useEffect(() => {
-    let raf = 0
     const check = () => {
       const h = header.current
       if (!h) return
@@ -49,9 +48,16 @@ function useDarkSurface(header: React.RefObject<HTMLElement | null>, pathname: s
       const under = document.elementsFromPoint(window.innerWidth / 2, Math.max(1, y)).find((el) => !h.contains(el))
       setDark(under?.closest('[data-surface]')?.getAttribute('data-surface') === 'dark')
     }
+    // controllo diretto (al massimo ogni 80 ms) più uno finale a scroll fermo
+    let last = 0, trail = 0
     const schedule = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(check)
+      const now = performance.now()
+      window.clearTimeout(trail)
+      if (now - last > 80) {
+        last = now
+        check()
+      }
+      trail = window.setTimeout(check, 120)
     }
     check()
     // pagine caricate in lazy: ricontrolla mentre il contenuto compare
@@ -63,7 +69,7 @@ function useDarkSurface(header: React.RefObject<HTMLElement | null>, pathname: s
     ro.observe(document.body)
     return () => {
       ro.disconnect()
-      cancelAnimationFrame(raf)
+      window.clearTimeout(trail)
       timers.forEach((t) => window.clearTimeout(t))
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', schedule)

@@ -1,5 +1,5 @@
 // Sfondo animato in GLSL (WebGL puro, senza three.js): fbm con domain warping,
-// bagliore che segue il puntatore, fasci di luce diagonali e vignettatura.
+// bagliore fisso, fasci di luce diagonali e vignettatura.
 // Renderizza a risoluzione ridotta, si ferma fuori schermo o a scheda nascosta
 // e mostra un solo fotogramma con "riduci movimento".
 
@@ -44,12 +44,10 @@ export interface ShaderBackdropProps {
   palette?: keyof typeof SHADER_PALETTES
   /** Centro del bagliore (coordinate normalizzate, 0,0 = centro). */
   anchor?: [number, number]
-  /** Il bagliore segue il puntatore sopra l'elemento padre. */
-  interactive?: boolean
   className?: string
 }
 
-export function ShaderBackdrop({ palette = 'ink', anchor = [0.45, 0.1], interactive = true, className }: ShaderBackdropProps) {
+export function ShaderBackdrop({ palette = 'ink', anchor = [0.45, 0.1], className }: ShaderBackdropProps) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [ax, ay] = anchor
 
@@ -86,7 +84,6 @@ export function ShaderBackdrop({ palette = 'ink', anchor = [0.45, 0.1], interact
 
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const scale = Math.min(window.devicePixelRatio || 1, 1.5) * 0.5
-    const mouse = { x: ax, y: ay, tx: ax, ty: ay }
     let visible = true
     let raf = 0
     const start = performance.now() - 20_000
@@ -102,11 +99,9 @@ export function ShaderBackdrop({ palette = 'ink', anchor = [0.45, 0.1], interact
     }
     const draw = (now: number) => {
       resize()
-      mouse.x += (mouse.tx - mouse.x) * 0.04
-      mouse.y += (mouse.ty - mouse.y) * 0.04
       gl.uniform2f(uR, canvas.width, canvas.height)
       gl.uniform1f(uT, (now - start) / 1000)
-      gl.uniform2f(uM, mouse.x, mouse.y)
+      gl.uniform2f(uM, ax, ay)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }
     const loop = (now: number) => {
@@ -131,17 +126,6 @@ export function ShaderBackdrop({ palette = 'ink', anchor = [0.45, 0.1], interact
     const ro = new ResizeObserver(() => { if (reduce) draw(performance.now()) })
     ro.observe(canvas)
 
-    const host = canvas.parentElement
-    const onMove = (e: PointerEvent) => {
-      const r = canvas.getBoundingClientRect()
-      mouse.tx = ((e.clientX - r.left) - r.width / 2) / r.height
-      mouse.ty = -((e.clientY - r.top) - r.height / 2) / r.height
-    }
-    const onLeave = () => { mouse.tx = ax; mouse.ty = ay }
-    if (interactive && !reduce && host) {
-      host.addEventListener('pointermove', onMove)
-      host.addEventListener('pointerleave', onLeave)
-    }
     play()
 
     return () => {
@@ -149,13 +133,11 @@ export function ShaderBackdrop({ palette = 'ink', anchor = [0.45, 0.1], interact
       io.disconnect()
       ro.disconnect()
       document.removeEventListener('visibilitychange', onVis)
-      host?.removeEventListener('pointermove', onMove)
-      host?.removeEventListener('pointerleave', onLeave)
       // Niente loseContext: in StrictMode lo stesso canvas viene riutilizzato subito dopo
       gl.deleteBuffer(buf)
       gl.deleteProgram(prog)
     }
-  }, [palette, ax, ay, interactive])
+  }, [palette, ax, ay])
 
   return <canvas ref={ref} aria-hidden className={cn('pointer-events-none absolute inset-0 h-full w-full', className)} />
 }

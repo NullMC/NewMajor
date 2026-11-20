@@ -46,7 +46,7 @@
   .accent-serif { @apply font-serif font-normal normal-case italic; font-stretch: 100%; letter-spacing: -0.01em; font-size: 1.08em; }
 
   /* ── Liquid glass ─────────────────────────────────────────────
-     Base: sfocatura + saturazione, bordo speculare e riflesso che segue il puntatore.
+     Base: sfocatura + saturazione, bordo speculare e riflesso fisso in alto.
      Sui browser Chromium <LiquidGlass> aggiunge la rifrazione dei bordi (filtro SVG). */
   .glass {
     position: relative;
@@ -65,8 +65,7 @@
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: radial-gradient(260px circle at var(--gx, 22%) var(--gy, -30%), rgb(255 255 255 / var(--glass-spec, .16)), transparent 65%);
-    transition: background-position .2s;
+    background: radial-gradient(120% 90% at 22% -30%, rgb(255 255 255 / var(--glass-spec, .16)), transparent 65%);
   }
   .glass::after {
     content: '';

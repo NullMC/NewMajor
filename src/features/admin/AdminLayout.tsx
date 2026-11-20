@@ -7,7 +7,6 @@ import { cn } from '@/lib/cn'
 import { supabase } from '@/lib/supabase'
 import { Drawer } from '@/components/ui/Overlay'
 import { PageLoader } from '@/components/ui/Spinner'
-import { useGlassPointer } from '@/components/fx/LiquidGlass'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useUnreadCount } from '@/features/notifications/api'
 
@@ -127,7 +126,6 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export default function AdminLayout() {
-  useGlassPointer()
   const { profile } = useAuth()
   const unread = useUnreadCount()
   const [open, setOpen] = useState(false)

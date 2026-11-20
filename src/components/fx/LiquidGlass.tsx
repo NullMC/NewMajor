@@ -139,25 +139,3 @@ export function LiquidGlass<T extends ElementType = 'div'>({
     </Tag>
   )
 }
-
-/** Riflesso speculare che segue il puntatore su tutte le superfici .glass. */
-export function useGlassPointer() {
-  useEffect(() => {
-    if (!window.matchMedia('(pointer: fine)').matches) return
-    let last: HTMLElement | null = null
-    const onMove = (e: PointerEvent) => {
-      const el = (e.target as Element | null)?.closest?.('.glass') as HTMLElement | null
-      if (last && last !== el) {
-        last.style.removeProperty('--gx')
-        last.style.removeProperty('--gy')
-      }
-      last = el
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      el.style.setProperty('--gx', `${e.clientX - r.left}px`)
-      el.style.setProperty('--gy', `${e.clientY - r.top}px`)
-    }
-    document.addEventListener('pointermove', onMove, { passive: true })
-    return () => document.removeEventListener('pointermove', onMove)
-  }, [])
-}
