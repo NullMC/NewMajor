@@ -40,12 +40,14 @@ export function StretchWordmark({ text, className, letterClassName }: { text: st
   }, [text])
 
   return (
-    <div ref={ref} aria-hidden className={cn('flex select-none justify-between font-display font-black uppercase leading-[.78]', className)}>
-      {Array.from(text).map((ch, i) =>
-        ch === ' ' ? <span key={i} className="w-[.42em]" /> : (
-          <span key={i} data-l="" className={cn('inline-block origin-bottom', letterClassName)} style={{ fontVariationSettings: '"wdth" 72' }}>{ch}</span>
-        ),
-      )}
+    <div ref={ref} aria-hidden className={cn('flex select-none justify-between gap-[.2em] font-display font-black uppercase leading-[.78]', className)}>
+      {text.split(/\s+/).map((word, w) => (
+        <span key={w} className="flex">
+          {Array.from(word).map((ch, i) => (
+            <span key={i} data-l="" className={cn('inline-block origin-bottom', letterClassName)} style={{ fontVariationSettings: '"wdth" 72' }}>{ch}</span>
+          ))}
+        </span>
+      ))}
     </div>
   )
 }

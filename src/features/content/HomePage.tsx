@@ -48,7 +48,7 @@ export default function HomePage() {
 
       {/* Prodotti in evidenza (selezionati dal backoffice): nastro curvo da 3 prodotti in su */}
       {(featuredLoading || featuredList.length > 0) && (
-        <section className="container pt-16 sm:pt-24" aria-labelledby="featured">
+        <section className="container pt-20 sm:pt-28 lg:pt-32" aria-labelledby="featured">
           <Reveal className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 id="featured" className="display-lg text-[clamp(1.5rem,6.6vw,3rem)]"><AccentTitle text={featuredMeta.title || 'In evidenza'} accentClassName="text-gold-600" /></h2>
@@ -88,10 +88,10 @@ export default function HomePage() {
       )}
 
       {/* CTA finali */}
-      <section className="container grid gap-4 pt-20 sm:pt-32 md:grid-cols-2">
+      <section className="container grid gap-3 pt-20 sm:pt-28 lg:pt-32 sm:gap-4 md:grid-cols-2">
         {sections.catalog_cta && (
           <Reveal>
-            <Link to="/catalogo" className="group relative flex h-full min-h-[18rem] flex-col justify-between gap-8 overflow-hidden rounded-[2rem] bg-gold-500 p-8 text-ink-950 sm:p-10">
+            <Link to="/catalogo" className="group relative flex h-full min-h-[13rem] flex-col justify-between gap-6 overflow-hidden rounded-[1.75rem] bg-gold-500 p-6 text-ink-950 sm:min-h-[18rem] sm:gap-8 sm:rounded-[2rem] sm:p-10">
               <div aria-hidden className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold-300/70 blur-3xl transition-transform duration-700 group-hover:scale-125" />
               <Grain opacity={0.18} />
               <div className="relative">
@@ -107,7 +107,7 @@ export default function HomePage() {
         )}
         {sections.contact_cta && (
           <Reveal delay={120}>
-            <div className="flex h-full min-h-[18rem] flex-col justify-between gap-8 rounded-[2rem] bg-white p-8 ring-1 ring-ink-200 sm:p-10">
+            <div className="flex h-full min-h-[13rem] flex-col justify-between gap-6 rounded-[1.75rem] bg-white p-6 ring-1 ring-ink-200 sm:min-h-[18rem] sm:gap-8 sm:rounded-[2rem] sm:p-10">
               <div>
                 <h2 className="display-lg text-[clamp(1.5rem,6.6vw,2.25rem)]"><AccentTitle text={sections.contact_cta.title} accentClassName="text-gold-600" /></h2>
                 <p className="mt-4 max-w-sm text-ink-600">{sections.contact_cta.text}</p>

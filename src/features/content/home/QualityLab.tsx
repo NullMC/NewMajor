@@ -112,7 +112,7 @@ export function QualityLab({ title, text, quality }: { title: string; text: stri
   const ref = useRef<HTMLDivElement>(null)
   useScrollProgress(ref, undefined, { start: 0.15, end: 0.55 })
   return (
-    <section className="container pt-20 sm:pt-32">
+    <section className="container pt-20 sm:pt-28 lg:pt-32">
       <Reveal className="overflow-hidden rounded-[2rem] bg-ink-950 text-white">
         <div ref={ref} data-surface="dark" className="relative grid gap-10 p-6 sm:p-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] lg:items-center lg:p-16">
           <ShaderBackdrop palette="deep" anchor={[0.55, 0.25]} />

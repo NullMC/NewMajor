@@ -19,7 +19,7 @@ export function KineticWall({ title, text, points }: { title: string; text: stri
   useScrollProgress(ref)
 
   return (
-    <section ref={ref} className="pt-20 sm:pt-32">
+    <section ref={ref} className="pt-20 sm:pt-28 lg:pt-32">
       <Reveal className="container grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,.8fr)] lg:items-end">
         <h2 className="display-lg text-[clamp(1.5rem,6.6vw,3rem)]"><AccentTitle text={title} accentClassName="text-gold-600" /></h2>
         <div>
@@ -29,7 +29,7 @@ export function KineticWall({ title, text, points }: { title: string; text: stri
       </Reveal>
 
       <ul className="sr-only">{points.map((p) => <li key={p}>{p}</li>)}</ul>
-      <div aria-hidden className="mask-fade-x mt-12 space-y-1 overflow-hidden sm:mt-16">
+      <div aria-hidden className="mask-fade-x mt-10 space-y-1 overflow-hidden sm:mt-14">
         {points.map((p, i) => {
           const dir = i % 2 ? -1 : 1
           return (

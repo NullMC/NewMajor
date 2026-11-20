@@ -1,7 +1,7 @@
 // "Come funziona" raccontato con lo scroll: la sezione resta ferma mentre si scorre,
 // un indicatore verticale avanza e i passaggi si alternano con una maschera.
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { cn } from '@/lib/cn'
 import { AccentTitle } from '@/components/fx/Reveal'
 import { useScrollProgress } from '@/components/fx/scroll'
@@ -16,12 +16,18 @@ export function ProcessStory({ title, steps }: { title: string; steps: { title: 
   useScrollProgress(ref, onProgress, { start: 1, end: 0 })
 
   return (
-    <section ref={ref} aria-labelledby="process" className="relative mt-20 sm:mt-32" style={{ height: `${n * 65 + 45}svh` }}>
-      <div className="sticky top-0 flex h-[100svh] flex-col justify-center overflow-hidden pt-16">
+    <section
+      ref={ref}
+      aria-labelledby="process"
+      className="relative mt-4 h-[calc(var(--n)*55svh+40svh)] sm:mt-8 sm:h-[calc(var(--n)*65svh+45svh)]"
+      style={{ '--n': n } as CSSProperties}
+    >
+      {/* su mobile il contenuto parte dall'alto (niente vuoto sopra il titolo), da tablet in su è centrato */}
+      <div className="sticky top-0 flex h-[100svh] flex-col justify-start overflow-hidden pt-24 sm:justify-center sm:pt-16">
         <div className="container">
           <h2 id="process" className="display-lg text-[clamp(1.5rem,6.6vw,3rem)]"><AccentTitle text={title} accentClassName="text-gold-600" /></h2>
 
-          <div className="mt-10 grid grid-cols-[auto_minmax(0,1fr)] gap-6 sm:mt-14 sm:gap-14">
+          <div className="mt-8 grid grid-cols-[auto_minmax(0,1fr)] gap-6 sm:mt-12 sm:gap-14">
             {/* Indicatore */}
             <div className="flex flex-col items-center gap-3" aria-hidden>
               <span className="font-mono text-xs tabular-nums text-ink-500">{String(active + 1).padStart(2, '0')}</span>

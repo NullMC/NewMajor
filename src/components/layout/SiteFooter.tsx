@@ -17,10 +17,10 @@ export function SiteFooter() {
   const { data: legal } = useQuery('pages:legal', listLegalPages, { staleMs: 10 * 60_000 })
 
   return (
-    <footer data-surface="dark" className="relative mx-2 mb-2 mt-24 overflow-hidden rounded-[2rem] bg-ink-950 text-ink-300 sm:mx-3 sm:mb-3 sm:mt-32 sm:rounded-[2.5rem]">
+    <footer data-surface="dark" className="relative mx-2 mb-2 mt-20 overflow-hidden rounded-[2rem] bg-ink-950 text-ink-300 sm:mx-3 sm:mb-3 sm:mt-28 lg:mt-32 sm:rounded-[2.5rem]">
       <div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-gold-500/10 blur-3xl" />
       <Grain />
-      <div className="container relative grid gap-10 py-16 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="container relative grid gap-10 py-12 sm:grid-cols-2 sm:py-16 lg:grid-cols-4">
         <div className="space-y-4 lg:col-span-2">
           <div className="inline-flex items-center gap-3 rounded-full bg-white py-1.5 pl-2 pr-4">
             <img src="/brand/logo.png" alt="" width={30} height={36} className="h-9 w-auto" />
@@ -65,7 +65,7 @@ export function SiteFooter() {
       <div className="relative px-3 pb-2 sm:px-6">
         <StretchWordmark
           text="New Major"
-          className="text-[19vw]"
+          className="text-[16.8vw]"
           letterClassName="bg-gradient-to-b from-ink-200 via-ink-500 to-ink-900 bg-clip-text pb-[.04em] text-transparent"
         />
       </div>
