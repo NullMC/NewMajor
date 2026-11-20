@@ -88,19 +88,20 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-0.5">
-          {isAdmin && (
-            <IconLink to="/admin" label="Backoffice">
-              <LayoutDashboard className="h-5 w-5" />
-            </IconLink>
-          )}
           {user && (
-            <IconLink to="/account/notifiche" label="Notifiche" count={unread}>
+            <IconLink to={isAdmin ? '/admin/notifiche?tab=mie' : '/account/notifiche'} label="Notifiche" count={unread}>
               <Bell className="h-5 w-5" />
             </IconLink>
           )}
-          <IconLink to={user ? '/account' : '/accedi'} label={user ? 'Area personale' : 'Accedi'}>
-            <User className="h-5 w-5" />
-          </IconLink>
+          {isAdmin ? (
+            <IconLink to="/admin" label="Backoffice">
+              <LayoutDashboard className="h-5 w-5" />
+            </IconLink>
+          ) : (
+            <IconLink to={user ? '/account' : '/accedi'} label={user ? 'Area personale' : 'Accedi'}>
+              <User className="h-5 w-5" />
+            </IconLink>
+          )}
           <IconLink to="/carrello" label="Carrello" count={count}>
             <ShoppingBag className="h-5 w-5" />
           </IconLink>
@@ -125,12 +126,13 @@ export function SiteHeader() {
             </NavLink>
           ))}
           <div className="my-3 h-px bg-ink-100" />
-          <NavLink to={user ? '/account' : '/accedi'} className="rounded-xl px-4 py-3.5 text-base font-semibold text-ink-800 hover:bg-ink-100">
-            {user ? 'Area personale' : 'Accedi / Registrati'}
-          </NavLink>
-          {isAdmin && (
+          {isAdmin ? (
             <NavLink to="/admin" className="rounded-xl px-4 py-3.5 text-base font-semibold text-ink-800 hover:bg-ink-100">
               Backoffice
+            </NavLink>
+          ) : (
+            <NavLink to={user ? '/account' : '/accedi'} className="rounded-xl px-4 py-3.5 text-base font-semibold text-ink-800 hover:bg-ink-100">
+              {user ? 'Area personale' : 'Accedi / Registrati'}
             </NavLink>
           )}
         </nav>

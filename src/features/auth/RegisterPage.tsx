@@ -12,7 +12,7 @@ import { AuthCard, isEmail } from './AuthLayout'
 import { USERNAME_HINT, USERNAME_RE, normalizeUsername } from './username'
 
 export default function RegisterPage() {
-  const { signUp, user, loading: authLoading } = useAuth()
+  const { signUp, user, isAdmin, profileReady, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/account'
@@ -27,8 +27,9 @@ export default function RegisterPage() {
   const emailRequired = authSettings?.mailer_autoconfirm === false
 
   useEffect(() => {
-    if (!authLoading && user) navigate(from, { replace: true })
-  }, [user, authLoading, from, navigate])
+    if (authLoading || !user || !profileReady) return
+    navigate(isAdmin ? '/admin' : from, { replace: true })
+  }, [user, authLoading, profileReady, isAdmin, from, navigate])
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }))
 

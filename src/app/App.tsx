@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom'
 import { PublicLayout, ScrollToTop } from '@/components/layout/PublicLayout'
 import { PageLoader } from '@/components/ui/Spinner'
-import { RequireAdmin, RequireAuth } from '@/features/auth/guards'
+import { RequireAdmin, RequireAuth, RequireCustomer } from '@/features/auth/guards'
 import { SetupNotice } from './SetupNotice'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
@@ -58,6 +58,7 @@ const AdminContacts = lazy(() => import('@/features/admin/comms/ContactRequestsP
 const AdminStatuses = lazy(() => import('@/features/admin/settings/StatusesPage'))
 const AdminSettings = lazy(() => import('@/features/admin/settings/SettingsPage'))
 const AdminAudit = lazy(() => import('@/features/admin/settings/AuditLogPage'))
+const AdminAccount = lazy(() => import('@/features/admin/AccountPage'))
 
 function Root() {
   return (
@@ -94,7 +95,7 @@ const router = createBrowserRouter([
           { path: 'reimposta-password', element: <ResetPasswordPage /> },
           {
             path: 'account',
-            element: <RequireAuth><AccountLayout /></RequireAuth>,
+            element: <RequireCustomer><AccountLayout /></RequireCustomer>,
             children: [
               { index: true, element: <AccountOverview /> },
               { path: 'ordini', element: <AccountOrders /> },
@@ -135,6 +136,7 @@ const router = createBrowserRouter([
           { path: 'stati', element: <AdminStatuses /> },
           { path: 'impostazioni', element: <AdminSettings /> },
           { path: 'registro', element: <AdminAudit /> },
+          { path: 'account', element: <AdminAccount /> },
         ],
       },
     ],

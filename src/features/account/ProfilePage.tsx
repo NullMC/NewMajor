@@ -10,7 +10,7 @@ import { isEmail } from '@/features/auth/AuthLayout'
 import { updateProfile } from './api'
 
 export default function ProfilePage() {
-  const { profile, user, refreshProfile, updatePassword } = useAuth()
+  const { profile, user, isAdmin, refreshProfile, updatePassword } = useAuth()
   const { toast } = useUi()
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', company_name: '', vat_number: '', fiscal_code: '' })
   const [saving, setSaving] = useState(false)
@@ -18,7 +18,7 @@ export default function ProfilePage() {
   const [pwd, setPwd] = useState({ password: '', confirm: '' })
   const [pwdSaving, setPwdSaving] = useState(false)
   const [pwdError, setPwdError] = useState<string | null>(null)
-  useMeta({ title: 'Dati personali', noindex: true })
+  useMeta({ title: isAdmin ? 'Il mio account' : 'Dati personali', noindex: true })
 
   useEffect(() => {
     if (profile) {
@@ -76,11 +76,16 @@ export default function ProfilePage() {
         <form onSubmit={save} className="space-y-4 p-5" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome e cognome" required><Input value={form.full_name} onChange={set('full_name')} autoComplete="name" maxLength={120} /></Field>
-            <Field label="Email" hint="Recapito per gli ordini"><Input type="email" value={form.email} onChange={set('email')} autoComplete="email" maxLength={254} /></Field>
+            <Field label="Email" hint={isAdmin ? 'Facoltativa' : 'Recapito per gli ordini'}><Input type="email" value={form.email} onChange={set('email')} autoComplete="email" maxLength={254} /></Field>
             <Field label="Telefono"><Input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" maxLength={40} /></Field>
-            <Field label="Società / squadra"><Input value={form.company_name} onChange={set('company_name')} maxLength={160} /></Field>
-            <Field label="Partita IVA"><Input value={form.vat_number} onChange={set('vat_number')} maxLength={32} /></Field>
-            <Field label="Codice fiscale"><Input value={form.fiscal_code} onChange={set('fiscal_code')} maxLength={32} /></Field>
+            {/* Dati di fatturazione: servono solo ai clienti */}
+            {!isAdmin && (
+              <>
+                <Field label="Società / squadra"><Input value={form.company_name} onChange={set('company_name')} maxLength={160} /></Field>
+                <Field label="Partita IVA"><Input value={form.vat_number} onChange={set('vat_number')} maxLength={32} /></Field>
+                <Field label="Codice fiscale"><Input value={form.fiscal_code} onChange={set('fiscal_code')} maxLength={32} /></Field>
+              </>
+            )}
           </div>
           <FormError message={error} />
           <Button type="submit" loading={saving}>Salva</Button>

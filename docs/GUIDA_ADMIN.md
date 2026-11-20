@@ -2,6 +2,8 @@
 
 Accesso: **/admin** con nome utente (o email) e password di un account amministratore.
 
+Gli amministratori non usano l’area cliente: accedendo dal sito, dall’icona nell’intestazione o da un link dell’area personale vengono portati direttamente alla pagina corrispondente del backoffice. Nome, email, telefono e password si modificano da **Il mio account** (menu laterale o nome in alto a destra). Se il ruolo di un account cambia mentre è collegato, il sito se ne accorge al ritorno sulla scheda.
+
 ## Primi passi
 
 1. **Impostazioni → Dati aziendali**: verifica i dati (sede, P. IVA, REA, telefoni). Controlla l’email precompilata.

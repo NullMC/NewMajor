@@ -4,11 +4,13 @@ import { useSettings } from '@/features/settings/SettingsProvider'
 import { useQuery } from '@/hooks/useQuery'
 import { listLegalPages } from '@/features/content/api'
 import { NAV } from './SiteHeader'
+import { useAuth } from '@/features/auth/AuthProvider'
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`
 
 export function SiteFooter() {
   const { settings } = useSettings()
+  const { isAdmin } = useAuth()
   const c = settings.company
   const { data: legal } = useQuery('pages:legal', listLegalPages, { staleMs: 10 * 60_000 })
 
@@ -31,7 +33,7 @@ export function SiteFooter() {
             {NAV.map((n) => (
               <li key={n.to}><Link to={n.to} className="hover:text-white">{n.label}</Link></li>
             ))}
-            <li><Link to="/account" className="hover:text-white">Area personale</Link></li>
+            <li>{isAdmin ? <Link to="/admin" className="hover:text-white">Backoffice</Link> : <Link to="/account" className="hover:text-white">Area personale</Link>}</li>
           </ul>
         </div>
 

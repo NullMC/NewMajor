@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { Profile } from '@/types/db'
@@ -10,6 +10,10 @@ interface AuthContextValue {
   profile: Profile | null
   isAdmin: boolean
   loading: boolean
+  /** true quando il profilo dell'utente corrente è stato letto (con successo o meno) */
+  profileReady: boolean
+  /** true se la lettura del profilo è fallita (rete, profilo mancante) */
+  profileError: boolean
   /** true se l'account è stato disattivato da un amministratore */
   disabled: boolean
   /** identifier: nome utente oppure email */
@@ -28,21 +32,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [disabled, setDisabled] = useState(false)
+  // Utente per cui la lettura del profilo è terminata: finché non coincide con l'utente in sessione
+  // ruolo e permessi non sono noti e le pagine protette restano in attesa.
+  const [profileFor, setProfileFor] = useState<string | null>(null)
+  const [profileError, setProfileError] = useState(false)
+  const lastProfileLoad = useRef(0)
 
   const loadProfile = useCallback(async (userId: string | undefined) => {
+    lastProfileLoad.current = Date.now()
     if (!userId) {
       setProfile(null)
+      setProfileError(false)
+      setProfileFor(null)
       return
     }
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    if (error) {
+      setProfileError(true)
+      setProfileFor(userId)
+      return
+    }
     const p = data as Profile | null
     if (p && !p.is_active) {
       setDisabled(true)
       setProfile(null)
+      setProfileFor(null)
       await supabase.auth.signOut()
       return
     }
     setProfile(p)
+    setProfileError(!p)
+    setProfileFor(userId)
   }, [])
 
   useEffect(() => {
@@ -66,6 +86,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe()
     }
   }, [loadProfile])
+
+  // Ruolo e stato dell'account possono cambiare mentre la sessione è aperta (promozione, revoca,
+  // disattivazione): il profilo viene riletto quando la scheda torna visibile.
+  const sessionUserId = session?.user.id
+  useEffect(() => {
+    if (!sessionUserId) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastProfileLoad.current > 60_000) {
+        void loadProfile(sessionUserId)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [sessionUserId, loadProfile])
 
   const signIn = useCallback(async (identifier: string, password: string) => {
     setDisabled(false)
@@ -123,6 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       isAdmin: profile?.role === 'admin' && profile.is_active,
       loading,
+      profileReady: !session?.user || profileFor === session.user.id,
+      profileError,
       disabled,
       signIn,
       signUp,
@@ -131,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePassword,
       refreshProfile,
     }),
-    [session, profile, loading, disabled, signIn, signUp, signOut, sendPasswordReset, updatePassword, refreshProfile],
+    [session, profile, profileFor, profileError, loading, disabled, signIn, signUp, signOut, sendPasswordReset, updatePassword, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

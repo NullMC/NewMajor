@@ -9,15 +9,18 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { useSettings } from '@/features/settings/SettingsProvider'
 import { getOrder } from '@/features/orders/api'
 import { BankTransferInstructions } from '@/features/orders/components'
+import { useAuth } from '@/features/auth/AuthProvider'
 
 export default function OrderConfirmationPage() {
   const { id = '' } = useParams()
   const { settings } = useSettings()
+  const { isAdmin } = useAuth()
+  const ordersPath = isAdmin ? '/admin/ordini' : '/account/ordini'
   const { data: order, loading } = useQuery(`orders:${id}`, () => getOrder(id))
   useMeta({ title: 'Ordine ricevuto', noindex: true })
 
   if (loading && !order) return <PageLoader />
-  if (!order) return <div className="container py-16"><EmptyState title="Ordine non trovato" action={<ButtonLink to="/account/ordini">I miei ordini</ButtonLink>} /></div>
+  if (!order) return <div className="container py-16"><EmptyState title="Ordine non trovato" action={<ButtonLink to={ordersPath}>I miei ordini</ButtonLink>} /></div>
 
   return (
     <div className="container max-w-2xl py-12 sm:py-16">
@@ -46,7 +49,7 @@ export default function OrderConfirmationPage() {
         Verificheremo la configurazione e le grafiche e ti aggiorneremo nella tua area personale a ogni cambio di stato.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <ButtonLink to={`/account/ordini/${order.id}`}>Segui l’ordine</ButtonLink>
+        <ButtonLink to={`${ordersPath}/${order.id}`}>Segui l’ordine</ButtonLink>
         <ButtonLink to="/catalogo" variant="secondary">Continua gli acquisti</ButtonLink>
       </div>
     </div>

@@ -2,8 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Bell, ClipboardList, ExternalLink, FileText, FolderTree, Gauge, HelpCircle, Image, Images, Inbox, LayoutTemplate,
-  ListChecks, LogOut, Menu, Package, Settings, Shirt, ShoppingCart, Users, Workflow,
-} from 'lucide-react'
+  ListChecks, LogOut, Menu, Package, Settings, Shirt, ShoppingCart, Users, UserCog, Workflow, } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { supabase } from '@/lib/supabase'
 import { Drawer } from '@/components/ui/Overlay'
@@ -108,8 +107,26 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
+function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const { signOut } = useAuth()
+  const cls = 'flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm text-ink-300 hover:bg-white/5 hover:text-white'
+  return (
+    <div className="border-t border-white/10 p-3">
+      <Link to="/admin/account" onClick={onNavigate} className={cls}>
+        <UserCog className="h-4 w-4" aria-hidden /> Il mio account
+      </Link>
+      <a href="/" target="_blank" rel="noopener" className={cls}>
+        <ExternalLink className="h-4 w-4" aria-hidden /> Vai al sito
+      </a>
+      <button type="button" onClick={() => void signOut()} className={cls}>
+        <LogOut className="h-4 w-4" aria-hidden /> Esci
+      </button>
+    </div>
+  )
+}
+
 export default function AdminLayout() {
-  const { profile, signOut } = useAuth()
+  const { profile } = useAuth()
   const unread = useUnreadCount()
   const [open, setOpen] = useState(false)
   const location = useLocation()
@@ -123,14 +140,7 @@ export default function AdminLayout() {
           <span className="text-sm font-bold text-white">New Major<span className="block text-2xs font-medium text-ink-400">Backoffice</span></span>
         </Link>
         <div className="flex-1"><Nav /></div>
-        <div className="border-t border-white/10 p-3">
-          <a href="/" target="_blank" rel="noopener" className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm text-ink-300 hover:bg-white/5 hover:text-white">
-            <ExternalLink className="h-4 w-4" aria-hidden /> Vai al sito
-          </a>
-          <button type="button" onClick={() => void signOut()} className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm text-ink-300 hover:bg-white/5 hover:text-white">
-            <LogOut className="h-4 w-4" aria-hidden /> Esci
-          </button>
-        </div>
+        <AccountLinks />
       </aside>
 
       <div className="min-w-0">
@@ -144,7 +154,7 @@ export default function AdminLayout() {
               <Bell className="h-5 w-5" />
               {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-gold-500" />}
             </Link>
-            <span className="hidden max-w-[12rem] truncate pl-2 text-sm font-medium md:inline">{profile?.full_name || profile?.username || profile?.email}</span>
+            <Link to="/admin/account" className="hidden max-w-[12rem] truncate rounded-xl px-2 py-2 text-sm font-medium hover:bg-ink-100 md:inline">{profile?.full_name || profile?.username || profile?.email}</Link>
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -153,7 +163,10 @@ export default function AdminLayout() {
       </div>
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Backoffice" side="left">
-        <div className="min-h-full bg-ink-900"><Nav onNavigate={() => setOpen(false)} /></div>
+        <div className="flex min-h-full flex-col bg-ink-900">
+          <div className="flex-1"><Nav onNavigate={() => setOpen(false)} /></div>
+          <AccountLinks onNavigate={() => setOpen(false)} />
+        </div>
       </Drawer>
     </div>
   )

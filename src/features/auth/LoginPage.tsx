@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, FormError, Input } from '@/components/ui/Form'
 import { useAuth } from './AuthProvider'
 import { AuthCard } from './AuthLayout'
+import { adminEquivalent } from './guards'
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const { signIn } = useAuth()
@@ -44,15 +45,17 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 export default function LoginPage() {
-  const { user, loading, disabled } = useAuth()
+  const { user, loading, disabled, isAdmin, profileReady } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/account'
   useMeta({ title: 'Accedi', noindex: true })
 
+  // Gli amministratori vanno al backoffice invece che all'area cliente
   useEffect(() => {
-    if (!loading && user) navigate(from, { replace: true })
-  }, [user, loading, from, navigate])
+    if (loading || !user || !profileReady) return
+    navigate(isAdmin && from.startsWith('/account') ? adminEquivalent(from) : from, { replace: true })
+  }, [user, loading, profileReady, isAdmin, from, navigate])
 
   return (
     <AuthCard
@@ -61,7 +64,7 @@ export default function LoginPage() {
       footer={<>Non hai un account? <Link to="/registrati" state={{ from }} className="font-semibold text-ink-900 underline underline-offset-4">Registrati</Link></>}
     >
       {disabled && <div className="mb-4"><FormError message="Il tuo account è stato disattivato. Contattaci per assistenza." /></div>}
-      <LoginForm onSuccess={() => navigate(from, { replace: true })} />
+      <LoginForm onSuccess={() => undefined} />
     </AuthCard>
   )
 }

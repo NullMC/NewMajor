@@ -11,7 +11,7 @@ import { AuthCard } from './AuthLayout'
 
 /** Atterraggio dal link email di Supabase (sessione di recupero già attiva). */
 export default function ResetPasswordPage() {
-  const { updatePassword, user, loading: authLoading } = useAuth()
+  const { updatePassword, user, isAdmin, loading: authLoading } = useAuth()
   const { toast } = useUi()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
@@ -31,7 +31,7 @@ export default function ResetPasswordPage() {
     try {
       await updatePassword(password)
       toast('Password aggiornata')
-      navigate('/account', { replace: true })
+      navigate(isAdmin ? '/admin' : '/account', { replace: true })
     } catch (err) {
       setError(errorMessage(err))
     } finally {
