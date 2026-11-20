@@ -62,7 +62,7 @@ export function ConfiguratorViewer({ api }: { api: ConfiguratorApi }) {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-200/70 bg-white/70 p-2 backdrop-blur">
+      <div className="glass glass-light flex flex-wrap items-center justify-between gap-2 !rounded-none p-2">
         <div className="flex rounded-xl bg-ink-100 p-0.5" role="group" aria-label="Lato visualizzato">
           <button type="button" className={seg(view === 'front')} aria-pressed={view === 'front'} onClick={() => setView('front')}>Fronte</button>
           <button type="button" className={seg(view === 'back')} aria-pressed={view === 'back'} onClick={() => setView('back')}>Retro</button>

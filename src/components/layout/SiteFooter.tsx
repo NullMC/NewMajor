@@ -5,6 +5,7 @@ import { useQuery } from '@/hooks/useQuery'
 import { listLegalPages } from '@/features/content/api'
 import { NAV } from './SiteHeader'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { Grain } from '@/components/fx/ShaderBackdrop'
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`
 
@@ -15,14 +16,16 @@ export function SiteFooter() {
   const { data: legal } = useQuery('pages:legal', listLegalPages, { staleMs: 10 * 60_000 })
 
   return (
-    <footer className="mt-24 bg-ink-900 text-ink-300">
-      <div className="container grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
+    <footer data-surface="dark" className="relative mx-2 mb-2 mt-24 overflow-hidden rounded-[2rem] bg-ink-950 text-ink-300 sm:mx-3 sm:mb-3 sm:mt-32 sm:rounded-[2.5rem]">
+      <div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-gold-500/10 blur-3xl" />
+      <Grain />
+      <div className="container relative grid gap-10 py-16 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-4 lg:col-span-2">
-          <div className="inline-flex items-center gap-3 rounded-xl bg-white px-3 py-2">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white py-1.5 pl-2 pr-4">
             <img src="/brand/logo.png" alt="" width={30} height={36} className="h-9 w-auto" />
             <span className="font-display text-sm font-extrabold uppercase text-ink-900" style={{ fontStretch: '120%' }}>New Major</span>
           </div>
-          <p className="max-w-sm text-sm leading-6 text-ink-400">
+          <p className="max-w-sm font-serif text-2xl italic leading-8 text-ink-200">
             Personalizzazione e vendita di divise, abbigliamento e kit da gara sportivi.
           </p>
         </div>
@@ -57,10 +60,10 @@ export function SiteFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-white/10">
+      <div className="relative border-t border-white/10">
         <div className="container flex flex-col gap-4 py-6 text-xs text-ink-500 md:flex-row md:items-center md:justify-between">
           <p>
-            © {new Date().getFullYear()} {c.name} · P. IVA {c.vat_number} · REA {c.rea}
+            <span className="font-mono">© {new Date().getFullYear()} {c.name} · P. IVA {c.vat_number} · REA {c.rea}</span>
           </p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
             {(legal ?? []).map((p) => (

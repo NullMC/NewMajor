@@ -154,7 +154,7 @@ function Configurator({ product, editLine }: { product: ProductDetail; editLine:
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 p-3 pb-safe backdrop-blur lg:hidden">
+      <div className="glass glass-light fixed inset-x-2 bottom-2 z-30 rounded-[1.5rem] p-3 pb-safe lg:hidden">
         <div className="container flex items-center gap-3 px-0">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-ink-500">{api.qty} {api.qty === 1 ? 'capo' : 'capi'}</p>

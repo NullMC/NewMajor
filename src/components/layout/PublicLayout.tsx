@@ -6,6 +6,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { SiteHeader } from './SiteHeader'
 import { SiteFooter } from './SiteFooter'
 import { CookieBanner } from './CookieBanner'
+import { useGlassPointer } from '@/components/fx/LiquidGlass'
 
 export function ScrollToTop() {
   const { pathname } = useLocation()
@@ -25,6 +26,7 @@ function AnnouncementBar() {
 }
 
 export function PublicLayout() {
+  useGlassPointer()
   return (
     <div className="flex min-h-dvh flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[80] focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-2 focus:text-white">

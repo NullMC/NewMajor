@@ -53,7 +53,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 animate-fade-in bg-ink-950/50 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 animate-fade-in bg-ink-950/40 backdrop-blur-md" onClick={onClose} aria-hidden />
       <div
         ref={ref}
         role="dialog"
@@ -61,7 +61,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         aria-label={typeof title === 'string' ? title : undefined}
         tabIndex={-1}
         className={cn(
-          'relative flex max-h-[92dvh] w-full animate-slide-up flex-col rounded-t-2xl bg-white shadow-pop sm:rounded-2xl',
+          'glass glass-light relative flex max-h-[92dvh] w-full animate-slide-up flex-col rounded-t-[1.75rem] !bg-white/[.92] shadow-pop sm:rounded-[1.75rem]',
           { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' }[size],
         )}
       >
@@ -89,7 +89,7 @@ export function Drawer({
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-[60]">
-      <div className="absolute inset-0 animate-fade-in bg-ink-950/50" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 animate-fade-in bg-ink-950/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
         ref={ref}
         role="dialog"
@@ -97,7 +97,7 @@ export function Drawer({
         aria-label={typeof title === 'string' ? title : undefined}
         tabIndex={-1}
         className={cn(
-          'absolute top-0 flex h-full w-[min(100%,26rem)] flex-col bg-white shadow-pop',
+          'glass glass-light absolute top-0 flex h-full w-[min(100%,26rem)] flex-col !bg-ink-50/[.86] shadow-pop',
           side === 'right' ? 'right-0 animate-slide-in-right' : 'left-0 animate-fade-in',
         )}
       >

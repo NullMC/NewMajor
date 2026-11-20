@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { supabase } from '@/lib/supabase'
 import { Drawer } from '@/components/ui/Overlay'
 import { PageLoader } from '@/components/ui/Spinner'
+import { useGlassPointer } from '@/components/fx/LiquidGlass'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useUnreadCount } from '@/features/notifications/api'
 
@@ -126,6 +127,7 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export default function AdminLayout() {
+  useGlassPointer()
   const { profile } = useAuth()
   const unread = useUnreadCount()
   const [open, setOpen] = useState(false)
@@ -144,7 +146,7 @@ export default function AdminLayout() {
       </aside>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-ink-200 bg-white/90 px-4 backdrop-blur sm:px-6">
+        <header className="glass glass-light sticky top-0 z-30 flex h-14 items-center gap-3 !rounded-none px-4 !shadow-[inset_0_-1px_0_rgb(14_14_16/.08)] sm:px-6">
           <button type="button" className="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-xl hover:bg-ink-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Apri menu">
             <Menu className="h-5 w-5" />
           </button>
