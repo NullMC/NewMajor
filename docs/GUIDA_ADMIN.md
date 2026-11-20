@@ -51,7 +51,7 @@ Creati automaticamente per ogni nuovo ordine, cambio stato (se richiesto) e rich
 
 ## Contenuti
 
-- **Home e banner**: banner annunci in cima al sito, hero, sezioni, prodotti in evidenza. Una sezione senza titolo non viene mostrata. Senza immagine hero, la home mostra i modelli 3D di due maglie (ruotabili trascinando); caricando un’immagine, questa li sostituisce. L’ultima parola dei titoli della home è resa in corsivo.
+- **Home e banner**: banner annunci in cima al sito, hero, sezioni, prodotti in evidenza. Una sezione senza titolo non viene mostrata. Senza immagine hero, la home mostra due maglie 3D appese a uno stender (si trascinano lungo l’asta, un clic mostra il retro); caricando un’immagine, questa le sostituisce. I file delle maglie sono in `public/hero/`. L’ultima parola dei titoli della home è resa in corsivo; i punti di “Personalizzazione” scorrono a tutta larghezza, “Come funziona” avanza con lo scroll e la sezione qualità include un calcolatore dei DPI effettivi che usa le soglie di **Impostazioni → Controllo qualità grafiche**. Con almeno 3 prodotti in evidenza, la home li mostra su un nastro curvo.
 - **Pagine**: testo in Markdown (`## Titolo`, `**grassetto**`, `- elenco`, `[link](/catalogo)`), con anteprima. Le pagine di sistema (Chi siamo e legali) non si eliminano ma si possono mettere in bozza.
 - **FAQ**: domande ordinabili, attivabili e raggruppabili per categoria.
 - **Media**: carica immagini e copia il codice da incollare nelle pagine.

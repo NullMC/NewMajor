@@ -1,15 +1,19 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, Phone } from 'lucide-react'
+import { ArrowRight, Phone } from 'lucide-react'
 import { useQuery } from '@/hooks/useQuery'
 import { useMeta } from '@/hooks/useMeta'
 import { ButtonLink } from '@/components/ui/Button'
 import { useSettings } from '@/features/settings/SettingsProvider'
 import { listCategories, listFeatured } from '@/features/catalog/api'
 import { ProductCard, ProductCardSkeleton } from '@/features/catalog/ProductCard'
+import { Reveal, AccentTitle } from '@/components/fx/Reveal'
+import { Grain } from '@/components/fx/ShaderBackdrop'
 import { getSiteContents, type HeroContent, type HomeSections } from './api'
 import { Hero } from './hero/Hero'
-import { Reveal, AccentTitle } from '@/components/fx/Reveal'
-import { ShaderBackdrop, Grain } from '@/components/fx/ShaderBackdrop'
+import { CurvedCarousel } from './home/CurvedCarousel'
+import { KineticWall } from './home/KineticWall'
+import { ProcessStory } from './home/ProcessStory'
+import { QualityLab } from './home/QualityLab'
 
 export default function HomePage() {
   const { settings } = useSettings()
@@ -21,6 +25,7 @@ export default function HomePage() {
   const sections = (content?.['home.sections'] ?? {}) as HomeSections
   const featuredMeta = (content?.['home.featured'] ?? {}) as { title?: string; subtitle?: string }
   const topCategories = (categories ?? []).filter((c) => !c.parent_id).slice(0, 6)
+  const featuredList = featured?.slice(0, 10) ?? []
 
   useMeta({})
 
@@ -41,8 +46,8 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Prodotti in evidenza (selezionati dal backoffice) */}
-      {(featuredLoading || !!featured?.length) && (
+      {/* Prodotti in evidenza (selezionati dal backoffice): nastro curvo da 3 prodotti in su */}
+      {(featuredLoading || featuredList.length > 0) && (
         <section className="container pt-16 sm:pt-24" aria-labelledby="featured">
           <Reveal className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -53,79 +58,33 @@ export default function HomePage() {
               Tutto il catalogo <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </Reveal>
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
-            {featuredLoading && !featured
-              ? Array.from({ length: 4 }, (_, i) => <ProductCardSkeleton key={i} />)
-              : featured!.slice(0, 8).map((p, i) => (
-                <Reveal key={p.id} delay={(i % 4) * 90}><ProductCard product={p} eager={i < 2} /></Reveal>
-              ))}
-          </div>
+          {featuredLoading && !featured ? (
+            <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+              {Array.from({ length: 4 }, (_, i) => <ProductCardSkeleton key={i} />)}
+            </div>
+          ) : featuredList.length >= 3 ? (
+            <Reveal className="mt-8"><CurvedCarousel products={featuredList} /></Reveal>
+          ) : (
+            <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+              {featuredList.map((p, i) => <Reveal key={p.id} delay={i * 90}><ProductCard product={p} eager={i < 2} /></Reveal>)}
+            </div>
+          )}
         </section>
       )}
 
       {/* Personalizzazione */}
       {sections.personalization && (
-        <section className="container pt-20 sm:pt-32">
-          <Reveal className="grid gap-10 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:gap-16">
-            <div className="lg:sticky lg:top-28 lg:self-start">
-              <h2 className="display-lg text-[clamp(1.5rem,6.6vw,3rem)]"><AccentTitle text={sections.personalization.title} accentClassName="text-gold-600" /></h2>
-              <p className="mt-5 max-w-md text-lg leading-8 text-ink-600">{sections.personalization.text}</p>
-              <ButtonLink to="/catalogo" size="lg" className="mt-9 rounded-full" icon={<ArrowRight className="h-4 w-4" />}>Inizia a configurare</ButtonLink>
-            </div>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {sections.personalization.points.map((p) => (
-                <li key={p} className="group flex min-h-[9.5rem] flex-col justify-between gap-6 rounded-[1.5rem] bg-white p-6 ring-1 ring-ink-200 transition hover:-translate-y-0.5 hover:shadow-card">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-900 text-gold-400 transition group-hover:bg-gold-500 group-hover:text-ink-950"><Check className="h-4 w-4" aria-hidden /></span>
-                  <span className="text-base font-semibold leading-6 text-ink-900">{p}</span>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        </section>
+        <KineticWall title={sections.personalization.title} text={sections.personalization.text} points={sections.personalization.points} />
       )}
 
       {/* Processo */}
-      {sections.process && (
-        <section className="container pt-20 sm:pt-32" aria-labelledby="process">
-          <Reveal>
-            <h2 id="process" className="display-lg text-[clamp(1.5rem,6.6vw,3rem)]"><AccentTitle text={sections.process.title} accentClassName="text-gold-600" /></h2>
-          </Reveal>
-          <ol className="mt-12 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-            {sections.process.steps.map((s, i) => (
-              <Reveal as="li" key={s.title} delay={i * 110} className="relative border-t border-ink-900/15 pt-6">
-                <span className="absolute -top-px left-0 h-px w-12 bg-gold-500" aria-hidden />
-                <span className="font-serif text-6xl italic leading-none text-gold-600">{String(i + 1).padStart(2, '0')}</span>
-                <p className="mt-6 text-lg font-semibold">{s.title}</p>
-                <p className="mt-2 text-[15px] leading-7 text-ink-600">{s.text}</p>
-              </Reveal>
-            ))}
-          </ol>
-        </section>
+      {sections.process && sections.process.steps.length > 0 && (
+        <ProcessStory title={sections.process.title} steps={sections.process.steps} />
       )}
 
       {/* Qualità grafiche */}
       {sections.quality && (
-        <section className="container pt-20 sm:pt-32">
-          <Reveal className="overflow-hidden rounded-[2rem] bg-ink-950 text-white">
-            <div data-surface="dark" className="relative grid min-h-[22rem] items-end gap-8 p-8 sm:p-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:p-16">
-              <ShaderBackdrop palette="deep" anchor={[0.55, 0.25]} />
-              <Grain />
-              <div className="relative max-w-2xl">
-                <h2 className="display-lg text-[clamp(1.5rem,6.6vw,3rem)] text-white"><AccentTitle text={sections.quality.title} accentClassName="text-gold-400" /></h2>
-                <p className="mt-5 text-lg leading-8 text-ink-300">{sections.quality.text}</p>
-              </div>
-              <p className="relative whitespace-nowrap leading-[.8]">
-                <span
-                  className="bg-gradient-to-b from-white via-white/70 to-white/0 bg-clip-text font-display text-[7rem] font-extrabold text-transparent sm:text-[11rem]"
-                  style={{ fontStretch: '120%' }}
-                >
-                  {settings.quality.min_dpi}
-                </span>
-                <span className="ml-2 align-top font-mono text-base font-medium tracking-widest text-gold-400 sm:text-lg">DPI</span>
-              </p>
-            </div>
-          </Reveal>
-        </section>
+        <QualityLab title={sections.quality.title} text={sections.quality.text} quality={settings.quality} />
       )}
 
       {/* CTA finali */}

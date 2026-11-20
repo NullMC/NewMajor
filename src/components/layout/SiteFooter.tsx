@@ -6,6 +6,7 @@ import { listLegalPages } from '@/features/content/api'
 import { NAV } from './SiteHeader'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { Grain } from '@/components/fx/ShaderBackdrop'
+import { StretchWordmark } from '@/components/fx/StretchWordmark'
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`
 
@@ -59,6 +60,14 @@ export function SiteFooter() {
             </li>
           </ul>
         </div>
+      </div>
+      {/* Marchio a tutta larghezza: le lettere si allargano verso il puntatore */}
+      <div className="relative px-3 pb-2 sm:px-6">
+        <StretchWordmark
+          text="New Major"
+          className="text-[19vw]"
+          letterClassName="bg-gradient-to-b from-ink-200 via-ink-500 to-ink-900 bg-clip-text pb-[.04em] text-transparent"
+        />
       </div>
       <div className="relative border-t border-white/10">
         <div className="container flex flex-col gap-4 py-6 text-xs text-ink-500 md:flex-row md:items-center md:justify-between">
