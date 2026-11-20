@@ -27,6 +27,10 @@ const CODES: Record<string, (arg?: string, arg2?: string) => string> = {
   invalid_price: () => 'Prezzo non valido.',
   email_required: () => 'Inserisci un indirizzo email valido: è necessario per inviare l’ordine.',
   phone_required: () => 'Inserisci un numero di telefono valido: è necessario per inviare l’ordine.',
+  unsupported_file_type: (kind) => kind === 'graphic'
+    ? 'Formato non supportato: carica un file PNG, JPG, WebP o SVG.'
+    : 'Formato immagine non supportato: usa JPG, PNG, WebP, AVIF o SVG.',
+  file_too_large: (mb) => `Il file supera il limite di ${mb} MB.`,
   username_taken: () => 'Nome utente non disponibile: scegline un altro.',
   username_login_failed: () => 'Nome utente o password non corretti. Se in registrazione hai indicato l’email, prova ad accedere con quella.',
 }
@@ -45,6 +49,13 @@ export function errorMessage(err: unknown): string {
       ? err
       : (err as { message?: string }).message ?? (err as { error_description?: string }).error_description ?? ''
   if (AUTH[raw]) return AUTH[raw]
+  if (/^Email address ".*@utenti\.newmajor\.invalid" is invalid/.test(raw)) return 'Al momento non è possibile registrarsi senza email: inserisci un indirizzo email.'
+  if (/^Email address ".*" is invalid/.test(raw)) return 'Indirizzo email non accettato: controlla di averlo scritto correttamente.'
+  if (/maximum allowed size|Payload too large/i.test(raw)) return 'Il file è troppo grande per essere caricato.'
+  if (/mime type .* is not supported|invalid_mime_type/i.test(raw)) return 'Formato file non supportato.'
+  if (/Email address not authorized|error sending (confirmation|recovery) email/i.test(raw)) return 'Non è stato possibile inviare l’email. Contattaci per assistenza.'
+  if (/rate limit/i.test(raw)) return 'Troppi tentativi in poco tempo. Riprova tra qualche minuto.'
+  if (/Database error saving new user/i.test(raw)) return 'Registrazione non riuscita: il nome utente potrebbe essere già in uso. Riprova con un altro.'
   const [code, a, b] = raw.split(':')
   if (CODES[code]) return CODES[code](a, b)
   if (/duplicate key value.*slug/i.test(raw)) return 'Esiste già un elemento con questo slug.'

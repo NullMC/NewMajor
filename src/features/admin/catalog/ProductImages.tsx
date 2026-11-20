@@ -4,7 +4,7 @@ import type { ProductImage } from '@/types/db'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
-import { optimizeImage, publicUrl, removePublic, uploadPublic } from '@/lib/storage'
+import { optimizeImage, publicUrl, removePublic, uploadPublic, SITE_IMAGE_ACCEPT } from '@/lib/storage'
 import { Badge } from '@/components/ui/Display'
 import { Dropzone } from '@/components/ui/Dropzone'
 import { Input } from '@/components/ui/Form'
@@ -128,7 +128,7 @@ export function ProductImages({ productId, images, onChanged }: { productId: str
                     )}
                     <label className="cursor-pointer rounded-lg p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Sostituisci immagine">
                       <Replace className="h-4 w-4" />
-                      <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void replace(img, f); e.target.value = '' }} />
+                      <input type="file" accept={SITE_IMAGE_ACCEPT} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void replace(img, f); e.target.value = '' }} />
                     </label>
                     <button type="button" onClick={() => void remove(img)} className="rounded-lg p-1.5 text-ink-500 hover:bg-danger-50 hover:text-danger-600" aria-label="Elimina immagine"><Trash2 className="h-4 w-4" /></button>
                   </div>

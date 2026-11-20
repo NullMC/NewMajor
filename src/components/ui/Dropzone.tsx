@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { SITE_IMAGE_ACCEPT } from '@/lib/storage'
 
 interface DropzoneProps {
   onFiles: (files: File[]) => void
@@ -15,7 +16,7 @@ interface DropzoneProps {
 
 /** Area di upload con drag & drop, accessibile anche da tastiera. */
 export function Dropzone({
-  onFiles, accept = 'image/*', multiple, disabled, label = 'Trascina qui i file o selezionali', hint, compact, className,
+  onFiles, accept = SITE_IMAGE_ACCEPT, multiple, disabled, label = 'Trascina qui i file o selezionali', hint, compact, className,
 }: DropzoneProps) {
   const id = useId()
   const input = useRef<HTMLInputElement>(null)

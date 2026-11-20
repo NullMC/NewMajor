@@ -4,7 +4,7 @@ import type { MediaItem } from '@/types/db'
 import { supabase } from '@/lib/supabase'
 import { errorMessage } from '@/lib/errors'
 import { formatBytes, formatDate } from '@/lib/format'
-import { optimizeImage, publicUrl, removePublic, uploadPublic } from '@/lib/storage'
+import { optimizeImage, publicUrl, removePublic, uploadPublic, SITE_IMAGE_ACCEPT } from '@/lib/storage'
 import { useQuery } from '@/hooks/useQuery'
 import { useMeta } from '@/hooks/useMeta'
 import { EmptyState, PageHeader, Skeleton } from '@/components/ui/Display'
@@ -94,7 +94,7 @@ export default function MediaPage() {
                 <p className="text-2xs text-ink-500">{m.width ? `${m.width}×${m.height}` : ''}{m.size_bytes ? ` · ${formatBytes(m.size_bytes)}` : ''} · {formatDate(m.created_at)}</p>
                 <div className="flex justify-end">
                   <button type="button" onClick={() => copy(m)} className="rounded-lg p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Copia codice Markdown"><Copy className="h-4 w-4" /></button>
-                  <label className="cursor-pointer rounded-lg p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Sostituisci"><Replace className="h-4 w-4" /><input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void replace(m, f); e.target.value = '' }} /></label>
+                  <label className="cursor-pointer rounded-lg p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Sostituisci"><Replace className="h-4 w-4" /><input type="file" accept={SITE_IMAGE_ACCEPT} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void replace(m, f); e.target.value = '' }} /></label>
                   <button type="button" onClick={() => void remove(m)} className="rounded-lg p-1.5 text-ink-500 hover:bg-danger-50 hover:text-danger-600" aria-label="Elimina"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
