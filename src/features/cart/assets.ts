@@ -89,8 +89,8 @@ export async function uploadPendingAssets(
         next.areas[areaId] = { ...area, asset: null, enabled: false }
         continue
       }
+      // I file locali vengono eliminati dal chiamante solo dopo il salvataggio della riga
       const path = await uploadCustomerFile(userId, blob, blob.type || asset.mime, 'graphics')
-      await blobStore.del(asset.localKey)
       next.areas[areaId] = { ...area, asset: { ...asset, path, localKey: undefined } }
     }
   }
@@ -102,7 +102,6 @@ export async function uploadPendingAssets(
       const blob = await blobStore.get(key)
       if (blob) {
         preview[side] = await uploadCustomerFile(userId, blob, 'image/png', 'previews')
-        await blobStore.del(key)
       }
     }
     next.preview = preview

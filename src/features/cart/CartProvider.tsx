@@ -74,9 +74,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const { data: created, error } = await supabase.from('carts').insert({ user_id: uidValue }).select('id').single()
     if (error) {
       // Possibile creazione concorrente: rileggi
-      const { data: again } = await supabase.from('carts').select('id').eq('user_id', uidValue).single()
-      cartIdRef.current = again?.id ?? null
-      return cartIdRef.current as string
+      const { data: again } = await supabase.from('carts').select('id').eq('user_id', uidValue).maybeSingle()
+      if (!again?.id) throw error
+      cartIdRef.current = again.id
+      return again.id as string
     }
     cartIdRef.current = created.id
     return created.id as string
@@ -118,13 +119,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (guest.length) {
           setSyncing(true)
           const cartId = await ensureCart(userId)
+          // Le righe non sincronizzate restano nel browser: nessuna configurazione va persa
+          const failed: typeof guest = []
           for (const line of guest) {
-            const config = await uploadPendingAssets(userId, line.configuration, line.pendingPreview)
-            await supabase.from('cart_items').insert({
-              cart_id: cartId, product_id: line.productId, configuration: config, quantity: line.quantity,
-            })
+            try {
+              const config = await uploadPendingAssets(userId, line.configuration, line.pendingPreview)
+              const { error } = await supabase.from('cart_items').insert({
+                cart_id: cartId, product_id: line.productId, configuration: config, quantity: line.quantity,
+              })
+              if (error) throw error
+              await cleanupLocalBlobs(line)
+            } catch (err) {
+              console.error('Riga del carrello non sincronizzata', err)
+              failed.push(line)
+            }
           }
-          writeLocal([])
+          writeLocal(failed)
           setSyncing(false)
         }
         if (!cancelled) await loadRemote(userId)
