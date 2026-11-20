@@ -51,7 +51,7 @@ Creati automaticamente per ogni nuovo ordine, cambio stato (se richiesto) e rich
 
 ## Contenuti
 
-- **Home e banner**: banner annunci in cima al sito, hero, sezioni, prodotti in evidenza. Una sezione senza titolo non viene mostrata.
+- **Home e banner**: banner annunci in cima al sito, hero, sezioni, prodotti in evidenza. Una sezione senza titolo non viene mostrata. Senza immagine hero, la home mostra i modelli 3D di due maglie (ruotabili trascinando); caricando un’immagine, questa li sostituisce. L’ultima parola dei titoli della home è resa in corsivo.
 - **Pagine**: testo in Markdown (`## Titolo`, `**grassetto**`, `- elenco`, `[link](/catalogo)`), con anteprima. Le pagine di sistema (Chi siamo e legali) non si eliminano ma si possono mettere in bozza.
 - **FAQ**: domande ordinabili, attivabili e raggruppabili per categoria.
 - **Media**: carica immagini e copia il codice da incollare nelle pagine.

@@ -9,6 +9,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    chunkSizeWarningLimit: 900,
+    // three.js + R3F: chunk caricato solo dal configuratore e dalla scena 3D della home
+    chunkSizeWarningLimit: 1000,
   },
 })
