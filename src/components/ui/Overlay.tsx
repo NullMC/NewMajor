@@ -8,18 +8,25 @@ const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input:not([disabled])
 /** Gestisce Esc, focus trap, blocco scroll e ripristino del focus. */
 function useOverlay(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null)
+  // onClose spesso è una funzione nuova a ogni render: tenerla in un ref evita che
+  // l'effetto riparta (e rimetta il focus sul primo elemento) a ogni tasto premuto.
+  const close = useRef(onClose)
+  close.current = onClose
   useEffect(() => {
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const node = ref.current
-    const first = node?.querySelector<HTMLElement>('[data-autofocus]') ?? node?.querySelector<HTMLElement>(FOCUSABLE)
+    // primo campo del modulo, se c'è; altrimenti il primo elemento interattivo
+    const first = node?.querySelector<HTMLElement>('[data-autofocus]')
+      ?? node?.querySelector<HTMLElement>('input:not([disabled]):not([type=hidden]):not(.sr-only),textarea,select')
+      ?? node?.querySelector<HTMLElement>(FOCUSABLE)
     ;(first ?? node)?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        close.current()
       } else if (e.key === 'Tab' && node) {
         const els = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null)
         if (!els.length) return
@@ -34,7 +41,7 @@ function useOverlay(open: boolean, onClose: () => void) {
       document.body.style.overflow = prevOverflow
       prev?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
   return ref
 }
 
