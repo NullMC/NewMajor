@@ -166,7 +166,7 @@ export default function HomeContentPage() {
           {text('Pulsante principale — link', c.hero.cta_primary?.href, (v) => setC({ ...c, hero: { ...c.hero, cta_primary: { label: c.hero.cta_primary?.label ?? '', href: v } } }))}
           {text('Pulsante secondario — testo', c.hero.cta_secondary?.label, (v) => setC({ ...c, hero: { ...c.hero, cta_secondary: { href: c.hero.cta_secondary?.href ?? '/contatti', label: v } } }))}
           {text('Pulsante secondario — link', c.hero.cta_secondary?.href, (v) => setC({ ...c, hero: { ...c.hero, cta_secondary: { label: c.hero.cta_secondary?.label ?? '', href: v } } }))}
-          <Field label="Immagine hero" hint="Facoltativa: se assente viene mostrata l’illustrazione vettoriale delle maglie" className="sm:col-span-2">
+          <Field label="Immagine hero" hint="Facoltativa: sostituisce la foto predefinita a destra dell’hero (sfumata verso sinistra). Consigliata almeno 1600 px di larghezza." className="sm:col-span-2">
             <ImageInput value={c.hero.image_path ?? null} onChange={(p) => setC({ ...c, hero: { ...c.hero, image_path: p } })} folder="site" />
           </Field>
         </div>
