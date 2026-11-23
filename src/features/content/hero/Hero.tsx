@@ -1,26 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { publicUrl } from '@/lib/storage'
-import { supportsWebGL } from '@/features/configurator/garment/webgl'
 import { ShaderBackdrop, Grain } from '@/components/fx/ShaderBackdrop'
 import { LiquidGlass } from '@/components/fx/LiquidGlass'
 import { AccentTitle } from '@/components/fx/Reveal'
 import type { HeroContent } from '../api'
-
-const HeroRail = lazy(() => import('./HeroRail'))
-
-/** Senza WebGL: le stesse maglie, ferme sull'asta. */
-function RailStill() {
-  return (
-    <div className="relative flex h-full items-start justify-center gap-4 pt-10 sm:gap-8">
-      <div aria-hidden className="absolute inset-x-0 top-10 h-1.5 rounded-full bg-gradient-to-b from-ink-500 to-ink-800" />
-      <img src="/hero/splash-front.webp" alt="" className="relative mt-3 w-[42%] max-w-[17rem] -rotate-2 drop-shadow-[0_30px_40px_rgba(0,0,0,0.5)]" />
-      <img src="/hero/lupo-front.webp" alt="Maglie da gara personalizzate" className="relative mt-3 w-[42%] max-w-[17rem] rotate-2 drop-shadow-[0_30px_40px_rgba(0,0,0,0.5)]" />
-    </div>
-  )
-}
 
 function HeroCta({ href, label, primary }: { href?: string; label?: string; primary?: boolean }) {
   if (!href || !label) return null
@@ -41,65 +26,46 @@ function HeroCta({ href, label, primary }: { href?: string; label?: string; prim
     : <LiquidGlass as="a" href={href} className={cls}>{label}{icon}</LiquidGlass>
 }
 
-function useWide() {
-  const query = '(min-width: 1024px)'
-  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const on = () => setWide(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [])
-  return wide
-}
+/** Foto predefinita dell'hero (sostituibile da Home e banner → Immagine hero). */
+const DEFAULT_PHOTO = '/hero/showroom.webp'
 
 export function Hero({ hero }: { hero: HeroContent | null }) {
-  const image = publicUrl(hero?.image_path)
-  const [webgl] = useState(supportsWebGL)
-  const [ready, setReady] = useState(false)
-  const wide = useWide()
-  const anchorA = useRef<HTMLDivElement>(null)
-  const anchorB = useRef<HTMLDivElement>(null)
-  const anchors = useMemo(() => [anchorA, anchorB], [])
+  const photo = publicUrl(hero?.image_path) ?? DEFAULT_PHOTO
+  const custom = !!hero?.image_path
   const title = hero?.title ?? 'Divise e kit da gara personalizzati'
-  // Su mobile e tablet le maglie fluttuano tra i contenuti (niente stender)
-  const floating = !wide && !image
-  const sceneClass = cn('absolute inset-0 transition-[opacity,filter] duration-[1400ms] ease-[cubic-bezier(.2,.75,.15,1)]', ready ? 'opacity-100 blur-0' : 'opacity-0 blur-md')
-
-  const still = (src: string) => !webgl && <img src={src} alt="" className="h-full w-full object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,0.5)]" />
 
   return (
     <section
       data-surface="dark"
       className="relative -mt-16 flex flex-col overflow-hidden bg-ink-950 text-white"
     >
-      <ShaderBackdrop anchor={[0.5, 0.35]} />
-      <Grain />
-      {/* Velo per la leggibilità del testo sul lato sinistro */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_12%_62%,rgba(8,8,10,.8),transparent_58%)]" />
+      <ShaderBackdrop anchor={[0.22, 0.4]} />
 
-      {/* Scena 3D: da desktop metà destra con lo stender, su mobile dietro ai contenuti */}
-      {floating ? (
-        webgl && (
-          <div className="absolute inset-0">
-            <Suspense fallback={null}>
-              <HeroRail anchors={anchors} onReady={() => setReady(true)} className={sceneClass} />
-            </Suspense>
-          </div>
-        )
-      ) : (
-        <div className="relative order-2 h-[min(100vw,30rem)] lg:absolute lg:inset-y-0 lg:left-[44%] lg:right-0 lg:h-auto lg:pt-16">
-          {image ? (
-            <img src={image} alt="" className="absolute inset-0 h-full w-full animate-scene-in object-cover" fetchPriority="high" />
-          ) : webgl ? (
-            <Suspense fallback={null}>
-              <HeroRail onReady={() => setReady(true)} className={sceneClass} />
-            </Suspense>
-          ) : (
-            <RailStill />
+      {/* Foto: su desktop occupa la parte destra e sfuma verso sinistra nello sfondo; su mobile sta sotto i testi e sfuma verso l'alto.
+          La maschera è sul blocco intero (foto + velature), così il bordo che tocca lo sfondo è sempre trasparente. */}
+      <div
+        className={cn(
+          'relative order-2 -mt-24 h-[min(125vw,36rem)] sm:-mt-32 lg:absolute lg:inset-y-0 lg:left-[36%] lg:right-0 lg:mt-0 lg:h-auto',
+          '[mask-image:linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,.5)_18%,#000_40%,#000_86%,transparent_100%)]',
+          'lg:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,.12)_10%,rgba(0,0,0,.45)_24%,rgba(0,0,0,.82)_38%,#000_52%)]',
+        )}
+      >
+        <img
+          src={photo}
+          alt={custom ? '' : 'Maglie e kit da gara personalizzati in esposizione'}
+          fetchPriority="high"
+          decoding="async"
+          className={cn(
+            'absolute inset-0 h-full w-full animate-scene-in object-cover [filter:saturate(.9)_brightness(.84)_contrast(1.06)]',
+            !custom && 'object-[50%_58%] lg:object-[50%_52%]',
           )}
-        </div>
-      )}
+        />
+        {/* Velature: tono scuro coerente con l'hero (sotto l'intestazione, in basso e ai bordi) */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(8,8,10,.6)_0%,transparent_24%,transparent_76%,rgba(8,8,10,.55)_100%)]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_95%_at_68%_48%,transparent_50%,rgba(8,8,10,.5)_100%)]" />
+      </div>
+
+      <Grain />
 
       <div className="container pointer-events-none relative z-10 order-1 flex items-center pb-10 pt-28 sm:pb-14 lg:min-h-[min(100svh,60rem)] lg:pb-24">
         <div className="relative w-full max-w-2xl lg:max-w-[min(46%,36rem)]">
@@ -110,22 +76,12 @@ export function Hero({ hero }: { hero: HeroContent | null }) {
           >
             <AccentTitle text={title} animate accentClassName="text-gold-400" />
           </h1>
-
-          {/* Sottotitolo e prima maglia affiancati (solo mobile/tablet) */}
-          <div className={cn('mt-6 sm:mt-8', floating && 'grid grid-cols-[minmax(0,1fr)_42%] items-center gap-3 sm:gap-6')}>
-            {hero?.subtitle ? (
-              <p className="max-w-lg animate-slide-up text-base leading-7 text-ink-300 [animation-delay:.45s] sm:text-lg sm:leading-8">{hero.subtitle}</p>
-            ) : <span />}
-            {floating && <div ref={anchorA} aria-hidden className="pointer-events-none aspect-[7/8]">{still('/hero/splash-front.webp')}</div>}
-          </div>
-
-          {/* Seconda maglia e pulsanti */}
-          <div className={cn('mt-6 sm:mt-10', floating && 'grid grid-cols-[40%_minmax(0,1fr)] items-center gap-3 sm:gap-6')}>
-            {floating && <div ref={anchorB} aria-hidden className="pointer-events-none aspect-[7/8]">{still('/hero/lupo-front.webp')}</div>}
-            <div className={cn('pointer-events-auto flex animate-slide-up gap-3 [animation-delay:.6s]', floating ? 'flex-col items-start' : 'flex-wrap')}>
-              <HeroCta primary href={hero?.cta_primary?.href ?? '/catalogo'} label={hero?.cta_primary?.label ?? 'Personalizza ora'} />
-              <HeroCta href={hero?.cta_secondary?.href} label={hero?.cta_secondary?.label} />
-            </div>
+          {hero?.subtitle && (
+            <p className="mt-6 max-w-lg animate-slide-up text-base leading-7 text-ink-300 [animation-delay:.45s] sm:mt-8 sm:text-lg sm:leading-8">{hero.subtitle}</p>
+          )}
+          <div className="pointer-events-auto mt-8 flex animate-slide-up flex-wrap gap-3 [animation-delay:.6s] sm:mt-10">
+            <HeroCta primary href={hero?.cta_primary?.href ?? '/catalogo'} label={hero?.cta_primary?.label ?? 'Personalizza ora'} />
+            <HeroCta href={hero?.cta_secondary?.href} label={hero?.cta_secondary?.label} />
           </div>
         </div>
       </div>
