@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, FormError, Input, Textarea } from '@/components/ui/Form'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useSettings } from '@/features/settings/SettingsProvider'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { sendContactRequest } from './api'
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`
@@ -15,11 +15,12 @@ export default function ContactPage() {
   const { settings } = useSettings()
   const { user, profile } = useAuth()
   const c = settings.company
+  const [params] = useSearchParams()
   const [form, setForm] = useState({
     name: profile?.full_name ?? '',
     email: profile?.email ?? user?.email ?? '',
     phone: profile?.phone ?? '',
-    subject: '',
+    subject: (params.get('oggetto') ?? '').slice(0, 160), // es. dal pulsante "Richiedi una consulenza" della home
     message: '',
     website: '', // honeypot anti-spam
   })
