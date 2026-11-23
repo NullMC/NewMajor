@@ -13,6 +13,8 @@ export interface HomeSections {
   personalization?: { title: string; text: string; points: string[] }
   process?: { title: string; steps: { title: string; text: string }[] }
   portfolio?: { title: string; text: string }
+  /** Avviso sulla qualità delle grafiche; se assente si usa il testo predefinito. */
+  disclaimer?: { title: string; text: string; points?: string[] }
   catalog_cta?: { title: string; text: string }
   contact_cta?: { title: string; text: string }
 }

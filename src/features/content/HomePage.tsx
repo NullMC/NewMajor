@@ -14,6 +14,7 @@ import { CurvedCarousel } from './home/CurvedCarousel'
 import { KineticWall } from './home/KineticWall'
 import { ProcessStory } from './home/ProcessStory'
 import { PortfolioShowcase } from './home/PortfolioShowcase'
+import { DISCLAIMER_DEFAULT, PrintDisclaimer } from './home/PrintDisclaimer'
 
 export default function HomePage() {
   const { settings } = useSettings()
@@ -87,6 +88,9 @@ export default function HomePage() {
       {sections.portfolio?.title && portfolio && portfolio.length > 0 && (
         <PortfolioShowcase title={sections.portfolio.title} text={sections.portfolio.text} posts={portfolio} />
       )}
+
+      {/* Avviso qualità grafiche e invito alla consulenza (testo predefinito finché non viene modificato) */}
+      {(sections.disclaimer ?? DISCLAIMER_DEFAULT).title && <PrintDisclaimer content={sections.disclaimer ?? DISCLAIMER_DEFAULT} />}
 
       {/* CTA finali */}
       <section className="container grid gap-3 pt-20 sm:pt-28 lg:pt-32 sm:gap-4 md:grid-cols-2">

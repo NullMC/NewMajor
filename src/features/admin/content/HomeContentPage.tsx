@@ -13,6 +13,7 @@ import { useUi } from '@/components/ui/Toast'
 import type { HeroContent, HomeSections, SiteBanner } from '@/features/content/api'
 import { ImageInput, ReorderButtons } from '../components/fields'
 import { adminListProducts } from '../catalog/api'
+import { DISCLAIMER_DEFAULT } from '@/features/content/home/PrintDisclaimer'
 
 type Content = { hero: HeroContent; sections: HomeSections; featured: { title: string; subtitle: string }; banner: SiteBanner }
 
@@ -201,6 +202,15 @@ export default function HomeContentPage() {
             </div>
           ))}
           <Button size="sm" variant="ghost" icon={<Plus className="h-4 w-4" />} onClick={() => setS({ process: { title: s.process?.title ?? '', steps: [...steps, { title: '', text: '' }] } })}>Aggiungi passo</Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Avviso qualità grafiche" description="Spiega che grafiche piccole o generate con l’AI senza cura possono dare stampe sgranate e invita a richiedere una consulenza. Lascia vuoto il titolo per nasconderlo." />
+        <div className="space-y-4 p-5">
+          {text('Titolo', (s.disclaimer ?? DISCLAIMER_DEFAULT).title, (v) => setS({ disclaimer: { ...DISCLAIMER_DEFAULT, ...s.disclaimer, title: v } }))}
+          {text('Testo', (s.disclaimer ?? DISCLAIMER_DEFAULT).text, (v) => setS({ disclaimer: { ...DISCLAIMER_DEFAULT, ...s.disclaimer, text: v } }), true)}
+          <Field label="Punti elenco"><div><ListEditor label="Punto" items={(s.disclaimer ?? DISCLAIMER_DEFAULT).points ?? []} onChange={(points) => setS({ disclaimer: { ...DISCLAIMER_DEFAULT, ...s.disclaimer, points } })} /></div></Field>
         </div>
       </Card>
 
