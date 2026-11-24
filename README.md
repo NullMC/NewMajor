@@ -175,6 +175,10 @@ docs/               Documentazione tecnica e operativa
 | `tailwindcss`, `postcss`, `autoprefixer` | Styling (dev) |
 | `typescript`, `vite`, `@vitejs/plugin-react`, `@types/*` | Build e tipi (dev) |
 | `@electric-sql/pglite` | Postgres embedded per `npm run test:db` (dev) |
+| `dxf-parser` | Importazione dei cartamodelli DXF (AAMA/ASTM) nel backoffice |
+| `pdf-lib` | File di produzione PDF 1:1 (generato nel browser dell'admin, chunk caricato al bisogno) |
+| `clipper-lib` | Abbondanza di stampa: offset dei contorni dei pezzi senza auto-intersezioni |
+| `jszip` | Archivio ZIP dei file originali del cliente per l'admin |
 
 Nessuna libreria di stato globale, form o data-fetching: sono coperti da context React, componenti propri e un hook `useQuery` minimale con cache e invalidazione.
 

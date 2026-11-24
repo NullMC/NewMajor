@@ -27,6 +27,30 @@ Gli amministratori non usano l’area cliente: accedendo dal sito, dall’icona 
 
 Per creare un prodotto simile usa **Duplica** nell’elenco prodotti (copia tutto tranne le immagini, in bozza).
 
+## Cartamodelli, loghi liberi e file di produzione
+
+Il file di stampa usa i **cartamodelli reali** del capo. Senza cartamodello il prodotto si vende come prima, ma il PDF di produzione non è disponibile e i loghi/sponsor liberi non compaiono nel configuratore.
+
+**1. Esportare dal CAD** (Gerber, Lectra, CLO, Optitex…): formato **DXF AAMA o ASTM**, con la linea di taglio sullo **strato 1** e, per ogni pezzo, i testi “Piece Name:”, “Size:” e “Quantity:”. In alternativa un **SVG in scala reale** (dimensioni del documento in mm o cm) con una forma chiusa per pezzo. Le tabelle di sviluppo taglie (grade rules) non vengono interpretate: esporta tutte le taglie già sviluppate (un file con tutte o un file per taglia).
+
+**2. Importare**: prodotto → scheda **Cartamodelli** → *Importa cartamodello*. Controlla per ogni pezzo nome, **tipo** (davanti, dietro, manica sinistra/destra, collo, polsino, altro), **taglia** e **quantità**; una manica tagliata in coppia può diventare automaticamente sinistra + destra (specchiata). Le misure mostrate sono quelle lette dal file: verificale. Il file originale resta scaricabile (privato, solo admin).
+
+**3. Punti di riferimento**: su ogni pezzo il punto oro è il riferimento da cui si misurano le grafiche: **centro collo** per davanti e dietro, **sommità della testa** per le maniche. Viene proposto in automatico; aprendo il pezzo puoi trascinarlo o scriverne le coordinate, e indicare l’angolo del drittofilo. Imposta la **taglia di riferimento** (quella mostrata al cliente nel configuratore). I controlli in alto segnalano taglie senza pezzi, davanti/dietro mancanti o una sola manica.
+
+**4. Loghi e sponsor liberi**: sempre nella scheda Cartamodelli imposta numero massimo (0 = disattivati), prezzo per logo e per sponsor, larghezza minima e massima in cm e zone consentite. Il cliente li aggiunge e li trascina, ridimensiona e ruota sul pezzo reale; le misure sono in **centimetri reali dal punto di riferimento** e restano identiche su tutte le taglie. Il configuratore blocca gli elementi che escono dal pezzo, avvisa quelli a meno di 1,5 cm dalla cucitura e controlla i DPI alla larghezza di stampa.
+
+**5. Dall’ordine** (dettaglio ordine, per ogni articolo):
+- **Anteprima prodotto**: un’immagine unica con fronte, retro e maniche (se hanno grafiche).
+- **File del cliente (ZIP)**: tutti i file originali con nomi chiari e un `riepilogo.txt` con zona, larghezza e posizione in cm di ogni elemento.
+- **File di produzione (PDF)**: indica larghezza utile del rotolo, abbondanza, distanza tra i pezzi, lunghezza massima per pagina e se specchiare le pagine per la carta transfer (puoi farle ricordare). Il PDF contiene un foglio di riepilogo (roster, colori, metri di rotolo stimati, avvisi) e, in scala 1:1, i pezzi di **ogni giocatore nella sua taglia** con colore di fondo, grafiche all-over, loghi, sponsor, nome e numero, **abbondanza**, **linea di taglio sul colore spot “CutContour”** ed etichetta sotto ogni pezzo (sul tessuto di scarto). Nomi e numeri sono resi a 300 dpi con lo stesso carattere dell’anteprima; le immagini del cliente restano alla loro risoluzione originale. Le posizioni di nomi, numeri e loghi delle aree fisse sono ricavate sulla taglia di riferimento e riportate in cm sulle altre; colletti e polsini prendono il colore dei profili.
+
+**Prima di andare in produzione — stampa di prova** (da fare con il primo cartamodello reale):
+1. Genera il PDF di un ordine di prova con una sola taglia e aprilo al **100%** (non “adatta alla pagina”): misura con il righello del visualizzatore larghezza e altezza di un pezzo e confrontale con il cartamodello.
+2. Controlla che logo e numero siano alla distanza attesa dal collo (es. 10 cm) su due taglie diverse.
+3. Invia il PDF al RIP: verifica che riconosca la linea “CutContour” e se applica già la specchiatura (in quel caso lasciala disattivata qui).
+4. Stampa e taglia **un solo pezzo**, sovrapponilo al cartamodello fisico e controlla taglio, abbondanza e posizione delle grafiche.
+5. Solo dopo questa verifica usa i PDF per gli ordini reali.
+
 ## Dashboard
 
 In alto a destra scegli il periodo del riepilogo: 7 giorni, 30 giorni, 3, 6, 12 o 24 mesi (la scelta resta memorizzata nel browser). Il periodo vale per numero e valore degli ordini (esclusi gli annullati), per il grafico (per giorno fino a 30 giorni, per settimana fino a 6 mesi, per mese oltre) e per “Ordini per stato”. Gli altri contatori (ordini in corso, bonifici, promemoria, richieste, clienti, prodotti) mostrano sempre la situazione attuale.
@@ -34,7 +58,7 @@ In alto a destra scegli il periodo del riepilogo: 7 giorni, 30 giorni, 3, 6, 12 
 ## Gestire gli ordini
 
 - **Ordini**: filtri per stato, pagamento, tipo, date e ricerca (riferimento, nome, email, telefono).
-- Nel dettaglio trovi anteprime, personalizzazioni con **download del file originale**, qualità delle grafiche (e se il cliente ha accettato una qualità bassa), roster con nomi/numeri/taglie, indirizzi, note.
+- Nel dettaglio trovi anteprime, personalizzazioni con **download del file originale** (per loghi e sponsor liberi anche zona, misura e posizione in cm), i download per la produzione (vedi *Cartamodelli, loghi liberi e file di produzione*), qualità delle grafiche (e se il cliente ha accettato una qualità bassa), roster con nomi/numeri/taglie, indirizzi, note.
 - **Aggiorna stato**: scegli lo stato (la barra di avanzamento del cliente si aggiorna), aggiungi un messaggio facoltativo; puoi notificare il cliente e creare un promemoria per contattarlo.
 - **Pagamento**: “Conferma pagamento ricevuto” quando arriva il bonifico (o all’incasso alla consegna).
 - **Spedizione**: inserisci il costo se era “da definire”: il totale si aggiorna.
