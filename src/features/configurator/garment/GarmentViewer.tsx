@@ -1,8 +1,9 @@
 // Mockup 3D live del capo (React Three Fiber). Caricato in lazy solo nel configuratore.
 //
-// La mesh è generata dalla sagoma: due superfici (fronte/retro) a "cuscino" la cui
-// profondità dipende dalla distanza dal bordo, ritagliate con alphaTest sulla texture.
-// Leggero (nessun modello da scaricare) e coerente con le aree definite dall'admin.
+// Se per la sagoma esiste un modello 3D reale (GARMENT_MODELS) le grafiche vengono
+// proiettate su di esso; altrimenti, o finché il modello non è pronto, la mesh è generata
+// dalla sagoma: due superfici (fronte/retro) a "cuscino" la cui profondità dipende dalla
+// distanza dal bordo, ritagliate con alphaTest sulla texture.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -11,6 +12,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ModelShape } from '@/types/db'
 import { getShape } from './shapes'
 import { buildPanelGeometry } from './geometry'
+import { ModelGarment, useGarmentModel } from './ModelGarment'
 
 function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
   const { gl, invalidate } = useThree()
@@ -31,9 +33,10 @@ function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
   return texture
 }
 
-function Garment({ shape, front, back, version, view }: {
-  shape: ModelShape; front: HTMLCanvasElement | null; back: HTMLCanvasElement | null; version: number; view: 'front' | 'back'
+function Garment({ shape, front, back, version, view, baseColor }: {
+  shape: ModelShape; front: HTMLCanvasElement | null; back: HTMLCanvasElement | null; version: number; view: 'front' | 'back'; baseColor: string
 }) {
+  const model = useGarmentModel(shape)
   const s = getShape(shape)
   const frontGeo = useMemo(() => buildPanelGeometry(s, 'front'), [s])
   const backGeo = useMemo(() => buildPanelGeometry(s, 'back'), [s])
@@ -57,12 +60,18 @@ function Garment({ shape, front, back, version, view }: {
 
   return (
     <group ref={group} position={[0, -0.08, 0]}>
-      <mesh geometry={frontGeo} castShadow>
-        <meshStandardMaterial map={frontTex} alphaTest={0.5} alphaToCoverage side={THREE.DoubleSide} roughness={0.82} metalness={0} />
-      </mesh>
-      <mesh geometry={backGeo} rotation={[0, Math.PI, 0]}>
-        <meshStandardMaterial map={backTex} alphaTest={0.5} alphaToCoverage side={THREE.DoubleSide} roughness={0.82} metalness={0} />
-      </mesh>
+      {model.status === 'ready' && frontTex && backTex ? (
+        <ModelGarment shape={shape} geos={model.geos} front={frontTex} back={backTex} baseColor={baseColor} />
+      ) : (
+        <>
+          <mesh geometry={frontGeo} castShadow>
+            <meshStandardMaterial map={frontTex} alphaTest={0.5} alphaToCoverage side={THREE.DoubleSide} roughness={0.82} metalness={0} />
+          </mesh>
+          <mesh geometry={backGeo} rotation={[0, Math.PI, 0]}>
+            <meshStandardMaterial map={backTex} alphaTest={0.5} alphaToCoverage side={THREE.DoubleSide} roughness={0.82} metalness={0} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }
@@ -102,11 +111,13 @@ export interface GarmentViewerProps {
   back: HTMLCanvasElement | null
   version: number
   view: 'front' | 'back'
+  /** Colore base del capo: usato sul modello 3D dove le grafiche non arrivano. */
+  baseColor: string
   resetToken?: number
   className?: string
 }
 
-export default function GarmentViewer({ shape, front, back, version, view, resetToken = 0, className }: GarmentViewerProps) {
+export default function GarmentViewer({ shape, front, back, version, view, baseColor, resetToken = 0, className }: GarmentViewerProps) {
   return (
     <Canvas
       className={className}
@@ -121,7 +132,7 @@ export default function GarmentViewer({ shape, front, back, version, view, reset
       <directionalLight position={[2.5, 3, 4]} intensity={1.6} />
       <directionalLight position={[-3, 1.5, -3]} intensity={0.9} />
       <directionalLight position={[0, -2, 3]} intensity={0.25} />
-      <Garment shape={shape} front={front} back={back} version={version} view={view} />
+      <Garment shape={shape} front={front} back={back} version={version} view={view} baseColor={baseColor} />
       <Controls resetKey={`${view}-${shape}-${resetToken}`} />
     </Canvas>
   )

@@ -44,7 +44,7 @@ export function ConfiguratorViewer({ api }: { api: ConfiguratorApi }) {
       <div className="relative min-h-0 flex-1">
         {mode === '3d' ? (
           <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-400"><Spinner label="Caricamento anteprima 3D" /></div>}>
-            <GarmentViewer shape={shape} front={frontCanvas} back={backCanvas} version={version} view={view} resetToken={resetToken} className="!absolute inset-0 touch-none" />
+            <GarmentViewer shape={shape} front={frontCanvas} back={backCanvas} version={version} view={view} baseColor={api.baseColor} resetToken={resetToken} className="!absolute inset-0 touch-none" />
           </Suspense>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center p-6">
