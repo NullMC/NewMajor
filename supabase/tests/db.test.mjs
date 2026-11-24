@@ -247,6 +247,24 @@ await expectError('link al post solo https', () => as(admin.id, () => q(`insert 
 const [{ unit }] = await as(null, () => q(`select compute_unit_price($1, $2) unit`, [prod.id, JSON.stringify(config)]))
 Number(unit) === 31.5 ? ok('compute_unit_price coerente con il client (31.50)') : fail(unit)
 
+console.log('\nDashboard: riepilogo per periodo')
+{
+  const period = async (days) => (await as(admin.id, () => q(`select admin_dashboard_period($1) v`, [days])))[0].v
+  const [{ n: allOrders }] = await q(`select count(*)::int n from orders where kind = 'order'`)
+  const p30 = await period(30)
+  p30.orders === allOrders && p30.bucket === 'day' && p30.series.length === 30
+    ? ok(`30 giorni: ${p30.orders} ordini, serie giornaliera di 30 punti`) : fail(JSON.stringify({ orders: p30.orders, allOrders, bucket: p30.bucket, n: p30.series.length }))
+  p30.series.reduce((a, s) => a + s.count, 0) === p30.orders ? ok('la serie somma al totale del periodo') : fail('serie incoerente')
+  // un ordine spostato a 100 giorni fa esce dai 30 giorni ma rientra nei 6 mesi
+  await q(`update orders set created_at = now() - interval '100 days' where id = $1`, [order.order_id])
+  const [p30b, p180, p365] = [await period(30), await period(180), await period(365)]
+  p30b.orders === allOrders - 1 && p180.orders === allOrders ? ok('il periodo filtra per data di creazione') : fail(JSON.stringify({ p30: p30b.orders, p180: p180.orders, allOrders }))
+  p180.bucket === 'week' && p365.bucket === 'month' && p365.series.length >= 12 ? ok('unità del grafico: settimane fino a 6 mesi, mesi oltre') : fail(`${p180.bucket}/${p365.bucket}/${p365.series.length}`)
+  await q(`update orders set created_at = now() where id = $1`, [order.order_id])
+  await expectError('periodo fuori intervallo rifiutato', () => as(admin.id, () => q(`select admin_dashboard_period(0)`)), 'invalid_period')
+  await expectError('cliente non legge il riepilogo', () => as(c1.id, () => q(`select admin_dashboard_period(30)`)))
+}
+
 console.log('\nSeed dimostrativo')
 await db.exec(fs.readFileSync(path.join(dir, '..', 'seed_demo.sql'), 'utf8'))
 const [demo] = await q(`select p.is_published, (select count(*)::int from customization_areas a where a.product_id = p.id) areas from products p where slug = 'prodotto-dimostrativo'`)
