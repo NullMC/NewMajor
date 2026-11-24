@@ -31,6 +31,20 @@ function neckY(pts: [number, number][]): number {
 
 export interface SilhouetteElement { image: CanvasImageSource; cx: number; cy: number; w: number; h: number; rotation: number }
 
+/**
+ * Corrispondenza tra pezzo reale e sagoma: `k` = unità della sagoma per millimetro (dalla
+ * larghezza all'orlo), `neck` = quota del centro collo della sagoma (dove cade il riferimento).
+ */
+export function silhouetteFrame(shape: ModelShape, side: 'front' | 'back', piece: ZonePiece | Pick<ZonePiece, 'outline' | 'anchor'>) {
+  const s = getShape(shape)
+  const outline = (side === 'front' ? s.front : s.back) as [number, number][]
+  const sb = s.bounds
+  const pb = bounds(piece.outline)
+  const silHem = widthAt(outline, sb.minY + (sb.maxY - sb.minY) * 0.02)
+  const pieceHem = widthAt(piece.outline, pb.minY + pb.height * 0.02)
+  return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck: neckY(outline), bounds: sb }
+}
+
 /** Elementi di davanti/dietro convertiti in unità della sagoma per il pannello indicato. */
 export function toSilhouette(
   shape: ModelShape,
@@ -40,15 +54,8 @@ export function toSilhouette(
   images: Record<string, CanvasImageSource>,
 ): SilhouetteElement[] {
   if (!piece) return []
-  const s = getShape(shape)
-  const outline = (side === 'front' ? s.front : s.back) as [number, number][]
-  const sb = s.bounds
-  const pb = bounds(piece.outline)
-  const silHem = widthAt(outline, sb.minY + (sb.maxY - sb.minY) * 0.02)
-  const pieceHem = widthAt(piece.outline, pb.minY + pb.height * 0.02)
-  const k = silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0 // unità sagoma per mm
+  const { k, neck: n } = silhouetteFrame(shape, side, piece)
   if (!k) return []
-  const n = neckY(outline)
   const [ax, ay] = anchorOf(piece)
   return elements
     .filter((e) => e.zone === side && images[e.id])
@@ -87,4 +94,34 @@ export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement) {
   if (!piece) return null
   const b = bounds(piece.outline)
   return { canvas, rect: [b.minX, b.minY, b.width, b.height] as [number, number, number, number], anchor: anchorOf(piece) as [number, number] }
+}
+
+/** Anteprima di una manica per l'ordine: il pezzo reale nel colore di fondo con i suoi elementi. */
+export function drawSleevePreview(piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>, baseColor: string) {
+  const elCanvas = document.createElement('canvas')
+  drawSleeve(elCanvas, piece, elements, images)
+  const b = bounds(piece.outline)
+  const pad = 40
+  const c = document.createElement('canvas')
+  c.width = elCanvas.width + pad * 2
+  c.height = elCanvas.height + pad * 2
+  const ctx = c.getContext('2d')!
+  ctx.translate(pad, pad)
+  ctx.beginPath()
+  piece.outline.forEach(([x, y], i) => {
+    const px = (x - b.minX) * SLEEVE_PX_PER_MM, py = (b.maxY - y) * SLEEVE_PX_PER_MM
+    if (i) ctx.lineTo(px, py)
+    else ctx.moveTo(px, py)
+  })
+  ctx.closePath()
+  ctx.fillStyle = baseColor
+  ctx.fill()
+  ctx.save()
+  ctx.clip()
+  ctx.drawImage(elCanvas, 0, 0)
+  ctx.restore()
+  ctx.lineWidth = 3
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'
+  ctx.stroke()
+  return c
 }

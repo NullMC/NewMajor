@@ -85,7 +85,7 @@ function drawImageFit(
   ctx.drawImage(img, rx + (rw - dw) / 2, ry + (rh - dh) / 2, dw, dh)
 }
 
-function drawFittedText(
+export function drawFittedText(
   ctx: CanvasRenderingContext2D, text: string, rx: number, ry: number, rw: number, rh: number,
   style: TextStyle, kind: 'text' | 'number',
 ) {
