@@ -27,6 +27,10 @@ Gli amministratori non usano l’area cliente: accedendo dal sito, dall’icona 
 
 Per creare un prodotto simile usa **Duplica** nell’elenco prodotti (copia tutto tranne le immagini, in bozza).
 
+## Dashboard
+
+In alto a destra scegli il periodo del riepilogo: 7 giorni, 30 giorni, 3, 6, 12 o 24 mesi (la scelta resta memorizzata nel browser). Il periodo vale per numero e valore degli ordini (esclusi gli annullati), per il grafico (per giorno fino a 30 giorni, per settimana fino a 6 mesi, per mese oltre) e per “Ordini per stato”. Gli altri contatori (ordini in corso, bonifici, promemoria, richieste, clienti, prodotti) mostrano sempre la situazione attuale.
+
 ## Gestire gli ordini
 
 - **Ordini**: filtri per stato, pagamento, tipo, date e ricerca (riferimento, nome, email, telefono).
