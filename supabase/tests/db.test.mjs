@@ -278,6 +278,38 @@ console.log('\nCartamodelli')
   await expectError('anonimo non legge i cartamodelli', () => as(null, () => q(`select id from pattern_sets`)))
 }
 
+console.log('\nLoghi e sponsor liberi')
+{
+  const zones = (await as(null, () => q(`select product_print_zones($1) z`, [prod.id])))[0].z
+  zones.length === 1 && zones[0].zone === 'front' && zones[0].size === 'M' ? ok('zone di stampa pubbliche: solo i pezzi della taglia di riferimento') : fail(JSON.stringify(zones))
+  const el = (kind, zone, path, widthCm = 10) => ({ id: kind + zone, kind, zone, asset: { bucket: 'customer-uploads', path, name: 'a.png' }, xCm: 0, yCm: 8, widthCm, rotation: 0 })
+  const cfg = (elements) => ({ ...config, roster: [{ id: '1', size: 'M', quantity: 1 }, { id: '2', size: 'L', quantity: 1 }], elements })
+  const two = [el('logo', 'front', `${c1.id}/graphics/l.png`), el('sponsor', 'sleeve_left', `${c1.id}/graphics/s.png`)]
+  const place = (c) => as(c1.id, async () => {
+    await q(`delete from cart_items`)
+    const [cart] = await q(`select id from carts where user_id=$1`, [c1.id])
+    await q(`insert into cart_items (cart_id, product_id, configuration, quantity) values ($1, $2, $3, 1)`, [cart.id, prod.id, JSON.stringify(c)])
+    return (await q(`select * from place_order('cash_on_delivery', $1)`, [JSON.stringify({ full_name: 'M', line1: 'V', city: 'B', postal_code: '70100' })]))[0]
+  })
+  await expectError('elementi rifiutati se il prodotto non li consente', () => place(cfg(two)), 'elements_not_allowed')
+  await q(`update products set free_elements_max = 2, free_logo_price = 2, free_sponsor_price = 3.5 where id = $1`, [prod.id])
+  const [{ unit }] = await as(null, () => q(`select compute_unit_price($1, $2) unit`, [prod.id, JSON.stringify(cfg(two))]))
+  Number(unit) === 37 ? ok('prezzo: 31,50 + logo 2,00 + sponsor 3,50 = 37,00') : fail(`unit ${unit}`)
+  await expectError('troppi elementi', () => place(cfg([...two, el('logo', 'back', `${c1.id}/graphics/x.png`)])), 'too_many_elements')
+  await expectError('larghezza fuori dai limiti', () => place(cfg([el('logo', 'front', `${c1.id}/graphics/l.png`, 80)])), 'invalid_element')
+  await q(`update products set free_zones = '{front,back}' where id = $1`, [prod.id])
+  await expectError('zona non consentita', () => place(cfg(two)), 'invalid_element')
+  await q(`update products set free_zones = '{front,back,sleeve_left,sleeve_right}' where id = $1`, [prod.id])
+  await expectError('file di un altro utente rifiutato', () => place(cfg([el('logo', 'front', `${c2.id}/graphics/l.png`)])), 'invalid_asset_path')
+  const o = await place(cfg(two))
+  const rows = await q(`select area_name, area_type, side, asset_meta from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1 and (c.asset_meta->>'free')::boolean order by area_name`, [o.order_id])
+  rows.length === 2 && rows[0].area_name === 'Logo 1' && rows[0].side === 'front' && rows[1].asset_meta.zone === 'sleeve_left' && rows[1].side === null && Number(rows[0].asset_meta.widthCm) === 10
+    ? ok(`ordine ${o.reference}: elementi salvati con zona e misure in cm`) : fail(JSON.stringify(rows))
+  const [{ subtotal }] = await q(`select subtotal from orders where id = $1`, [o.order_id])
+  Number(subtotal) === 74 ? ok('totale ricalcolato dal DB con gli elementi (2 × 37,00)') : fail(`subtotal ${subtotal}`)
+  await q(`update products set free_elements_max = 0, free_logo_price = 0, free_sponsor_price = 0 where id = $1`, [prod.id])
+}
+
 console.log('\nSeed dimostrativo')
 await db.exec(fs.readFileSync(path.join(dir, '..', 'seed_demo.sql'), 'utf8'))
 const [demo] = await q(`select p.is_published, (select count(*)::int from customization_areas a where a.product_id = p.id) areas from products p where slug = 'prodotto-dimostrativo'`)

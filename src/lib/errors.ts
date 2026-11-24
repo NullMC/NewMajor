@@ -31,6 +31,9 @@ const CODES: Record<string, (arg?: string, arg2?: string) => string> = {
     ? 'Formato non supportato: carica un file PNG, JPG, WebP o SVG.'
     : 'Formato immagine non supportato: usa JPG, PNG, WebP, AVIF o SVG.',
   file_too_large: (mb) => `Il file supera il limite di ${mb} MB.`,
+  elements_not_allowed: (n) => `Il prodotto "${n}" non consente loghi o sponsor aggiuntivi.`,
+  too_many_elements: (n, m) => `Per "${n}" puoi aggiungere al massimo ${m} loghi e sponsor.`,
+  invalid_element: () => 'Uno dei loghi o sponsor non è valido (posizione, dimensione o file): controllalo e riprova.',
   username_taken: () => 'Nome utente non disponibile: scegline un altro.',
   username_login_failed: () => 'Nome utente o password non corretti. Se in registrazione hai indicato l’email, prova ad accedere con quella.',
 }
