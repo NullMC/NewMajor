@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ModelShape } from '@/types/db'
 import { getShape } from './shapes'
 import { buildPanelGeometry } from './geometry'
-import { ModelGarment, useGarmentModel } from './ModelGarment'
+import { ModelGarment, useGarmentModel, type SleeveTexture } from './ModelGarment'
 
 function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
   const { gl, invalidate } = useThree()
@@ -33,10 +33,21 @@ function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
   return texture
 }
 
-function Garment({ shape, front, back, version, view, baseColor }: {
+export interface SleeveCanvas { canvas: HTMLCanvasElement; rect: [number, number, number, number]; anchor: [number, number] }
+
+function useSleeve(s: SleeveCanvas | null | undefined, version: number): SleeveTexture | null {
+  const texture = usePanelTexture(s?.canvas ?? null, version)
+  const rectKey = s ? `${s.rect.join(',')}|${s.anchor.join(',')}` : ''
+  return useMemo(() => (texture && s ? { texture, rect: s.rect, anchor: s.anchor } : null), [texture, rectKey]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+function Garment({ shape, front, back, version, view, baseColor, sleeves }: {
   shape: ModelShape; front: HTMLCanvasElement | null; back: HTMLCanvasElement | null; version: number; view: 'front' | 'back'; baseColor: string
+  sleeves?: { left?: SleeveCanvas | null; right?: SleeveCanvas | null }
 }) {
   const model = useGarmentModel(shape)
+  const sleeveLeft = useSleeve(sleeves?.left, version)
+  const sleeveRight = useSleeve(sleeves?.right, version)
   const s = getShape(shape)
   const frontGeo = useMemo(() => buildPanelGeometry(s, 'front'), [s])
   const backGeo = useMemo(() => buildPanelGeometry(s, 'back'), [s])
@@ -61,7 +72,7 @@ function Garment({ shape, front, back, version, view, baseColor }: {
   return (
     <group ref={group} position={[0, -0.08, 0]}>
       {model.status === 'ready' && frontTex && backTex ? (
-        <ModelGarment shape={shape} geos={model.geos} front={frontTex} back={backTex} baseColor={baseColor} />
+        <ModelGarment shape={shape} geos={model.geos} front={frontTex} back={backTex} baseColor={baseColor} sleeveLeft={sleeveLeft} sleeveRight={sleeveRight} />
       ) : (
         <>
           <mesh geometry={frontGeo} castShadow>
@@ -113,11 +124,13 @@ export interface GarmentViewerProps {
   view: 'front' | 'back'
   /** Colore base del capo: usato sul modello 3D dove le grafiche non arrivano. */
   baseColor: string
+  /** Elementi delle maniche (solo per i modelli 3D reali). */
+  sleeves?: { left?: SleeveCanvas | null; right?: SleeveCanvas | null }
   resetToken?: number
   className?: string
 }
 
-export default function GarmentViewer({ shape, front, back, version, view, baseColor, resetToken = 0, className }: GarmentViewerProps) {
+export default function GarmentViewer({ shape, front, back, version, view, baseColor, sleeves, resetToken = 0, className }: GarmentViewerProps) {
   return (
     <Canvas
       className={className}
@@ -132,7 +145,7 @@ export default function GarmentViewer({ shape, front, back, version, view, baseC
       <directionalLight position={[2.5, 3, 4]} intensity={1.6} />
       <directionalLight position={[-3, 1.5, -3]} intensity={0.9} />
       <directionalLight position={[0, -2, 3]} intensity={0.25} />
-      <Garment shape={shape} front={front} back={back} version={version} view={view} baseColor={baseColor} />
+      <Garment shape={shape} front={front} back={back} version={version} view={view} baseColor={baseColor} sleeves={sleeves} />
       <Controls resetKey={`${view}-${shape}-${resetToken}`} />
     </Canvas>
   )

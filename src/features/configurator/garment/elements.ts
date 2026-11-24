@@ -57,3 +57,34 @@ export function toSilhouette(
       return { image: images[e.id], cx: (px - ax) * k, cy: n + (py - ay) * k, w: e.widthCm * 10 * k, h: elementHeightCm(e) * 10 * k, rotation: e.rotation || 0 }
     })
 }
+
+const SLEEVE_PX_PER_MM = 3
+
+/** Disegna i soli elementi della manica su un canvas trasparente che copre il pezzo (3 px/mm). */
+export function drawSleeve(canvas: HTMLCanvasElement, piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>) {
+  const b = bounds(piece.outline)
+  const w = Math.max(1, Math.round(b.width * SLEEVE_PX_PER_MM)), h = Math.max(1, Math.round(b.height * SLEEVE_PX_PER_MM))
+  if (canvas.width !== w) canvas.width = w
+  if (canvas.height !== h) canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, w, h)
+  for (const e of elements) {
+    const img = images[e.id]
+    if (!img) continue
+    const [px, py] = elementCenterMm(e, piece)
+    ctx.save()
+    ctx.translate((px - b.minX) * SLEEVE_PX_PER_MM, (b.maxY - py) * SLEEVE_PX_PER_MM)
+    ctx.rotate(((e.rotation || 0) * Math.PI) / 180)
+    const ew = e.widthCm * 10 * SLEEVE_PX_PER_MM, eh = elementHeightCm(e) * 10 * SLEEVE_PX_PER_MM
+    ctx.drawImage(img, -ew / 2, -eh / 2, ew, eh)
+    ctx.restore()
+  }
+}
+
+/** Dati della manica per il visualizzatore 3D: canvas, riquadro del pezzo e riferimento (mm). */
+export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement) {
+  if (!piece) return null
+  const b = bounds(piece.outline)
+  return { canvas, rect: [b.minX, b.minY, b.width, b.height] as [number, number, number, number], anchor: anchorOf(piece) as [number, number] }
+}

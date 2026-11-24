@@ -8,7 +8,7 @@ import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
 import { canvasToBlob, drawPanel, ensureFonts, type PanelLayer } from './garment/panel'
-import { toSilhouette } from './garment/elements'
+import { drawSleeve, sleeveInfo, toSilhouette } from './garment/elements'
 import { elementDpi, elementHeightCm, placementIssue, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 
 export const DEFAULT_BASE = '#F4F4F2'
@@ -80,6 +80,8 @@ export function useConfigurator(
 
   const frontCanvas = useMemo(() => document.createElement('canvas'), [])
   const backCanvas = useMemo(() => document.createElement('canvas'), [])
+  const sleeveLeftCanvas = useMemo(() => document.createElement('canvas'), [])
+  const sleeveRightCanvas = useMemo(() => document.createElement('canvas'), [])
 
   const kitItem = product.kit_items.find((k) => k.id === activeKitItem) ?? null
   const firstKitItem = product.kit_items[0]?.id ?? null
@@ -167,11 +169,15 @@ export function useConfigurator(
         const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides, highlightId: highlightArea }
         drawPanel(frontCanvas, { ...common, side: 'front', elements: silhouetteElements('front', shape, elementKit) })
         drawPanel(backCanvas, { ...common, side: 'back', elements: silhouetteElements('back', shape, elementKit) })
+        for (const [zone, canvas] of [['sleeve_left', sleeveLeftCanvas], ['sleeve_right', sleeveRightCanvas]] as const) {
+          const piece = zonePiece(zones, zone, elementKit)
+          if (piece) drawSleeve(canvas, piece, elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages)
+        }
         setVersion((v) => v + 1)
       })
     }, 16)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit])
+  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, zones, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas])
 
   // Azioni --------------------------------------------------------------------------
   const patch = useCallback((p: Partial<Configuration>) => setConfig((c) => ({ ...c, ...p })), [])
@@ -405,6 +411,10 @@ export function useConfigurator(
     highlightArea, setHighlightArea, uploading, frontCanvas, backCanvas, version, guides, setGuides,
     baseColor, secondaryColor, renderPreviews,
     zones, freeEnabled, freeZones, freeMax, elements, elementKit, selectedElement, setSelectedElement,
+    sleeveCanvases: {
+      left: sleeveInfo(zonePiece(zones, 'sleeve_left', elementKit), sleeveLeftCanvas),
+      right: sleeveInfo(zonePiece(zones, 'sleeve_right', elementKit), sleeveRightCanvas),
+    },
     addElement, updateElement, removeElement, elementQuality, elementUploading, elementHeightCm,
   }
 }
