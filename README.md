@@ -52,6 +52,7 @@ Il sito è disponibile su `http://localhost:5173`. Senza variabili Supabase l’
 | `npm run build` | Type-check + build di produzione in `dist/` |
 | `npm run preview` | Anteprima della build |
 | `npm run typecheck` | Solo controllo TypeScript |
+| `npm run test:unit` | Test di importazione dei cartamodelli (DXF di prova con misure note) e, nelle fasi successive, di posizionamento e disposizione dei pezzi |
 | `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (88 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
 | `npm run sitemap` | Genera `public/sitemap.xml` e `public/robots.txt` dai contenuti pubblicati |
 
