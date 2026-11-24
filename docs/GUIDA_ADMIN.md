@@ -16,7 +16,7 @@ Gli amministratori non usano l’area cliente: accedendo dal sito, dall’icona 
 
 ## Creare un prodotto personalizzabile
 
-1. **Generale**: nome, slug, categoria, tipo (capo singolo o kit), prezzo base, quantità minima, disponibilità, **modello 3D**, taglie, descrizioni, SEO. Salva.
+1. **Generale**: nome, slug, categoria, tipo (capo singolo o kit), prezzo base, quantità minima, disponibilità, **modello 3D**, taglie, descrizioni, SEO. Salva. Con il modello **Maglia manica corta** l’anteprima 3D del configuratore usa una maglia 3D reale (`public/models/jersey.glb`) su cui colori, loghi, nomi e numeri vengono proiettati da fronte e retro; gli altri modelli usano ancora la sagoma generata. Le aree di personalizzazione si posizionano come sempre sull’anteprima 2D.
 2. **Immagini**: trascina le foto; la prima è la principale (stella per cambiarla), frecce per l’ordine, testo alternativo per accessibilità/SEO. *Sostituisci* elimina automaticamente il file precedente. Le stesse foto si gestiscono anche da **Contenuti → Media**. Nel catalogo la principale fa da copertina e, passando il mouse sulla scheda, si sfogliano le prime 5; nella pagina prodotto si cambiano con frecce e miniature e si ingrandiscono tenendo premuto.
 3. **Tipologie, colori, opzioni**: spunta le tipologie disponibili (sovrapprezzo specifico facoltativo), aggiungi i colori (principale + profili) e le opzioni con i relativi valori e sovrapprezzi.
 4. **Aree personalizzazione**: aggiungi le aree (logo cuore, sponsor, all-over, nome retro, numero…). Indica sempre la **dimensione di stampa in cm**: serve a calcolare i DPI effettivi delle grafiche dei clienti. Posiziona le aree trascinandole nell’anteprima.

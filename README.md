@@ -199,7 +199,7 @@ Nessuna libreria di stato globale, form o data-fetching: sono coperti da context
 
 ## 8. Semplificazioni e punti da completare
 
-- **Modelli 3D**: le sagome (maglia manica corta/lunga, canotta, pantaloncino) sono generate proceduralmente; non è previsto il caricamento di modelli 3D specifici per brand.
+- **Modelli 3D**: la maglia manica corta usa un modello 3D reale (`public/models/jersey.glb`, derivato da un modello CLO 3D con licenza MIT: vedi `public/models/LICENSE-jersey.txt`), su cui le grafiche sono proiettate da fronte e retro senza bisogno di mappatura UV. Manica lunga, canotta e pantaloncino usano ancora sagome generate proceduralmente. Per aggiungere un modello: file GLB centrato, altezza 1, fronte verso +z, registrato in `GARMENT_MODELS` (`src/features/configurator/garment/ModelGarment.tsx`).
 - **Spedizione**: costo fisso (con soglia di gratuità) oppure “da definire” alla conferma; nessun calcolo per zona o peso.
 - **Immagini responsive**: ottimizzazione lato browser al caricamento (WebP, lato max 2000 px); le trasformazioni server di Supabase richiedono il piano Pro.
 - **Disattivazione utente**: blocca ordini e forza il logout lato app; la revoca server-side delle sessioni Auth richiederebbe una Edge Function con service role (non inclusa).
