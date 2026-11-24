@@ -21,8 +21,9 @@ import { ChildRowsEditor } from '../components/ChildRowsEditor'
 import { adminGetProduct, adminListProducts, isFeatured } from './api'
 import { ProductImages } from './ProductImages'
 import { AreaCanvasEditor } from './AreaCanvasEditor'
+import { PatternsTab } from './patterns/PatternsTab'
 
-type TabKey = 'general' | 'images' | 'configurator' | 'areas' | 'kit' | 'pricing' | 'related'
+type TabKey = 'general' | 'images' | 'configurator' | 'areas' | 'kit' | 'patterns' | 'pricing' | 'related'
 
 const SHAPES = Object.entries(SHAPE_LABEL).map(([value, label]) => ({ value, label }))
 const AREA_TYPES = [
@@ -139,6 +140,7 @@ export default function ProductEditPage() {
       { value: 'configurator' as const, label: 'Tipologie, colori, opzioni' },
       { value: 'areas' as const, label: 'Aree personalizzazione', count: p?.customization_areas.length },
       ...(isKit ? [{ value: 'kit' as const, label: 'Componenti kit', count: p?.kit_items.length }] : []),
+      { value: 'patterns' as const, label: 'Cartamodelli' },
       { value: 'pricing' as const, label: 'Sconti quantità' },
       { value: 'related' as const, label: 'Correlati' },
     ] : []),
@@ -170,6 +172,8 @@ export default function ProductEditPage() {
           <div className="mt-5 flex justify-end"><Button loading={saving} onClick={saveGeneral}>{isNew ? 'Crea prodotto' : 'Salva'}</Button></div>
         </Card>
       )}
+
+      {tab === 'patterns' && p && <PatternsTab product={p} />}
 
       {tab === 'images' && p && <ProductImages productId={p.id} images={p.product_images ?? []} onChanged={refresh} />}
 
