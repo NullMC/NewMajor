@@ -14,6 +14,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { useUi } from '@/components/ui/Toast'
 import { getOrder, listStatuses } from '@/features/orders/api'
 import { AddressBlock, OrderItemDetails, OrderProgress, PaymentBadge } from '@/features/orders/components'
+import { ProductionDownloads } from './ProductionDownloads'
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`
 
@@ -138,7 +139,7 @@ export default function OrderDetailPage() {
           <Card>
             <CardHeader title={`Articoli (${order.order_items.length})`} />
             <ul className="divide-y divide-ink-100">
-              {order.order_items.map((it) => <li key={it.id} className="p-5"><OrderItemDetails item={it} showFiles /></li>)}
+              {order.order_items.map((it, i) => <li key={it.id} className="p-5"><OrderItemDetails item={it} showFiles actions={<ProductionDownloads item={it} orderRef={order.reference} index={i} />} /></li>)}
             </ul>
             <dl className="space-y-2 border-t border-ink-100 p-5 text-sm">
               <div className="flex justify-between"><dt className="text-ink-500">Subtotale</dt><dd>{formatPrice(order.subtotal)}</dd></div>

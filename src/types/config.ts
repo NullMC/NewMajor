@@ -92,7 +92,7 @@ export interface Configuration {
   roster: RosterEntry[]
   textStyle?: TextStyle
   /** Anteprime renderizzate (percorsi nel bucket customer-uploads). */
-  preview?: { front?: string; back?: string }
+  preview?: { front?: string; back?: string; sleeveLeft?: string; sleeveRight?: string }
   /** Ordini custom dell'admin senza prodotto a catalogo. */
   customAreas?: CustomArea[]
   customDescription?: string

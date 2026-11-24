@@ -115,25 +115,35 @@ function Row({ label, value, onCopy, mono }: { label: string; value: string; onC
   )
 }
 
+/** Zona e, per loghi/sponsor liberi, misure e posizione in cm. */
+function placementText(side: string | null, m: Record<string, unknown>) {
+  const zones: Record<string, string> = { front: 'Fronte', back: 'Retro', sleeve_left: 'Manica sinistra', sleeve_right: 'Manica destra' }
+  const zone = (m.zone as string) ?? side ?? 'front'
+  if (!m.free) return zones[zone] ?? zone
+  const x = Number(m.xCm), y = Number(m.yCm)
+  const fmt = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',')
+  return `${zones[zone] ?? zone} · ${fmt(Number(m.widthCm))} cm di larghezza · ${x === 0 ? 'centrato' : `${fmt(Math.abs(x))} cm a ${x > 0 ? 'destra' : 'sinistra'}`} · ${fmt(y)} cm ${zone.startsWith('sleeve') ? 'dalla spalla' : 'sotto il collo'}${Number(m.rotation) ? ` · ${m.rotation}°` : ''}`
+}
+
 // Anteprime -----------------------------------------------------------------------
 
 export function PreviewThumbs({ preview, className, size = 'md' }: { preview?: Configuration['preview']; className?: string; size?: 'sm' | 'md' }) {
-  const [urls, setUrls] = useState<{ front?: string | null; back?: string | null }>({})
+  const [urls, setUrls] = useState<{ front?: string | null; back?: string | null; sleeveLeft?: string | null; sleeveRight?: string | null }>({})
   useEffect(() => {
     let cancelled = false
-    Promise.all([previewDisplayUrl(preview?.front), previewDisplayUrl(preview?.back)]).then(([front, back]) => {
-      if (!cancelled) setUrls({ front, back })
+    Promise.all([previewDisplayUrl(preview?.front), previewDisplayUrl(preview?.back), previewDisplayUrl(preview?.sleeveLeft), previewDisplayUrl(preview?.sleeveRight)]).then(([front, back, sleeveLeft, sleeveRight]) => {
+      if (!cancelled) setUrls({ front, back, sleeveLeft, sleeveRight })
     })
     return () => { cancelled = true }
-  }, [preview?.front, preview?.back])
+  }, [preview?.front, preview?.back, preview?.sleeveLeft, preview?.sleeveRight])
   const box = size === 'sm' ? 'h-16 w-16' : 'h-24 w-24'
   if (!preview?.front && !preview?.back) {
     return <div className={cn('flex items-center justify-center rounded-xl bg-ink-100 text-ink-300', box, className)}><ImageOff className="h-5 w-5" aria-hidden /></div>
   }
   return (
     <div className={cn('flex gap-1.5', className)}>
-      {(['front', 'back'] as const).map((s) => urls[s] ? (
-        <a key={s} href={urls[s]!} target="_blank" rel="noopener noreferrer" className={cn('overflow-hidden rounded-xl bg-ink-100 p-1', box)} aria-label={`Anteprima ${s === 'front' ? 'fronte' : 'retro'}`}>
+      {(['front', 'back', 'sleeveLeft', 'sleeveRight'] as const).map((s) => urls[s] ? (
+        <a key={s} href={urls[s]!} target="_blank" rel="noopener noreferrer" className={cn('overflow-hidden rounded-xl bg-ink-100 p-1', box)} aria-label={`Anteprima ${({ front: 'fronte', back: 'retro', sleeveLeft: 'manica sinistra', sleeveRight: 'manica destra' } as const)[s]}`}>
           <img src={urls[s]!} alt="" className="h-full w-full object-contain" loading="lazy" />
         </a>
       ) : null)}
@@ -169,7 +179,7 @@ export function describeConfiguration(product: ProductDetail | undefined, config
 }
 
 /** Dettaglio completo di una riga ordine: personalizzazioni con file, roster. */
-export function OrderItemDetails({ item, showFiles = false }: { item: OrderItem; showFiles?: boolean }) {
+export function OrderItemDetails({ item, showFiles = false, actions }: { item: OrderItem; showFiles?: boolean; actions?: React.ReactNode }) {
   const customizations = item.order_item_customizations ?? []
   const roster = item.order_item_roster ?? []
   return (
@@ -182,6 +192,7 @@ export function OrderItemDetails({ item, showFiles = false }: { item: OrderItem;
           {item.configuration?.customDescription && <p className="mt-2 rounded-lg bg-ink-50 p-2 text-sm text-ink-700">{item.configuration.customDescription}</p>}
         </div>
       </div>
+      {actions}
       {customizations.length > 0 && (
         <div>
           <p className="label-caps">Personalizzazioni</p>
@@ -236,7 +247,7 @@ function CustomizationRow({ c, showFiles }: { c: NonNullable<OrderItem['order_it
         </div>
       ) : null}
       <div className="min-w-0 flex-1 text-sm">
-        <p className="font-medium">{c.area_name} <span className="font-normal text-ink-500">· {c.side === 'back' ? 'Retro' : 'Fronte'}</span></p>
+        <p className="font-medium">{c.area_name} <span className="font-normal text-ink-500">· {placementText(c.side, c.asset_meta as Record<string, unknown>)}</span></p>
         {c.asset_path && (
           <p className="truncate text-xs text-ink-500">
             {meta.name}{meta.isVector ? ' · vettoriale' : meta.width ? ` · ${meta.width}×${meta.height} px` : ''}

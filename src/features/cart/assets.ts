@@ -4,7 +4,10 @@ import { uid } from '@/lib/slug'
 import type { AssetRef, Configuration } from '@/types/config'
 
 /** Anteprime in attesa di upload (utente ospite): chiavi IndexedDB. */
-export interface PendingPreview { front?: string; back?: string }
+export interface PendingPreview { front?: string; back?: string; sleeveLeft?: string; sleeveRight?: string }
+
+/** Viste salvate con l'ordine: fronte, retro e, se presenti grafiche sulle maniche, le maniche. */
+export const PREVIEW_VIEWS = ['front', 'back', 'sleeveLeft', 'sleeveRight'] as const
 
 /** Salva un file grafico: upload immediato se autenticato, altrimenti IndexedDB. */
 export async function storeGraphic(file: Blob, userId: string | null): Promise<Pick<AssetRef, 'path' | 'localKey' | 'bucket'>> {
@@ -51,19 +54,19 @@ export async function previewDisplayUrl(ref: string | undefined): Promise<string
 
 /** Salva le anteprime (PNG fronte/retro) generate dal configuratore. */
 export async function storePreviews(
-  previews: { front?: Blob; back?: Blob },
+  previews: Partial<Record<(typeof PREVIEW_VIEWS)[number], Blob>>,
   userId: string | null,
 ): Promise<{ preview?: Configuration['preview']; pending?: PendingPreview }> {
   if (userId) {
     const preview: NonNullable<Configuration['preview']> = {}
-    for (const side of ['front', 'back'] as const) {
+    for (const side of PREVIEW_VIEWS) {
       const b = previews[side]
       if (b) preview[side] = await uploadCustomerFile(userId, b, 'image/png', 'previews')
     }
     return { preview }
   }
   const pending: PendingPreview = {}
-  for (const side of ['front', 'back'] as const) {
+  for (const side of PREVIEW_VIEWS) {
     const b = previews[side]
     if (b) {
       const key = `preview:${uid()}`
@@ -96,7 +99,7 @@ export async function uploadPendingAssets(
   }
   if (pending) {
     const preview: NonNullable<Configuration['preview']> = { ...(config.preview ?? {}) }
-    for (const side of ['front', 'back'] as const) {
+    for (const side of PREVIEW_VIEWS) {
       const key = pending[side]
       if (!key) continue
       const blob = await blobStore.get(key)

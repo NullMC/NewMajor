@@ -8,7 +8,7 @@ import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
 import { canvasToBlob, drawPanel, ensureFonts, type PanelLayer } from './garment/panel'
-import { drawSleeve, sleeveInfo, toSilhouette } from './garment/elements'
+import { drawSleeve, drawSleevePreview, sleeveInfo, toSilhouette } from './garment/elements'
 import { elementDpi, elementHeightCm, placementIssue, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 
 export const DEFAULT_BASE = '#F4F4F2'
@@ -400,9 +400,20 @@ export function useConfigurator(
     const mainKit = product.product_type === 'kit' ? firstKitItem : null
     drawPanel(f, { ...common, side: 'front', elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
     drawPanel(b, { ...common, side: 'back', elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
+    const out: Partial<Record<'front' | 'back' | 'sleeveLeft' | 'sleeveRight', Blob>> = {}
     const [front, back] = await Promise.all([canvasToBlob(f), canvasToBlob(b)])
-    return { front: front ?? undefined, back: back ?? undefined }
-  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements])
+    if (front) out.front = front
+    if (back) out.back = back
+    // maniche: solo se hanno loghi o sponsor (pezzo reale con colore di fondo ed elementi)
+    for (const [zone, key] of [['sleeve_left', 'sleeveLeft'], ['sleeve_right', 'sleeveRight']] as const) {
+      const piece = zonePiece(zones, zone, mainKit)
+      const els = elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === mainKit)
+      if (!piece || !els.length) continue
+      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor))
+      if (blob) out[key] = blob
+    }
+    return out
+  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements, zones, elements, elementImages])
 
   return {
     product, config, setConfig, patch, setArea, toggleOption, uploadGraphic, pickLibraryAsset, setRoster, setTextStyle,
