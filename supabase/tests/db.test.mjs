@@ -265,6 +265,19 @@ console.log('\nDashboard: riepilogo per periodo')
   await expectError('cliente non legge il riepilogo', () => as(c1.id, () => q(`select admin_dashboard_period(30)`)))
 }
 
+console.log('\nCartamodelli')
+{
+  const outline = JSON.stringify([[0, 0], [500, 0], [500, 700], [0, 700]])
+  const [set] = await as(admin.id, () => q(`insert into pattern_sets (product_id, reference_size) values ($1, 'M') returning id`, [prod.id]))
+  await as(admin.id, () => q(`insert into pattern_pieces (pattern_set_id, size, piece, name, outline, anchor) values ($1, 'M', 'front', 'Davanti', $2, '{"x":250,"y":680}')`, [set.id, outline]))
+  ok('admin crea cartamodello e pezzo')
+  await expectError('un solo cartamodello per prodotto', () => as(admin.id, () => q(`insert into pattern_sets (product_id) values ($1)`, [prod.id])), 'pattern_sets_unique')
+  await expectError('contorno con meno di 3 punti rifiutato', () => as(admin.id, () => q(`insert into pattern_pieces (pattern_set_id, size, piece, name, outline) values ($1, 'M', 'back', 'Dietro', '[[0,0],[1,1]]')`, [set.id])), 'check')
+  const cust = await as(c1.id, () => q(`select id from pattern_pieces`))
+  cust.length === 0 ? ok('cliente non legge i cartamodelli') : fail('LEAK cartamodelli al cliente')
+  await expectError('anonimo non legge i cartamodelli', () => as(null, () => q(`select id from pattern_sets`)))
+}
+
 console.log('\nSeed dimostrativo')
 await db.exec(fs.readFileSync(path.join(dir, '..', 'seed_demo.sql'), 'utf8'))
 const [demo] = await q(`select p.is_published, (select count(*)::int from customization_areas a where a.product_id = p.id) areas from products p where slug = 'prodotto-dimostrativo'`)

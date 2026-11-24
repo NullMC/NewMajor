@@ -52,7 +52,7 @@ Il sito è disponibile su `http://localhost:5173`. Senza variabili Supabase l’
 | `npm run build` | Type-check + build di produzione in `dist/` |
 | `npm run preview` | Anteprima della build |
 | `npm run typecheck` | Solo controllo TypeScript |
-| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (82 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
+| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (88 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
 | `npm run sitemap` | Genera `public/sitemap.xml` e `public/robots.txt` dai contenuti pubblicati |
 
 ## 2. Configurazione Supabase
@@ -70,6 +70,7 @@ Esegui le migration **in ordine** (cartella `supabase/migrations`):
 7. `20261119000007_username_signup.sql` – registrazione con nome utente ed email facoltativa; email e telefono obbligatori al momento dell’ordine
 8. `20261120000008_portfolio.sql` – portfolio dei progetti realizzati (post delle squadre mostrati in home); sostituisce la sezione “qualità grafiche” della home
 9. `20261124000009_dashboard_period.sql` – riepilogo della dashboard su un periodo a scelta (7 giorni … 24 mesi)
+10. `20261125000010_patterns.sql` – cartamodelli dei prodotti (pezzi per taglia in mm) e bucket privato `patterns` per i file CAD
 
 Due modi:
 
