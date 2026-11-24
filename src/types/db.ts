@@ -189,6 +189,13 @@ export interface Product {
   sort_order: number
   seo_title: string | null
   seo_description: string | null
+  /** Loghi e sponsor liberi: 0 = non consentiti. */
+  free_elements_max?: number
+  free_logo_price?: number
+  free_sponsor_price?: number
+  free_min_width_cm?: number
+  free_max_width_cm?: number
+  free_zones?: ('front' | 'back' | 'sleeve_left' | 'sleeve_right')[]
   deleted_at: string | null
   created_at: string
   updated_at: string

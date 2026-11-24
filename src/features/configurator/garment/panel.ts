@@ -34,6 +34,8 @@ export interface PanelSpec {
   textStyle: TextStyle
   guides?: boolean
   highlightId?: string | null
+  /** Loghi e sponsor liberi in unità della sagoma (centro, dimensioni, rotazione oraria in gradi). */
+  elements?: { image: CanvasImageSource; cx: number; cy: number; w: number; h: number; rotation: number }[]
 }
 
 export const PANEL_WIDTH = 1536
@@ -156,6 +158,17 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
     if ((l.area.area_type === 'logo' || l.area.area_type === 'sponsor') && l.image) {
       drawImageFit(ctx, l.image, ...rect(l.area), 'contain', l.scale ?? 1)
     }
+  }
+
+  // 3b. Loghi e sponsor liberi (posizionati dal cliente)
+  for (const e of spec.elements ?? []) {
+    const [cx, cy] = toCanvas([e.cx, e.cy], shape.bounds, w, h)
+    const sx = w / (shape.bounds.maxX - shape.bounds.minX)
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate((e.rotation * Math.PI) / 180)
+    ctx.drawImage(e.image, (-e.w * sx) / 2, (-e.h * sx) / 2, e.w * sx, e.h * sx)
+    ctx.restore()
   }
 
   // 4. Nomi e numeri

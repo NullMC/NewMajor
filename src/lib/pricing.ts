@@ -47,6 +47,12 @@ export function computePrice(product: ProductDetail, config: Configuration, fall
     }
   }
 
+  const els = config.elements ?? []
+  const logos = els.filter((e) => e.kind === 'logo').length
+  const sponsors = els.filter((e) => e.kind === 'sponsor').length
+  if (logos && Number(product.free_logo_price)) lines.push({ label: logos === 1 ? 'Logo aggiuntivo' : `${logos} loghi aggiuntivi`, amount: logos * Number(product.free_logo_price) })
+  if (sponsors && Number(product.free_sponsor_price)) lines.push({ label: sponsors === 1 ? 'Sponsor aggiuntivo' : `${sponsors} sponsor aggiuntivi`, amount: sponsors * Number(product.free_sponsor_price) })
+
   const unit = round2(base + lines.reduce((s, l) => s + l.amount, 0))
   const quantity = configQuantity(config, fallbackQty)
   const discountPercent = product.price_tiers

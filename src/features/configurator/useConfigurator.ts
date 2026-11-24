@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AssetRef, AreaConfig, Configuration, RosterEntry, TextStyle } from '@/types/config'
+import type { AssetRef, AreaConfig, Configuration, PlacedElement, PrintZone, RosterEntry, TextStyle } from '@/types/config'
 import { emptyConfiguration } from '@/types/config'
 import type { CustomizationArea, CustomizationAsset, ModelShape, ProductDetail, QualitySettings } from '@/types/db'
 import { computePrice, configQuantity } from '@/lib/pricing'
@@ -8,6 +8,8 @@ import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
 import { canvasToBlob, drawPanel, ensureFonts, type PanelLayer } from './garment/panel'
+import { toSilhouette } from './garment/elements'
+import { elementDpi, elementHeightCm, placementIssue, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 
 export const DEFAULT_BASE = '#F4F4F2'
 
@@ -43,7 +45,7 @@ export interface ValidationIssue { section: string; message: string }
 
 export function useConfigurator(
   product: ProductDetail,
-  opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number; initialVariantId?: string | null },
+  opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number; initialVariantId?: string | null; zones?: ZonePiece[] },
 ) {
   const roster = usesRoster(product)
   const [config, setConfig] = useState<Configuration>(() => {
@@ -97,6 +99,7 @@ export function useConfigurator(
   // Caricamento immagini delle aree ------------------------------------------------
   const assetKey = Object.entries(config.areas)
     .map(([id, a]) => `${id}:${a.enabled ? a.asset?.path ?? a.asset?.localKey ?? '' : ''}`)
+    .concat((config.elements ?? []).map((e) => `el:${e.id}:${e.asset.path ?? e.asset.localKey ?? ''}`))
     .join('|')
   useEffect(() => {
     let cancelled = false
@@ -109,10 +112,34 @@ export function useConfigurator(
           if (url) next[id] = await loadImage(url)
         } catch { /* immagine non disponibile */ }
       }
+      for (const e of config.elements ?? []) {
+        try {
+          const url = await assetDisplayUrl(e.asset)
+          if (url) next[`el:${e.id}`] = await loadImage(url)
+        } catch { /* immagine non disponibile */ }
+      }
       if (!cancelled) setImages(next)
     })()
     return () => { cancelled = true }
   }, [assetKey])
+
+  // Loghi e sponsor liberi ---------------------------------------------------------
+  const zones = opts.zones ?? []
+  const elementKit = product.product_type === 'kit' ? activeKitItem : null
+  const freeMax = Number(product.free_elements_max ?? 0)
+  /** Zone consentite che hanno un pezzo nel cartamodello del componente visualizzato. */
+  const freeZones = useMemo(() => (product.free_zones ?? ['front', 'back', 'sleeve_left', 'sleeve_right'])
+    .filter((z) => zonePiece(zones, z, elementKit)) as PrintZone[], [product.free_zones, zones, elementKit])
+  const freeEnabled = freeMax > 0 && freeZones.length > 0
+  const elements = config.elements ?? []
+  const elementImages = useMemo(() => {
+    const out: Record<string, CanvasImageSource> = {}
+    for (const e of elements) if (images[`el:${e.id}`]) out[e.id] = images[`el:${e.id}`]
+    return out
+  }, [elements, images])
+  const silhouetteElements = useCallback((side: 'front' | 'back', forShape: ModelShape, kit: string | null) =>
+    toSilhouette(forShape, side, elements.filter((e) => (e.kitItemId ?? null) === kit), zonePiece(zones, side, kit), elementImages),
+  [elements, zones, elementImages])
 
   // Ridisegno pannelli --------------------------------------------------------------
   const row = config.roster[Math.min(previewRow, Math.max(0, config.roster.length - 1))]
@@ -138,13 +165,13 @@ export function useConfigurator(
         if (cancelled) return
         const layers = buildLayers(areas)
         const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides, highlightId: highlightArea }
-        drawPanel(frontCanvas, { ...common, side: 'front' })
-        drawPanel(backCanvas, { ...common, side: 'back' })
+        drawPanel(frontCanvas, { ...common, side: 'front', elements: silhouetteElements('front', shape, elementKit) })
+        drawPanel(backCanvas, { ...common, side: 'back', elements: silhouetteElements('back', shape, elementKit) })
         setVersion((v) => v + 1)
       })
     }, 16)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas])
+  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit])
 
   // Azioni --------------------------------------------------------------------------
   const patch = useCallback((p: Partial<Configuration>) => setConfig((c) => ({ ...c, ...p })), [])
@@ -226,6 +253,72 @@ export function useConfigurator(
     setView(area.side)
   }, [opts.quality, setArea])
 
+  const [selectedElement, setSelectedElement] = useState<string | null>(null)
+  const [elementUploading, setElementUploading] = useState(false)
+  const minW = Number(product.free_min_width_cm ?? 2), maxW = Number(product.free_max_width_cm ?? 40)
+
+  /** Qualità di un elemento alla sua larghezza di stampa attuale. */
+  const elementQuality = useCallback((e: Pick<PlacedElement, 'widthCm' | 'asset'>): AssetRef['quality'] => {
+    const dpi = elementDpi(e)
+    if (dpi == null) return 'vector'
+    return dpi >= opts.quality.min_dpi ? 'ok' : dpi >= opts.quality.warn_dpi ? 'warn' : 'poor'
+  }, [opts.quality])
+
+  const updateElement = useCallback((id: string, p: Partial<PlacedElement>) => {
+    setConfig((c) => ({ ...c, elements: (c.elements ?? []).map((e) => {
+      if (e.id !== id) return e
+      const next = { ...e, ...p }
+      if (p.widthCm != null) next.widthCm = Math.round(Math.min(maxW, Math.max(minW, p.widthCm)) * 10) / 10
+      // cambiando dimensione la qualità va riconfermata
+      if (p.widthCm != null && p.widthCm !== e.widthCm) next.asset = { ...next.asset, acknowledgedLowQuality: false }
+      return next
+    }) }))
+  }, [minW, maxW])
+
+  const removeElement = useCallback((id: string) => {
+    setConfig((c) => ({ ...c, elements: (c.elements ?? []).filter((e) => e.id !== id) }))
+    setSelectedElement((s) => (s === id ? null : s))
+  }, [])
+
+  /** Aggiunge un logo o uno sponsor da file caricato o dalla libreria. */
+  const addElement = useCallback(async (kind: PlacedElement['kind'], zone: PrintZone, source: { file: File } | { library: CustomizationAsset }) => {
+    if ((config.elements ?? []).length >= freeMax) return { error: `Puoi aggiungere al massimo ${freeMax} loghi e sponsor.` }
+    const widthCm = Math.min(maxW, Math.max(minW, kind === 'logo' ? 8 : 20))
+    let asset: AssetRef
+    if ('file' in source) {
+      setElementUploading(true)
+      try {
+        const info = await readImageInfo(source.file)
+        const ratio = info.width && info.height ? info.height / info.width : 1
+        const report = evaluateQuality(info, { print_width_cm: widthCm, print_height_cm: widthCm * ratio, area_type: kind }, opts.quality)
+        if (report.blocking) return { report }
+        const stored = await storeGraphic(source.file, opts.userId)
+        asset = {
+          ...stored, name: source.file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
+          isVector: info.isVector, effectiveDpi: report.effectiveDpi, metadataDpi: report.metadataDpi, quality: report.quality, acknowledgedLowQuality: false,
+        }
+      } finally {
+        setElementUploading(false)
+      }
+    } else {
+      const a = source.library
+      const isVector = a.storage_path.toLowerCase().endsWith('.svg') || !a.width
+      asset = {
+        bucket: PUBLIC_BUCKET, path: a.storage_path, libraryAssetId: a.id, name: a.name, mime: isVector ? 'image/svg+xml' : 'image/png',
+        width: a.width ?? 0, height: a.height ?? 0, sizeBytes: 0, isVector, effectiveDpi: null, metadataDpi: null, quality: isVector ? 'vector' : 'ok',
+      }
+    }
+    const el: PlacedElement = {
+      id: uid(), kind, zone, kitItemId: elementKit, asset, widthCm,
+      xCm: 0, yCm: zone === 'front' || zone === 'back' ? (kind === 'logo' ? 10 : 18) : 6, rotation: 0,
+    }
+    el.asset = { ...asset, quality: elementQuality(el), effectiveDpi: elementDpi(el) }
+    setConfig((c) => ({ ...c, elements: [...(c.elements ?? []), el] }))
+    setSelectedElement(el.id)
+    if (zone === 'front' || zone === 'back') setView(zone)
+    return { element: el }
+  }, [config.elements, freeMax, minW, maxW, opts.quality, opts.userId, elementKit, elementQuality])
+
   const setRoster = useCallback((rows: RosterEntry[]) => setConfig((c) => ({ ...c, roster: rows })), [])
   const setTextStyle = useCallback((s: Partial<TextStyle>) => setConfig((c) => ({ ...c, textStyle: { ...c.textStyle!, ...s } })), [])
 
@@ -265,6 +358,13 @@ export function useConfigurator(
         out.push({ section: 'graphics', message: `Conferma di aver preso visione della qualità della grafica "${q.area.name}".` })
       }
     }
+    for (const [i, e] of (config.elements ?? []).entries()) {
+      const label = `${e.kind === 'logo' ? 'Logo' : 'Sponsor'} ${i + 1} (${ZONE_LABEL[e.zone].toLowerCase()})`
+      const piece = zonePiece(opts.zones ?? [], e.zone, e.kitItemId ?? null)
+      if (piece && placementIssue(e, piece, 0) === 'outside') out.push({ section: 'elements', message: `${label}: esce dal pezzo, spostalo o riducilo.` })
+      const q = elementQuality(e)
+      if ((q === 'warn' || q === 'poor') && !e.asset.acknowledgedLowQuality) out.push({ section: 'elements', message: `${label}: conferma di aver preso visione della qualità della grafica.` })
+    }
     if (roster) {
       if (!config.roster.length) out.push({ section: 'roster', message: 'Aggiungi almeno un capo.' })
       const needSize = product.product_type === 'simple' && product.sizes.length > 0
@@ -279,7 +379,7 @@ export function useConfigurator(
     }
     if (qty < product.min_quantity) out.push({ section: 'roster', message: `Quantità minima: ${product.min_quantity} pezzi.` })
     return out
-  }, [product, config, roster, qty, qualityIssues])
+  }, [product, config, roster, qty, qualityIssues, opts.zones, elementQuality])
 
   /** Anteprime piane fronte/retro senza guide, da salvare con l'ordine. */
   const renderPreviews = useCallback(async () => {
@@ -291,11 +391,12 @@ export function useConfigurator(
     const common = { shape: mainShape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides: false }
     const f = document.createElement('canvas')
     const b = document.createElement('canvas')
-    drawPanel(f, { ...common, side: 'front' }, 1024)
-    drawPanel(b, { ...common, side: 'back' }, 1024)
+    const mainKit = product.product_type === 'kit' ? firstKitItem : null
+    drawPanel(f, { ...common, side: 'front', elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
+    drawPanel(b, { ...common, side: 'back', elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
     const [front, back] = await Promise.all([canvasToBlob(f), canvasToBlob(b)])
     return { front: front ?? undefined, back: back ?? undefined }
-  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle])
+  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements])
 
   return {
     product, config, setConfig, patch, setArea, toggleOption, uploadGraphic, pickLibraryAsset, setRoster, setTextStyle,
@@ -303,6 +404,8 @@ export function useConfigurator(
     kitItem, activeKitItem, setActiveKitItem, shape, areas, view, setView, previewRow, setPreviewRow,
     highlightArea, setHighlightArea, uploading, frontCanvas, backCanvas, version, guides, setGuides,
     baseColor, secondaryColor, renderPreviews,
+    zones, freeEnabled, freeZones, freeMax, elements, elementKit, selectedElement, setSelectedElement,
+    addElement, updateElement, removeElement, elementQuality, elementUploading, elementHeightCm,
   }
 }
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { ZonePiece } from '@/lib/patterns/placement'
 import type {
   Availability, Category, CustomizationAsset, GarmentType, Product, ProductDetail, ProductType,
 } from '@/types/db'
@@ -59,6 +60,7 @@ export interface ProductFilters {
   attributes?: Record<string, string>
   sort?: 'default' | 'price_asc' | 'price_desc' | 'newest' | 'name'
 }
+
 
 const cleanSearch = (q: string) => q.replace(/[,()%*\\]/g, ' ').trim().slice(0, 80)
 
@@ -128,4 +130,11 @@ export async function listLibraryAssets(): Promise<CustomizationAsset[]> {
   const { data, error } = await supabase.from('customization_assets').select('*').eq('is_active', true).order('sort_order').order('name')
   if (error) throw error
   return data as CustomizationAsset[]
+}
+
+/** Pezzi della taglia di riferimento (davanti, dietro, maniche) per posizionare loghi e sponsor liberi. */
+export async function getPrintZones(productId: string): Promise<ZonePiece[]> {
+  const { data, error } = await supabase.rpc('product_print_zones', { p_product: productId })
+  if (error) throw error
+  return (data ?? []) as ZonePiece[]
 }

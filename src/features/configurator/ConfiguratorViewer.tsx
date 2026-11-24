@@ -5,6 +5,8 @@ import { Spinner } from '@/components/ui/Spinner'
 import type { ConfiguratorApi } from './useConfigurator'
 import { supportsWebGL } from './garment/webgl'
 import { SHAPE_LABEL } from './garment/shapes'
+import { PlacementEditor } from './PlacementEditor'
+import { zonePiece, ZONE_LABEL } from '@/lib/patterns/placement'
 
 const GarmentViewer = lazy(() => import('./garment/GarmentViewer'))
 
@@ -26,6 +28,10 @@ export function ConfiguratorViewer({ api }: { api: ConfiguratorApi }) {
   const [resetToken, setResetToken] = useState(0)
   const { product, view, setView, frontCanvas, backCanvas, version, shape, guides, setGuides } = api
 
+  // con un logo/sponsor selezionato la vista diventa l'editor di posizionamento sul pezzo reale
+  const selected = api.elements.find((e) => e.id === api.selectedElement) ?? null
+  const placePiece = selected ? zonePiece(api.zones, selected.zone, selected.kitItemId ?? null) : null
+
   const seg = (active: boolean) =>
     cn('h-9 rounded-lg px-3 text-xs font-semibold transition-colors', active ? 'bg-ink-900 text-white' : 'text-ink-600 hover:text-ink-900')
 
@@ -42,7 +48,15 @@ export function ConfiguratorViewer({ api }: { api: ConfiguratorApi }) {
       )}
 
       <div className="relative min-h-0 flex-1">
-        {mode === '3d' ? (
+        {selected && placePiece ? (
+          <div className="absolute inset-0 flex flex-col p-3 sm:p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-ink-900">{ZONE_LABEL[selected.zone]} <span className="font-normal text-ink-500">· pezzo reale, taglia {placePiece.size}</span></p>
+              <button type="button" onClick={() => api.setSelectedElement(null)} className="h-8 rounded-lg bg-ink-900 px-3 text-xs font-semibold text-white">Fatto</button>
+            </div>
+            <div className="min-h-0 flex-1"><PlacementEditor api={api} zone={selected.zone} piece={placePiece} baseColor={api.baseColor} /></div>
+          </div>
+        ) : mode === '3d' ? (
           <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-400"><Spinner label="Caricamento anteprima 3D" /></div>}>
             <GarmentViewer shape={shape} front={frontCanvas} back={backCanvas} version={version} view={view} baseColor={api.baseColor} resetToken={resetToken} className="!absolute inset-0 touch-none" />
           </Suspense>
@@ -55,7 +69,7 @@ export function ConfiguratorViewer({ api }: { api: ConfiguratorApi }) {
             />
           </div>
         )}
-        {mode === '3d' && (
+        {!selected && mode === '3d' && (
           <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-2xs text-ink-400">
             Trascina per ruotare · pizzica o scorri per lo zoom
           </p>

@@ -60,12 +60,35 @@ export interface CustomArea {
   asset?: AssetRef | null
 }
 
+/** Zone in cui il cliente può posizionare liberamente loghi e sponsor. */
+export type PrintZone = 'front' | 'back' | 'sleeve_left' | 'sleeve_right'
+
+/**
+ * Logo o sponsor posizionato liberamente. Il centro è espresso in centimetri rispetto al punto
+ * di riferimento del pezzo (centro collo per davanti/dietro, sommità della manica), con x verso
+ * destra e y verso il basso guardando il pezzo dall'esterno. Vale 1:1 su ogni taglia.
+ */
+export interface PlacedElement {
+  id: string
+  kind: 'logo' | 'sponsor'
+  zone: PrintZone
+  kitItemId?: string | null
+  asset: AssetRef
+  xCm: number
+  yCm: number
+  widthCm: number
+  /** Rotazione in gradi, senso orario. */
+  rotation: number
+}
+
 export interface Configuration {
   version: 1
   garmentTypeId?: string | null
   variantId?: string | null
   optionValueIds: string[]
   areas: Record<string, AreaConfig>
+  /** Loghi e sponsor liberi (se il prodotto li consente). */
+  elements?: PlacedElement[]
   roster: RosterEntry[]
   textStyle?: TextStyle
   /** Anteprime renderizzate (percorsi nel bucket customer-uploads). */

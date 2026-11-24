@@ -18,7 +18,7 @@ import { assetQualityFor, type ConfiguratorApi } from '../useConfigurator'
 
 const TYPE_LABEL = { logo: 'Logo', sponsor: 'Sponsor', all_over: 'Grafica all-over', text: 'Testo', number: 'Numero' } as const
 
-function Thumb({ asset }: { asset: AssetRef }) {
+export function Thumb({ asset }: { asset: AssetRef }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => { void assetDisplayUrl(asset).then(setUrl) }, [asset])
   return (
@@ -28,7 +28,7 @@ function Thumb({ asset }: { asset: AssetRef }) {
   )
 }
 
-function QualityBadge({ q }: { q: AssetRef['quality'] }) {
+export function QualityBadge({ q }: { q: AssetRef['quality'] }) {
   const tone = q === 'poor' ? 'danger' : q === 'warn' ? 'warning' : 'success'
   return <Badge tone={tone}>{QUALITY_LABEL[q]}</Badge>
 }
