@@ -20,13 +20,14 @@ import {
   type NewPiece, type PatternPiece, type PatternSet,
 } from './api'
 import { PieceShape } from './PieceShape'
+import { FreeElementsSettings } from './FreeElementsSettings'
 
 const KINDS = Object.keys(PIECE_LABEL) as PieceKind[]
 const cm = (mm: number) => `${round(mm / 10, 1)}`.replace('.', ',')
 
 interface Target { kitItemId: string | null; label: string; sizes: string[] }
 
-export function PatternsTab({ product }: { product: ProductDetail }) {
+export function PatternsTab({ product, onProductChanged }: { product: ProductDetail; onProductChanged: () => void }) {
   const targets: Target[] = useMemo(() => (
     product.product_type === 'kit' && product.kit_items.length
       ? product.kit_items.map((k) => ({ kitItemId: k.id, label: k.label, sizes: k.sizes.length ? k.sizes : product.sizes }))
@@ -66,6 +67,8 @@ export function PatternsTab({ product }: { product: ProductDetail }) {
           action={<ImportButton productId={product.id} target={target} set={null} onDone={reload} />}
         />
       )}
+
+      <FreeElementsSettings key={product.id} product={product} onSaved={onProductChanged} />
     </div>
   )
 }

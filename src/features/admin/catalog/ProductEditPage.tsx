@@ -173,7 +173,7 @@ export default function ProductEditPage() {
         </Card>
       )}
 
-      {tab === 'patterns' && p && <PatternsTab product={p} />}
+      {tab === 'patterns' && p && <PatternsTab product={p} onProductChanged={refresh} />}
 
       {tab === 'images' && p && <ProductImages productId={p.id} images={p.product_images ?? []} onChanged={refresh} />}
 
