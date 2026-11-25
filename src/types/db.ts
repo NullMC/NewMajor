@@ -3,6 +3,8 @@
 export type UserRole = 'customer' | 'admin'
 export type ProductType = 'simple' | 'kit'
 export type Availability = 'in_stock' | 'on_request' | 'out_of_stock'
+/** Fornitura: a magazzino (disponibilità immediata) o ordinato al fornitore al momento dell'ordine. */
+export type SupplyMode = 'immediate' | 'on_demand'
 export type ModelShape = 'tshirt' | 'longsleeve' | 'tank' | 'shorts' | 'polo' | 'hoodie' | 'track_jacket' | 'track_pants' | 'jacket'
 export type AreaSide = 'front' | 'back'
 export type AreaType = 'logo' | 'sponsor' | 'text' | 'number' | 'all_over'
@@ -130,6 +132,8 @@ export interface KitItem {
   quantity: number
   sizes: string[]
   sort_order: number
+  /** Grafica all-over consentita su questo componente (se attiva sul prodotto). */
+  all_over_enabled?: boolean
 }
 
 export interface CustomizationArea {
@@ -182,6 +186,8 @@ export interface Product {
   product_type: ProductType
   base_price: number
   availability: Availability
+  /** Sezione del catalogo: disponibilità immediata o print-on-demand. */
+  supply_mode?: SupplyMode
   is_configurable: boolean
   model_shape: ModelShape
   sizes: string[]
@@ -296,6 +302,8 @@ export interface OrderItem {
   order_id: string
   product_id: string | null
   product_name: string
+  /** Fornitura del prodotto al momento dell'ordine (null per le righe manuali). */
+  supply_mode?: SupplyMode | null
   product_snapshot: Record<string, unknown>
   configuration: import('./config').Configuration
   quantity: number

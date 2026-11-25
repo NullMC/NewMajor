@@ -352,6 +352,9 @@ console.log('\nGrafica all-over, nuovi modelli e immagini per colore')
   const ko = await place(kitCfg([{ kitItemId: kitItem.id, asset: asset(`${c1.id}/graphics/k.png`) }]), kit.id)
   const [krow] = await q(`select area_name from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1 and c.area_type = 'all_over'`, [ko.order_id])
   krow?.area_name === 'Grafica all-over · Pantalone tuta' ? ok('kit: grafica all-over per componente, con il nome del componente') : fail(JSON.stringify(krow))
+  await q(`update kit_items set all_over_enabled = false where id = $1`, [kitItem.id])
+  await expectError('kit: all-over su un componente non abilitato', () => place(kitCfg([{ kitItemId: kitItem.id, asset: asset(`${c1.id}/graphics/k.png`) }]), kit.id), 'invalid_all_over')
+  await q(`update kit_items set all_over_enabled = true where id = $1`, [kitItem.id])
   await as(c1.id, () => q(`delete from cart_items`))
 
   // immagini per colore
@@ -363,6 +366,32 @@ console.log('\nGrafica all-over, nuovi modelli e immagini per colore')
   await as(admin.id, () => q(`delete from product_variants where id = $1`, [variant.id]))
   const [afterDel] = await q(`select variant_id from product_images where id = $1`, [img.id])
   afterDel.variant_id === null ? ok('colore eliminato: l’immagine torna valida per tutti i colori') : fail(JSON.stringify(afterDel))
+}
+
+console.log('\nFornitura: disponibilità immediata / print-on-demand')
+{
+  const place = (c) => as(c1.id, async () => {
+    await q(`delete from cart_items`)
+    const [cart] = await q(`select id from carts where user_id=$1`, [c1.id])
+    await q(`insert into cart_items (cart_id, product_id, configuration, quantity) values ($1, $2, $3, 1)`, [cart.id, prod.id, JSON.stringify(c)])
+    return (await q(`select * from place_order('cash_on_delivery', $1)`, [JSON.stringify({ full_name: 'M', line1: 'V', city: 'B', postal_code: '70100' })]))[0]
+  })
+  const cfg = { ...config, variantId: null, roster: [{ id: '1', size: 'M', quantity: 1 }, { id: '2', size: 'L', quantity: 1 }] }
+  const [{ supply_mode: def }] = await q(`select supply_mode from products where id = $1`, [prod.id])
+  def === 'immediate' ? ok('prodotto in disponibilità immediata per impostazione predefinita') : fail(def)
+  await as(admin.id, () => q(`update products set supply_mode = 'on_demand' where id = $1`, [prod.id]))
+  const anon = await as(null, () => q(`select supply_mode from products where id = $1`, [prod.id]))
+  anon[0]?.supply_mode === 'on_demand' ? ok('fornitura leggibile dal pubblico (sezioni del catalogo)') : fail(JSON.stringify(anon))
+  const o = await place(cfg)
+  const [it] = await q(`select supply_mode from order_items where order_id = $1`, [o.order_id])
+  it.supply_mode === 'on_demand' ? ok('riga d’ordine marcata print-on-demand (da ordinare al fornitore)') : fail(JSON.stringify(it))
+  const [dup2] = await as(admin.id, () => q(`select admin_duplicate_product($1) id`, [prod.id]))
+  const [d2] = await q(`select supply_mode from products where id = $1`, [dup2.id])
+  d2.supply_mode === 'on_demand' ? ok('la duplicazione copia la fornitura') : fail(JSON.stringify(d2))
+  await as(admin.id, () => q(`update products set supply_mode = 'immediate' where id = $1`, [prod.id]))
+  const [it2] = await q(`select supply_mode from order_items where order_id = $1`, [o.order_id])
+  it2.supply_mode === 'on_demand' ? ok('la riga conserva la fornitura del momento dell’ordine') : fail(JSON.stringify(it2))
+  await as(c1.id, () => q(`delete from cart_items`))
 }
 
 console.log('\nSeed dimostrativo')
