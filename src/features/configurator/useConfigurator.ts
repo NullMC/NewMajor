@@ -205,9 +205,12 @@ export function useConfigurator(
       void ensureFonts().then(() => {
         if (cancelled) return
         const layers = buildLayers(areas)
-        const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides, highlightId: highlightArea }
-        drawPanel(frontCanvas, { ...common, side: 'front', allOver: allOverImage(elementKit, 'front'), elements: silhouetteElements('front', shape, elementKit) })
-        drawPanel(backCanvas, { ...common, side: 'back', allOver: allOverImage(elementKit, 'back'), elements: silhouetteElements('back', shape, elementKit) })
+        // pannelli usati anche come texture 3D: senza ombreggiatura del contorno (la aggiunge la vista
+        // piana) e con le guide solo sul lato inquadrato, così sui fianchi del modello, dove davanti e
+        // dietro si fondono, non compaiono le guide dell'altro lato
+        const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, highlightId: highlightArea, edges: false }
+        drawPanel(frontCanvas, { ...common, side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), elements: silhouetteElements('front', shape, elementKit) })
+        drawPanel(backCanvas, { ...common, side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), elements: silhouetteElements('back', shape, elementKit) })
         for (const [zone, canvas] of [['sleeve_left', sleeveLeftCanvas], ['sleeve_right', sleeveRightCanvas]] as const) {
           const piece = zonePiece(zones, zone, elementKit)
           if (piece) drawSleeve(canvas, piece, elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages, allOverImage(elementKit, zone))
@@ -216,7 +219,7 @@ export function useConfigurator(
       })
     }, 16)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, zones, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage])
+  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, view, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, zones, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage])
 
   // Azioni --------------------------------------------------------------------------
   const patch = useCallback((p: Partial<Configuration>) => setConfig((c) => ({ ...c, ...p })), [])

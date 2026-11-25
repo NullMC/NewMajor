@@ -15,14 +15,17 @@ await MeshoptDecoder.ready
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder })
 
 // modello -> sagoma, altezza reale indicativa del modello (mm, taglia M) per la scala delle maniche
+// neckY = centro della scollatura davanti, backNeckY = centro collo dietro (base del colletto),
+// letti sulla vista frontale con griglia (il contorno dà solo la cima di colletto o cappuccio).
+// Per i capi inferiori neckY è la vita e coincide con la sommità della sagoma.
 const MODELS = {
-  longsleeve: { file: 'longsleeve.glb', mm: 720 },
-  polo: { file: 'polo.glb', mm: 720 },
-  // cappuccio alzato: la scollatura non è sul contorno, quota stimata sotto l'apertura del cappuccio
-  hoodie: { file: 'hoodie.glb', mm: 900, neckY: 71 },
-  track_jacket: { file: 'track_jacket.glb', mm: 700 },
+  longsleeve: { file: 'longsleeve.glb', mm: 720, neckY: 93.5, backNeckY: 99.8 },
+  polo: { file: 'polo.glb', mm: 720, neckY: 90, backNeckY: 96 },
+  // cappuccio alzato: scollatura sotto l'apertura del cappuccio
+  hoodie: { file: 'hoodie.glb', mm: 900, neckY: 68, backNeckY: 73 },
+  track_jacket: { file: 'track_jacket.glb', mm: 700, neckY: 86, backNeckY: 91 },
   track_pants: { file: 'track_pants.glb', mm: 1050, bottom: true },
-  jacket: { file: 'puffer.glb', mm: 760 },
+  jacket: { file: 'puffer.glb', mm: 760, neckY: 89, backNeckY: 95 },
   shorts: { file: 'shorts.glb', mm: 500, bottom: true },
 }
 
@@ -174,7 +177,7 @@ for (const [shape, m] of Object.entries(MODELS)) {
   const centreRows = []
   for (let y = 0; y < H; y++) if (g[y * W + W / 2]) centreRows.push(y)
   const topRow = centreRows[0], hemRow = centreRows[centreRows.length - 1]
-  const info = { outline, hemY: +((1 - hemRow / H) * 100).toFixed(1), neckY: m.neckY ?? +((1 - topRow / H) * 100).toFixed(1), unitPerMm: +(1 / m.mm).toFixed(7) }
+  const info = { outline, hemY: +((1 - hemRow / H) * 100).toFixed(1), neckY: m.neckY ?? +((1 - topRow / H) * 100).toFixed(1), backNeckY: m.backNeckY ?? m.neckY ?? +((1 - topRow / H) * 100).toFixed(1), unitPerMm: +(1 / m.mm).toFixed(7) }
 
   if (!m.bottom) {
     // mezza larghezza del busto: minimo dell'intervallo centrale tra 8% e 45% dell'altezza del busto
@@ -216,7 +219,8 @@ for (const [shape, m] of Object.entries(MODELS)) {
 fs.writeFileSync(outJson, JSON.stringify(result))
 const header = `// GENERATO da scripts/models/outlines.mjs: non modificare a mano.
 // Sagome frontali dei modelli 3D (vista ortografica), in unità: x = x_modello · 100,
-// y = (y_modello + 0.5) · 100. hemY/neckY = orlo e sommità sull'asse centrale;
+// y = (y_modello + 0.5) · 100. hemY = orlo sull'asse centrale; neckY/backNeckY = centro della
+// scollatura davanti e dietro (per i capi inferiori: la vita);
 // sleeve = riferimenti per la proiezione delle maniche nel modello normalizzato.
 import type { Pt } from './shapes'
 
@@ -224,13 +228,14 @@ export interface ModelOutline {
   outline: Pt[]
   hemY: number
   neckY: number
+  backNeckY: number
   unitPerMm: number
   sleeve?: { topY: number; z: number; minAbsX: number; dir: [number, number] }
 }
 
 `
 const body = Object.entries(result).map(([k, v]) =>
-  `  ${k}: {\n    hemY: ${v.hemY}, neckY: ${v.neckY}, unitPerMm: ${v.unitPerMm},\n` +
+  `  ${k}: {\n    hemY: ${v.hemY}, neckY: ${v.neckY}, backNeckY: ${v.backNeckY}, unitPerMm: ${v.unitPerMm},\n` +
   (v.sleeve ? `    sleeve: ${JSON.stringify(v.sleeve).replace(/"(\w+)":/g, '$1: ')},\n` : '') +
   `    outline: ${JSON.stringify(v.outline)},\n  },`).join('\n')
 fs.writeFileSync(outTs, `${header}export const MODEL_OUTLINES = {\n${body}\n} satisfies Record<string, ModelOutline>\n`)

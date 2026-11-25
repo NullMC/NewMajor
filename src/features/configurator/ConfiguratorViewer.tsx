@@ -4,21 +4,27 @@ import { cn } from '@/lib/cn'
 import { Spinner } from '@/components/ui/Spinner'
 import type { ConfiguratorApi } from './useConfigurator'
 import { supportsWebGL } from './garment/webgl'
+import { drawPanelEdges } from './garment/panel'
+import type { ModelShape } from '@/types/db'
 import { SHAPE_LABEL } from './garment/shapes'
 import { PlacementEditor } from './PlacementEditor'
 import { zonePiece, ZONE_LABEL } from '@/lib/patterns/placement'
 
 const GarmentViewer = lazy(() => import('./garment/GarmentViewer'))
 
-function FlatPreview({ source, version, label }: { source: HTMLCanvasElement; version: number; label: string }) {
+function FlatPreview({ source, version, label, shape, side }: { source: HTMLCanvasElement; version: number; label: string; shape: ModelShape; side: 'front' | 'back' }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const c = ref.current
     if (!c || !source.width) return
     c.width = source.width
     c.height = source.height
-    c.getContext('2d')?.drawImage(source, 0, 0)
-  }, [source, version])
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(source, 0, 0)
+    // il pannello live non ha l'ombreggiatura del contorno (serve senza per la texture 3D)
+    drawPanelEdges(ctx, shape, side, c.width, c.height)
+  }, [source, version, shape, side])
   return <canvas ref={ref} role="img" aria-label={label} className="mx-auto h-full max-h-full w-auto max-w-full object-contain drop-shadow-xl" />
 }
 
@@ -64,6 +70,8 @@ export function ConfiguratorViewer({ api }: { api: ConfiguratorApi }) {
           <div className="absolute inset-0 flex items-center justify-center p-6">
             <FlatPreview
               source={view === 'front' ? frontCanvas : backCanvas}
+              shape={shape}
+              side={view}
               version={version}
               label={`Anteprima ${view === 'front' ? 'fronte' : 'retro'} — ${SHAPE_LABEL[shape]}`}
             />

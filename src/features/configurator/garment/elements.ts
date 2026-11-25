@@ -57,7 +57,8 @@ export function silhouetteFrame(shape: ModelShape, side: 'front' | 'back', piece
   const pieceY = s.bottom ? pb.maxY - pb.height * 0.02 : pb.minY + pb.height * 0.02
   const silHem = s.hemY !== undefined ? centreWidthAt(outline, silY) : widthAt(outline, silY)
   const pieceHem = widthAt(piece.outline, pieceY)
-  return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck: s.neckY ?? neckY(outline), bounds: sb }
+  const neck = (side === 'back' ? s.backNeckY : s.neckY) ?? neckY(outline)
+  return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck, bounds: sb }
 }
 
 /** Elementi di davanti/dietro convertiti in unità della sagoma per il pannello indicato. */

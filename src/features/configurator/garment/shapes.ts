@@ -40,9 +40,10 @@ export interface GarmentShape {
   trims: { front: Pt[][]; back: Pt[][] }
   /** Spessore relativo del "cuscino" 3D. */
   bulge: number
-  /** Quote dell'orlo del busto e del centro collo sull'asse centrale (sagome dai modelli 3D). */
+  /** Quote dell'orlo del busto e del centro collo davanti/dietro sull'asse centrale (sagome dai modelli 3D). */
   hemY?: number
   neckY?: number
+  backNeckY?: number
   /** Capo inferiore (pantaloncino, pantalone): la scala dei pezzi si misura in vita. */
   bottom?: boolean
 }
@@ -114,7 +115,7 @@ export function getShape(kind: ModelShape): GarmentShape {
   const shape: GarmentShape = {
     front: front.outline, back: back.outline, bounds, bulge,
     trims: { front: front.trims, back: back.trims },
-    hemY: gen?.hemY, neckY: gen?.neckY, bottom: BOTTOMS.includes(kind),
+    hemY: gen?.hemY, neckY: gen?.neckY, backNeckY: gen?.backNeckY, bottom: BOTTOMS.includes(kind),
   }
   cache.set(kind, shape)
   return shape

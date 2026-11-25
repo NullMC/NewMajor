@@ -33,6 +33,11 @@ export interface PanelSpec {
   layers: PanelLayer[]
   textStyle: TextStyle
   guides?: boolean
+  /**
+   * Ombreggiatura del contorno (profondità nella vista piana). Va esclusa dai pannelli usati come
+   * texture del modello 3D, dove il bordo della sagoma verrebbe proiettato come una linea.
+   */
+  edges?: boolean
   highlightId?: string | null
   /** Grafica all-over del cliente: copre l'intero pannello, sotto loghi, nomi e numeri. */
   allOver?: CanvasImageSource | null
@@ -116,6 +121,28 @@ export function drawFittedText(
   ctx.fillText(text, cx, cy)
 }
 
+function strokeEdges(ctx: CanvasRenderingContext2D, outline: Pt[], shape: GarmentShape, w: number, h: number) {
+  const unit = w / 100
+  tracePath(ctx, outline, shape, w, h)
+  ctx.lineWidth = unit * 5
+  ctx.strokeStyle = 'rgba(0,0,0,0.10)'
+  ctx.stroke()
+  ctx.lineWidth = unit * 1.6
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)'
+  ctx.stroke()
+}
+
+/** Ombreggiatura del contorno su un pannello disegnato senza (vista piana del configuratore). */
+export function drawPanelEdges(ctx: CanvasRenderingContext2D, kind: ModelShape, side: AreaSide, w: number, h: number) {
+  const shape = getShape(kind)
+  const outline = side === 'front' ? shape.front : shape.back
+  ctx.save()
+  tracePath(ctx, outline, shape, w, h)
+  ctx.clip()
+  strokeEdges(ctx, outline, shape, w, h)
+  ctx.restore()
+}
+
 /** Disegna il pannello sul canvas indicato (ridimensionandolo se necessario). */
 export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PANEL_WIDTH) {
   const shape = getShape(spec.shape)
@@ -182,13 +209,7 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
   }
 
   // 5. Ombreggiatura dei bordi (profondità nella vista piana)
-  tracePath(ctx, outline, shape, w, h)
-  ctx.lineWidth = unit * 5
-  ctx.strokeStyle = 'rgba(0,0,0,0.10)'
-  ctx.stroke()
-  ctx.lineWidth = unit * 1.6
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)'
-  ctx.stroke()
+  if (spec.edges !== false) strokeEdges(ctx, outline, shape, w, h)
 
   // 6. Guide delle aree (solo in modifica)
   if (spec.guides) {
@@ -201,7 +222,7 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
       if (l.area.area_type === 'all_over' && !hl) continue
       const [x, y, rw, rh] = rect(l.area)
       ctx.setLineDash([unit * 1.2, unit * 0.9])
-      ctx.lineWidth = unit * (hl ? 0.55 : 0.35)
+      ctx.lineWidth = unit * (hl ? 0.65 : 0.45)
       ctx.strokeStyle = hl ? '#C2A063' : dark ? 'rgba(255,255,255,0.55)' : 'rgba(14,14,16,0.4)'
       ctx.strokeRect(x, y, rw, rh)
       ctx.setLineDash([])
