@@ -84,6 +84,8 @@ export interface ProductImage {
   height: number | null
   sort_order: number
   is_primary: boolean
+  /** Colore a cui è associata l'immagine (null = tutti i colori). */
+  variant_id?: string | null
 }
 
 export interface ProductVariant {
@@ -196,6 +198,9 @@ export interface Product {
   free_min_width_cm?: number
   free_max_width_cm?: number
   free_zones?: ('front' | 'back' | 'sleeve_left' | 'sleeve_right')[]
+  /** Grafica all-over scelta dal cliente (su tutto il capo, con sostituzioni per pezzo). */
+  all_over_enabled?: boolean
+  all_over_price?: number
   deleted_at: string | null
   created_at: string
   updated_at: string

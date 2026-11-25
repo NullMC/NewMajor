@@ -310,6 +310,61 @@ console.log('\nLoghi e sponsor liberi')
   await q(`update products set free_elements_max = 0, free_logo_price = 0, free_sponsor_price = 0 where id = $1`, [prod.id])
 }
 
+console.log('\nGrafica all-over, nuovi modelli e immagini per colore')
+{
+  const asset = (p) => ({ bucket: 'customer-uploads', path: `${p}`, name: 'g.png' })
+  const cfg = (allOver) => ({ ...config, roster: [{ id: '1', size: 'M', quantity: 1 }, { id: '2', size: 'L', quantity: 1 }], allOver })
+  const place = (c, product = prod.id) => as(c1.id, async () => {
+    await q(`delete from cart_items`)
+    const [cart] = await q(`select id from carts where user_id=$1`, [c1.id])
+    await q(`insert into cart_items (cart_id, product_id, configuration, quantity) values ($1, $2, $3, 1)`, [cart.id, product, JSON.stringify(c)])
+    return (await q(`select * from place_order('cash_on_delivery', $1)`, [JSON.stringify({ full_name: 'M', line1: 'V', city: 'B', postal_code: '70100' })]))[0]
+  })
+  const one = [{ asset: asset(`${c1.id}/graphics/all.png`), overrides: { back: asset(`${c1.id}/graphics/back.png`), sleeve_left: asset(`${c1.id}/graphics/sl.png`) } }]
+  await expectError('all-over rifiutato se il prodotto non lo consente', () => place(cfg(one)), 'all_over_not_allowed')
+  await q(`update products set all_over_enabled = true, all_over_price = 6 where id = $1`, [prod.id])
+  const [{ unit }] = await as(null, () => q(`select compute_unit_price($1, $2) unit`, [prod.id, JSON.stringify(cfg(one))]))
+  Number(unit) === 37.5 ? ok('prezzo: 31,50 + all-over 6,00 = 37,50') : fail(`unit ${unit}`)
+  await expectError('sostituzione su un pezzo inesistente', () => place(cfg([{ asset: asset(`${c1.id}/graphics/all.png`), overrides: { collar: asset(`${c1.id}/graphics/x.png`) } }])), 'invalid_all_over')
+  await expectError('due grafiche all-over sullo stesso capo', () => place(cfg([...one, ...one])), 'invalid_all_over')
+  await expectError('componente indicato su un capo singolo', () => place(cfg([{ ...one[0], kitItemId: '00000000-0000-0000-0000-000000000000' }])), 'invalid_all_over')
+  await expectError('file all-over di un altro utente', () => place(cfg([{ asset: asset(`${c2.id}/graphics/all.png`) }])), 'invalid_asset_path')
+  await expectError('sostituzione con file di un altro utente', () => place(cfg([{ asset: asset(`${c1.id}/graphics/all.png`), overrides: { front: asset(`${c2.id}/x.png`) } }])), 'invalid_asset_path')
+  const o = await place(cfg(one))
+  const rows = await q(`select area_name, area_type, side, asset_path, asset_meta from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1 and c.area_type = 'all_over' order by area_name`, [o.order_id])
+  rows.length === 3 && rows[0].area_name === 'Grafica all-over' && rows[0].side === null
+    && rows[1].area_name === 'Grafica all-over · dietro' && rows[1].side === 'back' && rows[1].asset_path.endsWith('back.png')
+    && rows[2].asset_meta.zone === 'sleeve_left' && rows[2].asset_meta.allOver === true
+    ? ok(`ordine ${o.reference}: grafica all-over e sostituzioni salvate per pezzo`) : fail(JSON.stringify(rows))
+  const [{ subtotal }] = await q(`select subtotal from orders where id = $1`, [o.order_id])
+  Number(subtotal) === 75 ? ok('totale ricalcolato dal DB con l’all-over (2 × 37,50)') : fail(`subtotal ${subtotal}`)
+  await q(`update products set all_over_enabled = false, all_over_price = 0 where id = $1`, [prod.id])
+
+  // kit: una grafica per componente, componente obbligatorio e del kit
+  const { kit, kitItem } = await as(admin.id, async () => {
+    const [kit] = await q(`insert into products (name, slug, product_type, base_price, is_published, all_over_enabled, all_over_price) values ('Kit test', 'kit-test', 'kit', 30, true, true, 4) returning id`)
+    const [kitItem] = await q(`insert into kit_items (kit_id, label, model_shape, sizes) values ($1, 'Pantalone tuta', 'track_pants', '{M}') returning id`, [kit.id])
+    return { kit, kitItem }
+  })
+  ok('nuovi modelli 3D: componente "track_pants" accettato')
+  const kitCfg = (allOver) => ({ version: 1, optionValueIds: [], areas: {}, roster: [{ id: '1', sizes: { [kitItem.id]: 'M' }, quantity: 1 }], allOver })
+  await expectError('kit: all-over senza componente', () => place(kitCfg([{ asset: asset(`${c1.id}/graphics/k.png`) }]), kit.id), 'invalid_all_over')
+  const ko = await place(kitCfg([{ kitItemId: kitItem.id, asset: asset(`${c1.id}/graphics/k.png`) }]), kit.id)
+  const [krow] = await q(`select area_name from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1 and c.area_type = 'all_over'`, [ko.order_id])
+  krow?.area_name === 'Grafica all-over · Pantalone tuta' ? ok('kit: grafica all-over per componente, con il nome del componente') : fail(JSON.stringify(krow))
+  await as(c1.id, () => q(`delete from cart_items`))
+
+  // immagini per colore
+  const [img] = await as(admin.id, () => q(`insert into product_images (product_id, storage_path, variant_id) values ($1, 'products/nero.webp', $2) returning id`, [prod.id, variant.id]))
+  const pubImg = await as(null, () => q(`select variant_id from product_images where id = $1`, [img.id]))
+  pubImg[0]?.variant_id === variant.id ? ok('immagine associata a un colore, leggibile dal pubblico') : fail(JSON.stringify(pubImg))
+  const [otherVariant] = await as(admin.id, () => q(`insert into product_variants (product_id, name, color_hex) values ($1, 'Rosso', '#C62828') returning id`, [kit.id]))
+  await expectError('immagine con il colore di un altro prodotto rifiutata', () => as(admin.id, () => q(`insert into product_images (product_id, storage_path, variant_id) values ($1, 'x.webp', $2)`, [prod.id, otherVariant.id])), 'image_variant_mismatch')
+  await as(admin.id, () => q(`delete from product_variants where id = $1`, [variant.id]))
+  const [afterDel] = await q(`select variant_id from product_images where id = $1`, [img.id])
+  afterDel.variant_id === null ? ok('colore eliminato: l’immagine torna valida per tutti i colori') : fail(JSON.stringify(afterDel))
+}
+
 console.log('\nSeed dimostrativo')
 await db.exec(fs.readFileSync(path.join(dir, '..', 'seed_demo.sql'), 'utf8'))
 const [demo] = await q(`select p.is_published, (select count(*)::int from customization_areas a where a.product_id = p.id) areas from products p where slug = 'prodotto-dimostrativo'`)
