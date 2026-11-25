@@ -10,7 +10,7 @@ import { Reveal, AccentTitle } from '@/components/fx/Reveal'
 import { Grain } from '@/components/fx/ShaderBackdrop'
 import { getSiteContents, listPortfolio, type HeroContent, type HomeSections } from './api'
 import { Hero } from './hero/Hero'
-import { FeaturedShowcase } from './home/FeaturedShowcase'
+import { FeaturedCarousel } from './home/FeaturedCarousel'
 import { KineticWall } from './home/KineticWall'
 import { ProcessStory } from './home/ProcessStory'
 import { PortfolioShowcase } from './home/PortfolioShowcase'
@@ -48,7 +48,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Prodotti in evidenza (selezionati dal backoffice): vetrina con nomi e foto da 3 prodotti in su */}
+      {/* Prodotti in evidenza (selezionati dal backoffice): carosello coverflow a giro continuo da 3 prodotti in su */}
       {(featuredLoading || featuredList.length > 0) && (
         <section className="container pt-20 sm:pt-28 lg:pt-32" aria-labelledby="featured">
           <Reveal className="flex flex-wrap items-end justify-between gap-4">
@@ -65,7 +65,7 @@ export default function HomePage() {
               {Array.from({ length: 4 }, (_, i) => <ProductCardSkeleton key={i} />)}
             </div>
           ) : featuredList.length >= 3 ? (
-            <Reveal className="mt-10 sm:mt-12"><FeaturedShowcase products={featuredList} /></Reveal>
+            <Reveal className="mt-10 sm:mt-12"><FeaturedCarousel products={featuredList} /></Reveal>
           ) : (
             <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
               {featuredList.map((p, i) => <Reveal key={p.id} delay={i * 90}><ProductCard product={p} eager={i < 2} /></Reveal>)}
