@@ -82,6 +82,7 @@ export function SiteFooter() {
             {(legal ?? []).map((p) => (
               <li key={p.slug}><Link to={`/${p.slug}`} className="hover:text-white">{p.title}</Link></li>
             ))}
+            <li><Link to="/crediti" className="hover:text-white">Crediti modelli 3D</Link></li>
             <li>
               <button type="button" className="hover:text-white" onClick={() => window.dispatchEvent(new Event('nm:cookie-open'))}>
                 Preferenze cookie

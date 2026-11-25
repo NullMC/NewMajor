@@ -17,6 +17,7 @@ const OrderConfirmationPage = lazy(() => import('@/features/checkout/OrderConfir
 const AboutPage = lazy(() => import('@/features/content/AboutPage'))
 const FaqPage = lazy(() => import('@/features/content/FaqPage'))
 const ContactPage = lazy(() => import('@/features/content/ContactPage'))
+const CreditsPage = lazy(() => import('@/features/content/CreditsPage'))
 const CmsPage = lazy(() => import('@/features/content/CmsPage'))
 const NotFoundPage = lazy(() => import('@/features/content/NotFoundPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
@@ -91,6 +92,7 @@ const router = createBrowserRouter([
           { path: 'chi-siamo', element: <AboutPage /> },
           { path: 'faq', element: <FaqPage /> },
           { path: 'contatti', element: <ContactPage /> },
+          { path: 'crediti', element: <CreditsPage /> },
           { path: 'accedi', element: <LoginPage /> },
           { path: 'registrati', element: <RegisterPage /> },
           { path: 'password-dimenticata', element: <ForgotPasswordPage /> },

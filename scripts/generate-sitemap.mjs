@@ -41,6 +41,7 @@ const entries = [
   { loc: '/catalogo', priority: '0.9' },
   { loc: '/faq', priority: '0.5' },
   { loc: '/contatti', priority: '0.5' },
+  { loc: '/crediti', priority: '0.2' },
   ...categories.map((c) => ({ loc: `/catalogo/${c.slug}`, lastmod: c.updated_at, priority: '0.8' })),
   ...products.map((p) => ({ loc: `/prodotti/${p.slug}`, lastmod: p.updated_at, priority: '0.8' })),
   ...pages.map((p) => ({ loc: `/${p.slug}`, lastmod: p.updated_at, priority: '0.4' })),
