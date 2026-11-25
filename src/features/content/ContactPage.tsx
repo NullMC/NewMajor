@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { CheckCircle2, MapPin, Phone, Mail, Building2, Minus, Plus } from 'lucide-react'
+import { ArrowUpRight, Building2, Check, CheckCircle2, Copy, Mail, MapPin, Minus, Phone, Plus, Send } from 'lucide-react'
+import { AccentTitle } from '@/components/fx/Reveal'
+import { PageHero } from './PageHero'
 import { useMeta } from '@/hooks/useMeta'
 import { errorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/Button'
@@ -82,50 +84,70 @@ export default function ContactPage() {
     }
   }
 
-  return (
-    <div className="container py-12 sm:py-16">
-      <h1 className="display-lg text-4xl sm:text-5xl">Contattaci</h1>
-      <p className="mt-3 max-w-xl text-ink-500">Per informazioni, preventivi e richieste su misura scrivici o chiamaci.</p>
+  const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.legal_address)}`
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        <aside className="space-y-4">
-          <div className="surface space-y-5 p-6">
-            <div className="flex gap-3">
-              <Phone className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
-              <div>
-                <p className="text-sm text-ink-500">Info e ordini</p>
-                <a href={tel(c.phone)} className="text-lg font-semibold hover:text-gold-700">{c.phone}</a>
-                {c.phone_alt && <a href={tel(c.phone_alt)} className="block font-medium text-ink-700 hover:text-gold-700">{c.phone_alt}</a>}
-              </div>
+  return (
+    <>
+      <PageHero
+        kicker="Contatti"
+        title="Parliamo del tuo progetto"
+        lead="Per informazioni, preventivi e richieste su misura scrivici o chiamaci."
+        aside={
+          <a href={tel(c.phone)} className="group glass glass-clear flex items-center justify-between gap-4 rounded-[1.5rem] p-5 sm:p-6">
+            <span>
+              <span className="block font-mono text-2xs uppercase tracking-[0.18em] text-ink-400">Info e ordini</span>
+              <span className="mt-1 block font-display text-[clamp(1.6rem,5vw,2.4rem)] font-bold leading-none text-white" style={{ fontStretch: '112%' }}>{c.phone}</span>
+            </span>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gold-500 text-ink-950 transition-transform group-hover:scale-105"><Phone className="h-5 w-5" aria-hidden /></span>
+          </a>
+        }
+      />
+
+      <div className="container grid gap-6 pt-10 sm:pt-14 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] lg:gap-10">
+        {/* Recapiti */}
+        <aside className="space-y-3 lg:order-1">
+          <ContactCard icon={<Phone className="h-5 w-5" />} label="Telefono" copy={c.phone_alt ? undefined : c.phone}>
+            <a href={tel(c.phone)} className="block text-lg font-semibold hover:text-gold-700">{c.phone}</a>
+            {c.phone_alt && <a href={tel(c.phone_alt)} className="mt-0.5 block font-medium text-ink-600 hover:text-gold-700">{c.phone_alt}</a>}
+          </ContactCard>
+          {c.email && (
+            <ContactCard icon={<Mail className="h-5 w-5" />} label="Email" copy={c.email}>
+              <a href={`mailto:${c.email}`} className="block break-all text-lg font-semibold hover:text-gold-700">{c.email}</a>
+            </ContactCard>
+          )}
+
+          {/* Sede: mappa stilizzata (nessun servizio esterno caricato) e link a Google Maps */}
+          <div className="relative overflow-hidden rounded-[1.5rem] bg-ink-950 p-5 text-white sm:p-6">
+            <div aria-hidden className="absolute inset-0 opacity-60 [background-image:radial-gradient(rgb(255_255_255/.16)_1px,transparent_1px)] [background-size:14px_14px] [mask-image:radial-gradient(70%_80%_at_72%_40%,#000,transparent)]" />
+            <div aria-hidden className="absolute right-7 top-7">
+              <span className="absolute -inset-6 animate-ping rounded-full bg-gold-500/25 motion-reduce:animate-none" />
+              <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gold-500 text-ink-950 shadow-[0_0_0_6px_rgba(194,160,99,.25)]"><MapPin className="h-5 w-5" /></span>
             </div>
-            {c.email && (
-              <div className="flex gap-3">
-                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
-                <div>
-                  <p className="text-sm text-ink-500">Email</p>
-                  <a href={`mailto:${c.email}`} className="break-all font-medium hover:text-gold-700">{c.email}</a>
-                </div>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
-              <div>
-                <p className="text-sm text-ink-500">Sede legale</p>
-                <p className="font-medium">{c.legal_address}</p>
-                {c.show_alt_address && c.alt_address && <p className="text-sm text-ink-500">{c.alt_address}</p>}
-              </div>
+            <div className="relative max-w-[70%]">
+              <p className="font-mono text-2xs uppercase tracking-[0.18em] text-gold-400">Sede legale</p>
+              <p className="mt-2 text-lg font-semibold leading-snug">{c.legal_address}</p>
+              {c.show_alt_address && c.alt_address && <p className="mt-1 text-sm text-ink-300">{c.alt_address}</p>}
             </div>
-            <div className="flex gap-3">
-              <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
-              <div className="text-sm">
-                <p className="font-medium">{c.name}</p>
-                <p className="text-ink-500">P. IVA {c.vat_number} · REA {c.rea}</p>
-              </div>
+            <div className="relative mt-6 flex flex-wrap gap-2">
+              <a href={maps} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink-950 hover:bg-gold-100">
+                Apri in Google Maps <ArrowUpRight className="h-4 w-4" />
+              </a>
+              <CopyButton value={c.legal_address} dark />
             </div>
           </div>
+
+          <ContactCard icon={<Building2 className="h-5 w-5" />} label={c.name}>
+            <p className="text-sm text-ink-600">P. IVA {c.vat_number} · REA {c.rea}</p>
+          </ContactCard>
         </aside>
 
-        <div className="surface p-6 sm:p-8">
+        <div className="rounded-[1.75rem] bg-white p-6 shadow-[0_40px_80px_-50px_rgba(8,8,10,.5)] ring-1 ring-ink-200 sm:rounded-[2rem] sm:p-8 lg:order-2 lg:p-10">
+          {!sent && (
+            <div className="mb-6">
+              <h2 className="display-lg text-2xl sm:text-3xl"><AccentTitle text="Scrivici un messaggio" accentClassName="text-gold-600" /></h2>
+              <p className="mt-2 text-sm text-ink-500">Ti ricontattiamo all’indirizzo email o al numero che indichi.</p>
+            </div>
+          )}
           {sent ? (
             <div className="flex flex-col items-center py-10 text-center" role="status">
               <CheckCircle2 className="h-12 w-12 text-success-600" aria-hidden />
@@ -192,12 +214,51 @@ export default function ContactPage() {
                 label={<>Ho letto l’<Link to="/privacy-policy" className="underline underline-offset-4">informativa privacy</Link></>}
               />
               <FormError message={error} />
-              <Button type="submit" size="lg" loading={sending}>Invia richiesta</Button>
+              <Button type="submit" size="lg" loading={sending} className="w-full rounded-full sm:w-auto" icon={<Send className="h-4 w-4" />}>Invia richiesta</Button>
             </form>
           )}
         </div>
       </div>
+    </>
+  )
+}
+
+/** Scheda recapito: icona, etichetta, contenuto ed eventuale pulsante copia. */
+function ContactCard({ icon, label, copy, children }: { icon: React.ReactNode; label: string; copy?: string; children: React.ReactNode }) {
+  return (
+    <div className="group flex items-start gap-4 rounded-[1.5rem] bg-white p-5 ring-1 ring-ink-200 transition hover:ring-ink-400 sm:p-6">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-100 text-gold-700 transition-colors group-hover:bg-gold-500 group-hover:text-ink-950">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-ink-500">{label}</p>
+        <div className="mt-1">{children}</div>
+      </div>
+      {copy && <CopyButton value={copy} />}
     </div>
+  )
+}
+
+/** Copia negli appunti con conferma. */
+function CopyButton({ value, dark }: { value: string; dark?: boolean }) {
+  const [done, setDone] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setDone(true)
+      window.setTimeout(() => setDone(false), 1600)
+    } catch { /* appunti non disponibili */ }
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      aria-label={done ? 'Copiato' : `Copia ${value}`}
+      className={dark
+        ? 'inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold ring-1 ring-white/20 hover:ring-white/50'
+        : 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-500 ring-1 ring-ink-200 hover:text-ink-900 hover:ring-ink-400'}
+    >
+      {done ? <Check className="h-4 w-4 text-success-600" /> : <Copy className="h-4 w-4" />}
+      {dark && (done ? 'Copiato' : 'Copia indirizzo')}
+    </button>
   )
 }
 
