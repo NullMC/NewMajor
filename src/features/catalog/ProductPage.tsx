@@ -73,6 +73,11 @@ export default function ProductPage() {
   }
 
   const variants = product.product_variants.filter((v) => v.is_active)
+  // Colore scelto (o il primo): se ha immagini dedicate compaiono per prime, seguite da quelle
+  // valide per tutti i colori; altrimenti resta la galleria completa.
+  const selectedVariant = color ?? variants[0]?.id ?? null
+  const colorImages = images.filter((i) => i.variant_id && i.variant_id === selectedVariant)
+  const gallery = colorImages.length ? [...colorImages, ...images.filter((i) => !i.variant_id)] : images
   const garmentTypes = (product.product_garment_types ?? []).filter((g) => g.garment_types)
   const graphicAreas = product.customization_areas.filter((a) => a.is_active && ['logo', 'sponsor', 'all_over'].includes(a.area_type))
   const hasRoster = product.customization_areas.some((a) => a.is_active && ['text', 'number'].includes(a.area_type))
@@ -86,7 +91,7 @@ export default function ProductPage() {
       </nav>
 
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-14">
-        <ProductStage images={images} name={product.name} word={product.categories?.name} />
+        <ProductStage key={colorImages.length ? selectedVariant : 'all'} images={gallery} name={product.name} word={product.categories?.name} />
 
         {/* Info */}
         <div className="lg:pt-6">

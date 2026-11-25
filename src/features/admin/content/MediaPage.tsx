@@ -18,20 +18,21 @@ interface MediaProduct {
   is_published: boolean
   categories: { name: string } | null
   product_images: ProductImage[]
+  product_variants: { id: string; name: string; color_hex: string; sort_order: number }[]
 }
 
 type Filter = 'published' | 'all' | 'missing'
 
 /**
  * Foto dei prodotti raggruppate per prodotto. Sono le stesse della scheda "Immagini" del
- * prodotto: caricamento, ordine, immagine principale, testo alternativo e sostituzione.
+ * prodotto: caricamento, ordine, immagine principale, testo alternativo, colore e sostituzione.
  */
 export default function MediaPage() {
   useMeta({ title: 'Media', noindex: true })
   const { data, loading, reload } = useQuery('admin:media-products', async () => {
     const { data: rows, error } = await supabase
       .from('products')
-      .select('id,name,slug,is_published,categories(name),product_images(*)')
+      .select('id,name,slug,is_published,categories(name),product_images(*),product_variants(id,name,color_hex,sort_order)')
       .is('deleted_at', null)
       .order('sort_order')
       .order('name')
@@ -39,6 +40,7 @@ export default function MediaPage() {
     return (rows as unknown as MediaProduct[]).map((p) => ({
       ...p,
       product_images: [...(p.product_images ?? [])].sort((a, b) => a.sort_order - b.sort_order),
+      product_variants: [...(p.product_variants ?? [])].sort((a, b) => a.sort_order - b.sort_order),
     }))
   })
   const [filter, setFilter] = useState<Filter>('published')
@@ -147,7 +149,7 @@ export default function MediaPage() {
                 </div>
                 {isOpen && (
                   <div id={`media-${p.id}`} className="border-t border-ink-100 bg-ink-50/60 p-3 sm:p-5">
-                    <ProductImages productId={p.id} images={p.product_images} onChanged={changed} />
+                    <ProductImages productId={p.id} images={p.product_images} variants={p.product_variants} onChanged={changed} />
                   </div>
                 )}
               </li>

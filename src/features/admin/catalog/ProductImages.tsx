@@ -1,21 +1,22 @@
 import { useState } from 'react'
 import { Replace, Star, Trash2 } from 'lucide-react'
-import type { ProductImage } from '@/types/db'
+import type { ProductImage, ProductVariant } from '@/types/db'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
 import { optimizeImage, publicUrl, removePublic, uploadPublic, SITE_IMAGE_ACCEPT } from '@/lib/storage'
 import { Badge } from '@/components/ui/Display'
 import { Dropzone } from '@/components/ui/Dropzone'
-import { Input } from '@/components/ui/Form'
+import { Input, Select } from '@/components/ui/Form'
 import { useUi } from '@/components/ui/Toast'
 import { ReorderButtons } from '../components/fields'
 
 /**
  * Gestione immagini prodotto: upload multiplo con ottimizzazione WebP, ordinamento,
- * immagine principale, testo alternativo, sostituzione (il file precedente viene eliminato).
+ * immagine principale, testo alternativo, sostituzione (il file precedente viene eliminato) e
+ * colore associato: nella pagina prodotto, scelto un colore, compaiono prima le sue immagini.
  */
-export function ProductImages({ productId, images, onChanged }: { productId: string; images: ProductImage[]; onChanged: () => void }) {
+export function ProductImages({ productId, images, variants = [], onChanged }: { productId: string; images: ProductImage[]; variants?: Pick<ProductVariant, 'id' | 'name' | 'color_hex'>[]; onChanged: () => void }) {
   const { toast, confirm } = useUi()
   const [busy, setBusy] = useState(0)
   const [alts, setAlts] = useState<Record<string, string>>({})
@@ -91,6 +92,12 @@ export function ProductImages({ productId, images, onChanged }: { productId: str
     onChanged()
   }
 
+  const setVariant = async (img: ProductImage, variantId: string) => {
+    const { error } = await supabase.from('product_images').update({ variant_id: variantId || null }).eq('id', img.id)
+    if (error) toast(errorMessage(error), 'error')
+    else onChanged()
+  }
+
   const saveAlt = async (img: ProductImage) => {
     const alt = alts[img.id]
     if (alt === undefined || alt === (img.alt ?? '')) return
@@ -120,6 +127,17 @@ export function ProductImages({ productId, images, onChanged }: { productId: str
                   className="h-9 text-sm"
                   maxLength={200}
                 />
+                {variants.length > 0 && (
+                  <Select
+                    value={img.variant_id ?? ''}
+                    onChange={(e) => void setVariant(img, e.target.value)}
+                    aria-label="Colore dell’immagine"
+                    className="h-9 text-sm"
+                  >
+                    <option value="">Tutti i colori</option>
+                    {variants.map((v) => <option key={v.id} value={v.id}>Colore: {v.name}</option>)}
+                  </Select>
+                )}
                 <div className="flex items-center justify-between">
                   <ReorderButtons label={`immagine ${i + 1}`} onUp={() => move(i, -1)} onDown={() => move(i, 1)} disabledUp={i === 0} disabledDown={i === images.length - 1} />
                   <div className="flex">

@@ -175,7 +175,7 @@ export default function ProductEditPage() {
 
       {tab === 'patterns' && p && <PatternsTab product={p} onProductChanged={refresh} />}
 
-      {tab === 'images' && p && <ProductImages productId={p.id} images={p.product_images ?? []} onChanged={refresh} />}
+      {tab === 'images' && p && <ProductImages productId={p.id} images={p.product_images ?? []} variants={p.product_variants ?? []} onChanged={refresh} />}
 
       {tab === 'configurator' && p && (
         <div className="space-y-6">
