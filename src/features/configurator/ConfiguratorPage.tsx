@@ -22,6 +22,7 @@ import { ConfiguratorViewer } from './ConfiguratorViewer'
 import { ColorSection, GarmentSection, OptionsSection, TextStyleSection } from './sections/BasicSections'
 import { GraphicsSection } from './sections/GraphicsSection'
 import { ElementsSection } from './sections/ElementsSection'
+import { AllOverSection } from './sections/AllOverSection'
 import { RosterSection } from './sections/RosterSection'
 
 function Step({ n, title, children, issues }: { n: number; title: string; children: ReactNode; issues?: string[] }) {
@@ -48,8 +49,8 @@ function Configurator({ product, editLine, initialVariantId }: { product: Produc
   const { toast } = useUi()
   const navigate = useNavigate()
   const { data: library } = useQuery('assets:library', listLibraryAssets, { staleMs: 5 * 60_000 })
-  // pezzi della taglia di riferimento, solo se il prodotto consente loghi e sponsor liberi
-  const { data: zones } = useQuery(Number(product.free_elements_max) > 0 ? `print-zones:${product.id}` : null, () => getPrintZones(product.id), { staleMs: 5 * 60_000 })
+  // pezzi della taglia di riferimento, solo se il prodotto consente loghi e sponsor liberi o l'all-over
+  const { data: zones } = useQuery(Number(product.free_elements_max) > 0 || product.all_over_enabled ? `print-zones:${product.id}` : null, () => getPrintZones(product.id), { staleMs: 5 * 60_000 })
   const api = useConfigurator(product, {
     zones: zones ?? [],
     initial: editLine?.configuration ?? null,
@@ -119,6 +120,11 @@ function Configurator({ product, editLine, initialVariantId }: { product: Produc
           {hasGraphics && (
             <Step n={++n} title="Loghi, sponsor e grafiche" issues={issuesBy('graphics')}>
               <GraphicsSection api={api} library={library ?? []} />
+            </Step>
+          )}
+          {api.allOverEnabled && (
+            <Step n={++n} title="Grafica all-over" issues={issuesBy('allover')}>
+              <AllOverSection api={api} library={library ?? []} />
             </Step>
           )}
           {api.freeEnabled && (

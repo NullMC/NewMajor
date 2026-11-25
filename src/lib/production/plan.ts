@@ -7,9 +7,10 @@
 // - aree dell'admin (nomi, numeri, loghi in area): la posizione è ricavata una volta sul pezzo
 //   della taglia di riferimento (dalla stessa corrispondenza sagoma ↔ pezzo dell'anteprima) e poi
 //   applicata in cm su ogni taglia; la dimensione è quella di stampa indicata nell'area;
-// - grafiche all-over: coprono l'intero pezzo (abbondanza compresa).
+// - grafiche all-over (area dell'admin o grafica del cliente su tutto il capo, con sostituzioni
+//   per pezzo): coprono l'intero pezzo (abbondanza compresa).
 
-import type { AssetRef, Configuration, PlacedElement, TextStyle } from '@/types/config'
+import type { AssetRef, Configuration, PlacedElement, PrintZone, TextStyle } from '@/types/config'
 import type { CustomizationArea, ModelShape, ProductDetail } from '@/types/db'
 import { anchorOf, elementCenterMm, elementHeightCm } from '@/lib/patterns/placement'
 import { bounds, cleanOutline, type PieceKind, type Vec } from '@/lib/patterns/geometry'
@@ -107,6 +108,7 @@ export function buildPlan(input: PlanInput): PlanResult {
     const refOf = (kind: PieceKind) => compPieces.find((p) => p.size === refSize && p.piece === kind) ?? null
     const areas = product.customization_areas.filter((a) => a.is_active && (!isKit || (a.kit_item_id ?? firstKit) === comp.id))
     const elements = (config.elements ?? []).filter((e) => (e.kitItemId ?? null) === comp.id)
+    const allOverCfg = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === comp.id) ?? null
 
     // posizione delle aree in cm, calcolata una volta sulla taglia di riferimento
     const areaCm = new Map<string, { xCm: number; yCm: number }>()
@@ -154,6 +156,11 @@ export function buildPlan(input: PlanInput): PlanResult {
           }
         }
         for (const e of elements.filter((x) => x.zone === p.piece)) placements.push(elementPlacement(e, p))
+        // grafica all-over del cliente: sostituzione del pezzo, altrimenti la grafica del capo
+        // (collo e polsini restano nel colore dei profili)
+        if (allOverCfg && p.piece !== 'collar' && p.piece !== 'cuff') {
+          allOver = allOverCfg.overrides?.[p.piece as PrintZone] ?? allOverCfg.asset
+        }
 
         const fill = p.piece === 'collar' || p.piece === 'cuff' ? input.secondaryColor || input.baseColor : input.baseColor
         for (let c = 0; c < copies; c++) {

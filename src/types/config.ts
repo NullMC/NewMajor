@@ -81,6 +81,17 @@ export interface PlacedElement {
   rotation: number
 }
 
+/**
+ * Grafica all-over scelta dal cliente: copre l'intero capo (o il componente del kit). Le
+ * sostituzioni usano una grafica diversa su singoli pezzi. Collo e polsini restano nel colore
+ * dei profili.
+ */
+export interface AllOverConfig {
+  kitItemId?: string | null
+  asset: AssetRef
+  overrides?: Partial<Record<PrintZone, AssetRef>>
+}
+
 export interface Configuration {
   version: 1
   garmentTypeId?: string | null
@@ -89,6 +100,8 @@ export interface Configuration {
   areas: Record<string, AreaConfig>
   /** Loghi e sponsor liberi (se il prodotto li consente). */
   elements?: PlacedElement[]
+  /** Grafica all-over (una per capo o per componente del kit), se il prodotto la consente. */
+  allOver?: AllOverConfig[]
   roster: RosterEntry[]
   textStyle?: TextStyle
   /** Anteprime renderizzate (percorsi nel bucket customer-uploads). */

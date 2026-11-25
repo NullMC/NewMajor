@@ -53,6 +53,11 @@ export function computePrice(product: ProductDetail, config: Configuration, fall
   if (logos && Number(product.free_logo_price)) lines.push({ label: logos === 1 ? 'Logo aggiuntivo' : `${logos} loghi aggiuntivi`, amount: logos * Number(product.free_logo_price) })
   if (sponsors && Number(product.free_sponsor_price)) lines.push({ label: sponsors === 1 ? 'Sponsor aggiuntivo' : `${sponsors} sponsor aggiuntivi`, amount: sponsors * Number(product.free_sponsor_price) })
 
+  const allOver = config.allOver?.length ?? 0
+  if (allOver && Number(product.all_over_price)) {
+    lines.push({ label: allOver === 1 ? 'Grafica all-over' : `Grafica all-over (${allOver} capi del kit)`, amount: allOver * Number(product.all_over_price) })
+  }
+
   const unit = round2(base + lines.reduce((s, l) => s + l.amount, 0))
   const quantity = configQuantity(config, fallbackQty)
   const discountPercent = product.price_tiers

@@ -20,7 +20,7 @@ import {
   type NewPiece, type PatternPiece, type PatternSet,
 } from './api'
 import { PieceShape } from './PieceShape'
-import { FreeElementsSettings } from './FreeElementsSettings'
+import { AllOverSettings, FreeElementsSettings } from './FreeElementsSettings'
 
 const KINDS = Object.keys(PIECE_LABEL) as PieceKind[]
 const cm = (mm: number) => `${round(mm / 10, 1)}`.replace('.', ',')
@@ -69,6 +69,7 @@ export function PatternsTab({ product, onProductChanged }: { product: ProductDet
       )}
 
       <FreeElementsSettings key={product.id} product={product} onSaved={onProductChanged} />
+      <AllOverSettings key={`ao-${product.id}`} product={product} onSaved={onProductChanged} />
     </div>
   )
 }

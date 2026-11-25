@@ -84,18 +84,43 @@ export async function uploadPendingAssets(
   pending?: PendingPreview,
 ): Promise<Configuration> {
   const next: Configuration = { ...config, areas: { ...config.areas } }
+  // I file locali vengono eliminati dal chiamante solo dopo il salvataggio della riga.
+  // Restituisce l'asset caricato, oppure null se il file locale non esiste più.
+  const upload = async (asset: AssetRef): Promise<AssetRef | null> => {
+    if (!asset.localKey || asset.path) return asset
+    const blob = await blobStore.get(asset.localKey)
+    if (!blob) return null
+    const path = await uploadCustomerFile(userId, blob, blob.type || asset.mime, 'graphics')
+    return { ...asset, path, localKey: undefined }
+  }
   for (const [areaId, area] of Object.entries(config.areas)) {
-    const asset = area.asset
-    if (asset?.localKey && !asset.path) {
-      const blob = await blobStore.get(asset.localKey)
-      if (!blob) {
-        next.areas[areaId] = { ...area, asset: null, enabled: false }
-        continue
-      }
-      // I file locali vengono eliminati dal chiamante solo dopo il salvataggio della riga
-      const path = await uploadCustomerFile(userId, blob, blob.type || asset.mime, 'graphics')
-      next.areas[areaId] = { ...area, asset: { ...asset, path, localKey: undefined } }
+    if (!area.asset) continue
+    const asset = await upload(area.asset)
+    next.areas[areaId] = asset ? { ...area, asset } : { ...area, asset: null, enabled: false }
+  }
+  // loghi e sponsor liberi: quelli il cui file locale è andato perso vengono tolti
+  if (config.elements?.length) {
+    const elements = []
+    for (const e of config.elements) {
+      const asset = await upload(e.asset)
+      if (asset) elements.push({ ...e, asset })
     }
+    next.elements = elements
+  }
+  // grafica all-over e sostituzioni per pezzo
+  if (config.allOver?.length) {
+    const allOver = []
+    for (const ao of config.allOver) {
+      const asset = await upload(ao.asset)
+      if (!asset) continue
+      const overrides: NonNullable<typeof ao.overrides> = {}
+      for (const [zone, a] of Object.entries(ao.overrides ?? {})) {
+        const up = a ? await upload(a) : null
+        if (up) overrides[zone as keyof typeof overrides] = up
+      }
+      allOver.push({ ...ao, asset, overrides })
+    }
+    next.allOver = allOver
   }
   if (pending) {
     const preview: NonNullable<Configuration['preview']> = { ...(config.preview ?? {}) }
@@ -114,4 +139,16 @@ export async function uploadPendingAssets(
 
 /** true se la configurazione contiene ancora file non caricati. */
 export const hasPendingAssets = (config: Configuration) =>
-  Object.values(config.areas).some((a) => a.enabled && a.asset?.localKey && !a.asset.path)
+  configAssets(config).some((a) => a.localKey && !a.path)
+
+/** Tutti i file grafici di una configurazione: aree attive, loghi e sponsor liberi, all-over. */
+export function configAssets(config: Configuration): AssetRef[] {
+  const out: AssetRef[] = []
+  for (const a of Object.values(config.areas)) if (a.enabled && a.asset) out.push(a.asset)
+  for (const e of config.elements ?? []) out.push(e.asset)
+  for (const ao of config.allOver ?? []) {
+    out.push(ao.asset)
+    for (const a of Object.values(ao.overrides ?? {})) if (a) out.push(a)
+  }
+  return out
+}

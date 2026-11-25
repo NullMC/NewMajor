@@ -5,7 +5,7 @@ import { configQuantity } from '@/lib/pricing'
 import { blobStore } from '@/lib/idb'
 import type { Configuration } from '@/types/config'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { uploadPendingAssets, type PendingPreview } from './assets'
+import { configAssets, uploadPendingAssets, type PendingPreview } from './assets'
 
 export interface CartLine {
   id: string
@@ -49,9 +49,11 @@ function writeLocal(lines: CartLine[]) {
 
 async function cleanupLocalBlobs(line: CartLine) {
   const keys = [
-    ...Object.values(line.configuration.areas).map((a) => a.asset?.localKey),
+    ...configAssets(line.configuration).map((a) => a.localKey),
     line.pendingPreview?.front,
     line.pendingPreview?.back,
+    line.pendingPreview?.sleeveLeft,
+    line.pendingPreview?.sleeveRight,
   ].filter((k): k is string => !!k)
   await Promise.all(keys.map((k) => blobStore.del(k).catch(() => undefined)))
 }

@@ -139,6 +139,18 @@ near(bounds(inch.pieces[0].outline).width, 500 * 25.4, 0.5) ? ok('conversione da
   const sl = plan.jobs.find((j) => j.piece === 'sleeve_left')!
   sl.placements.length === 1 && sl.placements[0].label === 'Sponsor' ? ok('sponsor sulla manica sinistra') : fail(JSON.stringify(sl.placements))
   near(bounds(fM.bleed).width - bounds(fM.cut).width, 16, 0.2) ? ok('abbondanza di 8 mm intorno a ogni pezzo') : fail(String(bounds(fM.bleed).width - bounds(fM.cut).width))
+
+  // grafica all-over del cliente: riempie ogni pezzo, la sostituzione vale solo sul suo pezzo
+  const all = { ...asset, path: 'u/all.png' }, backArt = { ...asset, path: 'u/back.png' }
+  const aoPlan = buildPlan({
+    product, config: { ...(config as object), allOver: [{ asset: all, overrides: { back: backArt } }] } as never,
+    pieces, referenceSize: { main: 'M' }, baseColor: '#1E2A4A', secondaryColor: null, textStyle: { color: '#fff', outline: null, font: 'block' }, bleedMm: 8,
+  })
+  const byPiece = (k: string) => aoPlan.jobs.filter((j) => j.piece === k).map((j) => j.allOver?.path)
+  byPiece('front').every((p) => p === 'u/all.png') && byPiece('sleeve_left').every((p) => p === 'u/all.png') && byPiece('back').every((p) => p === 'u/back.png')
+    ? ok('all-over: grafica del capo su davanti e maniche, sostituzione solo sul dietro') : fail(JSON.stringify({ f: byPiece('front'), b: byPiece('back'), s: byPiece('sleeve_left') }))
+  aoPlan.jobs.find((j) => j.piece === 'front')!.placements.length === fM.placements.length
+    ? ok('all-over: loghi, nomi e numeri restano sopra la grafica') : fail('placements cambiati')
 }
 
 console.log(failures ? `\n${failures} TEST FALLITI` : '\nTutti i test superati')

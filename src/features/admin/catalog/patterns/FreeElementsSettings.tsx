@@ -1,5 +1,6 @@
 // Impostazioni dei loghi e sponsor liberi del prodotto: numero massimo, prezzo per elemento,
 // limiti di larghezza e zone consentite. Richiedono un cartamodello con taglia di riferimento.
+// In fondo: attivazione e prezzo della grafica all-over scelta dal cliente.
 
 import { useState } from 'react'
 import type { ProductDetail } from '@/types/db'
@@ -9,7 +10,7 @@ import { errorMessage } from '@/lib/errors'
 import { ZONE_LABEL } from '@/lib/patterns/placement'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Display'
-import { Field, FormError, Input } from '@/components/ui/Form'
+import { Field, FormError, Input, Switch } from '@/components/ui/Form'
 import { useUi } from '@/components/ui/Toast'
 
 const ZONES = Object.keys(ZONE_LABEL) as PrintZone[]
@@ -74,6 +75,52 @@ export function FreeElementsSettings({ product, onSaved }: { product: ProductDet
           </div>
           <p className="mt-2 text-xs text-ink-500">Nel configuratore compaiono solo le zone che hanno un pezzo nel cartamodello (per le maniche servono sinistra e destra).</p>
         </fieldset>
+        <div className="sm:col-span-2 lg:col-span-5"><FormError message={error} /></div>
+        <div className="flex justify-end sm:col-span-2 lg:col-span-5"><Button loading={saving} onClick={() => void save()}>Salva</Button></div>
+      </div>
+    </Card>
+  )
+}
+
+/** Grafica all-over scelta dal cliente: attivazione e prezzo per capo (o per componente del kit). */
+export function AllOverSettings({ product, onSaved }: { product: ProductDetail; onSaved: () => void }) {
+  const { toast } = useUi()
+  const [enabled, setEnabled] = useState(!!product.all_over_enabled)
+  const [price, setPrice] = useState(String(product.all_over_price ?? 0))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const save = async () => {
+    const p = Number(price.replace(',', '.'))
+    if (!(p >= 0)) return setError('Il prezzo deve essere un numero maggiore o uguale a 0.')
+    setSaving(true)
+    setError(null)
+    try {
+      const { error: e } = await supabase.from('products').update({ all_over_enabled: enabled, all_over_price: p }).eq('id', product.id)
+      if (e) throw e
+      toast('Impostazioni salvate')
+      onSaved()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Grafica all-over"
+        description="Il cliente carica una grafica che copre tutto il capo (per i kit: ogni componente) e può sostituirla su singoli pezzi. Collo e polsini restano nel colore dei profili. Con il cartamodello la grafica riempie ogni pezzo nel file di stampa e la risoluzione viene controllata sulle misure reali."
+      />
+      <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="flex items-center gap-3 sm:col-span-2">
+          <Switch checked={enabled} onChange={setEnabled} label="Consenti grafica all-over" />
+          <span className="text-sm font-medium text-ink-800">Consenti grafica all-over</span>
+        </div>
+        <Field label="Prezzo all-over (€ per capo)" hint="Per i kit si applica a ogni componente con grafica all-over.">
+          <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </Field>
         <div className="sm:col-span-2 lg:col-span-5"><FormError message={error} /></div>
         <div className="flex justify-end sm:col-span-2 lg:col-span-5"><Button loading={saving} onClick={() => void save()}>Salva</Button></div>
       </div>

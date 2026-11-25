@@ -43,6 +43,26 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 
 export interface ValidationIssue { section: string; message: string }
 
+const kitKey = (kit: string | null | undefined) => kit ?? '_'
+/** Chiave immagine della grafica all-over: `ao:<componente>:main` o `ao:<componente>:<pezzo>`. */
+export const allOverKey = (kit: string | null | undefined, zone: PrintZone | 'main') => `ao:${kitKey(kit)}:${zone}`
+
+/** Tutti i file all-over della configurazione con la loro chiave immagine. */
+function allOverAssets(config: Configuration): [string, AssetRef][] {
+  const out: [string, AssetRef][] = []
+  for (const ao of config.allOver ?? []) {
+    out.push([allOverKey(ao.kitItemId, 'main'), ao.asset])
+    for (const [zone, a] of Object.entries(ao.overrides ?? {})) if (a) out.push([allOverKey(ao.kitItemId, zone as PrintZone), a])
+  }
+  return out
+}
+
+/** Dimensioni in cm (larghezza, altezza) del contorno di un pezzo in mm. */
+function pieceCm(piece: ZonePiece) {
+  const xs = piece.outline.map((p) => p[0]), ys = piece.outline.map((p) => p[1])
+  return { w: (Math.max(...xs) - Math.min(...xs)) / 10, h: (Math.max(...ys) - Math.min(...ys)) / 10 }
+}
+
 export function useConfigurator(
   product: ProductDetail,
   opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number; initialVariantId?: string | null; zones?: ZonePiece[] },
@@ -102,11 +122,18 @@ export function useConfigurator(
   const assetKey = Object.entries(config.areas)
     .map(([id, a]) => `${id}:${a.enabled ? a.asset?.path ?? a.asset?.localKey ?? '' : ''}`)
     .concat((config.elements ?? []).map((e) => `el:${e.id}:${e.asset.path ?? e.asset.localKey ?? ''}`))
+    .concat(allOverAssets(config).map(([k, a]) => `${k}:${a.path ?? a.localKey ?? ''}`))
     .join('|')
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const next: Record<string, HTMLImageElement> = {}
+      for (const [key, asset] of allOverAssets(config)) {
+        try {
+          const url = await assetDisplayUrl(asset)
+          if (url) next[key] = await loadImage(url)
+        } catch { /* immagine non disponibile */ }
+      }
       for (const [id, a] of Object.entries(config.areas)) {
         if (!a.enabled || !a.asset) continue
         try {
@@ -143,6 +170,16 @@ export function useConfigurator(
     toSilhouette(forShape, side, elements.filter((e) => (e.kitItemId ?? null) === kit), zonePiece(zones, side, kit), elementImages),
   [elements, zones, elementImages])
 
+  // Grafica all-over ---------------------------------------------------------------
+  const allOverEnabled = !!product.all_over_enabled
+  const allOver = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === elementKit) ?? null
+  /** Immagine all-over per un pezzo del componente indicato: la sostituzione, altrimenti la grafica del capo. */
+  const allOverImage = useCallback((kit: string | null, zone: PrintZone): CanvasImageSource | null => {
+    const ao = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === kit)
+    if (!ao) return null
+    return (ao.overrides?.[zone] ? images[allOverKey(kit, zone)] : images[allOverKey(kit, 'main')]) ?? null
+  }, [config.allOver, images])
+
   // Ridisegno pannelli --------------------------------------------------------------
   const row = config.roster[Math.min(previewRow, Math.max(0, config.roster.length - 1))]
   const buildLayers = useCallback(
@@ -167,17 +204,17 @@ export function useConfigurator(
         if (cancelled) return
         const layers = buildLayers(areas)
         const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides, highlightId: highlightArea }
-        drawPanel(frontCanvas, { ...common, side: 'front', elements: silhouetteElements('front', shape, elementKit) })
-        drawPanel(backCanvas, { ...common, side: 'back', elements: silhouetteElements('back', shape, elementKit) })
+        drawPanel(frontCanvas, { ...common, side: 'front', allOver: allOverImage(elementKit, 'front'), elements: silhouetteElements('front', shape, elementKit) })
+        drawPanel(backCanvas, { ...common, side: 'back', allOver: allOverImage(elementKit, 'back'), elements: silhouetteElements('back', shape, elementKit) })
         for (const [zone, canvas] of [['sleeve_left', sleeveLeftCanvas], ['sleeve_right', sleeveRightCanvas]] as const) {
           const piece = zonePiece(zones, zone, elementKit)
-          if (piece) drawSleeve(canvas, piece, elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages)
+          if (piece) drawSleeve(canvas, piece, elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages, allOverImage(elementKit, zone))
         }
         setVersion((v) => v + 1)
       })
     }, 16)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, zones, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas])
+  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, zones, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage])
 
   // Azioni --------------------------------------------------------------------------
   const patch = useCallback((p: Partial<Configuration>) => setConfig((c) => ({ ...c, ...p })), [])
@@ -325,6 +362,89 @@ export function useConfigurator(
     return { element: el }
   }, [config.elements, freeMax, minW, maxW, opts.quality, opts.userId, elementKit, elementQuality])
 
+  // Grafica all-over: azioni e qualità -------------------------------------------------
+  const [allOverUploading, setAllOverUploading] = useState<PrintZone | 'main' | null>(null)
+  /** Pezzi del componente visualizzato (taglia di riferimento del cartamodello), se caricati. */
+  const allOverPieces = useMemo(
+    () => (['front', 'back', 'sleeve_left', 'sleeve_right'] as PrintZone[]).map((z) => zonePiece(zones, z, elementKit)).filter((p): p is ZonePiece => !!p),
+    [zones, elementKit],
+  )
+  /** Pezzi sostituibili: davanti e dietro sempre, le maniche solo se esiste il loro pezzo. */
+  const allOverZones = useMemo<PrintZone[]>(
+    () => ['front', 'back', ...(['sleeve_left', 'sleeve_right'] as PrintZone[]).filter((z) => allOverPieces.some((p) => p.zone === z))],
+    [allOverPieces],
+  )
+
+  /** DPI minimi della grafica sui pezzi che la usano; null se vettoriale o senza cartamodello. */
+  const allOverDpi = useCallback((asset: AssetRef, zone: PrintZone | 'main', overrides = allOver?.overrides): number | null => {
+    if (asset.isVector || !asset.width || !asset.height) return null
+    const target = zone === 'main' ? allOverPieces.filter((p) => !overrides?.[p.zone]) : allOverPieces.filter((p) => p.zone === zone)
+    if (!target.length) return null
+    return Math.min(...target.map((p) => { const c = pieceCm(p); return effectiveDpi(asset.width, asset.height, c.w, c.h, 1, 'cover') }))
+  }, [allOverPieces, allOver])
+
+  const allOverQuality = useCallback((asset: AssetRef, zone: PrintZone | 'main'): { quality: AssetRef['quality']; dpi: number | null } => {
+    if (asset.isVector) return { quality: 'vector', dpi: null }
+    const dpi = allOverDpi(asset, zone)
+    if (dpi == null) return { quality: 'ok', dpi: null }
+    return { quality: dpi >= opts.quality.min_dpi ? 'ok' : dpi >= opts.quality.warn_dpi ? 'warn' : 'poor', dpi }
+  }, [allOverDpi, opts.quality])
+
+  /** Imposta o rimuove (asset null) la grafica del capo o la sostituzione di un pezzo, per il componente visualizzato. */
+  const setAllOverAsset = useCallback((zone: PrintZone | 'main', asset: AssetRef | null) => {
+    setConfig((c) => {
+      const list = [...(c.allOver ?? [])]
+      const i = list.findIndex((x) => (x.kitItemId ?? null) === elementKit)
+      if (zone === 'main') {
+        if (!asset) return { ...c, allOver: list.filter((_, j) => j !== i) }
+        const entry = { ...(i >= 0 ? list[i] : {}), kitItemId: elementKit, asset }
+        if (i >= 0) list[i] = entry
+        else list.push(entry)
+        return { ...c, allOver: list }
+      }
+      if (i < 0) return c
+      const overrides = { ...(list[i].overrides ?? {}) }
+      if (asset) overrides[zone] = asset
+      else delete overrides[zone]
+      list[i] = { ...list[i], overrides }
+      return { ...c, allOver: list }
+    })
+    if (zone === 'front' || zone === 'back') setView(zone)
+  }, [elementKit])
+
+  /** Carica una grafica all-over (per il capo o per un pezzo) con controllo del file. */
+  const uploadAllOver = useCallback(async (zone: PrintZone | 'main', file: File) => {
+    setAllOverUploading(zone)
+    try {
+      const info = await readImageInfo(file)
+      // controllo del formato e dei limiti del file; la risoluzione si valuta sui pezzi reali
+      const ref = allOverPieces.find((p) => zone === 'main' || p.zone === zone)
+      const size = ref ? pieceCm(ref) : { w: 1, h: 1 }
+      const report = evaluateQuality(info, { print_width_cm: size.w, print_height_cm: size.h, area_type: 'all_over' }, opts.quality)
+      if (report.blocking) return report
+      const stored = await storeGraphic(file, opts.userId)
+      const asset: AssetRef = {
+        ...stored, name: file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
+        isVector: info.isVector, effectiveDpi: null, metadataDpi: report.metadataDpi, quality: 'ok', acknowledgedLowQuality: false,
+      }
+      const q = allOverQuality(asset, zone)
+      setAllOverAsset(zone, { ...asset, quality: q.quality, effectiveDpi: q.dpi })
+      return report
+    } finally {
+      setAllOverUploading(null)
+    }
+  }, [allOverPieces, allOverQuality, opts.quality, opts.userId, setAllOverAsset])
+
+  const pickAllOverLibrary = useCallback((zone: PrintZone | 'main', a: CustomizationAsset) => {
+    const isVector = a.storage_path.toLowerCase().endsWith('.svg') || !a.width
+    const asset: AssetRef = {
+      bucket: PUBLIC_BUCKET, path: a.storage_path, libraryAssetId: a.id, name: a.name, mime: isVector ? 'image/svg+xml' : 'image/png',
+      width: a.width ?? 0, height: a.height ?? 0, sizeBytes: 0, isVector, effectiveDpi: null, metadataDpi: null, quality: isVector ? 'vector' : 'ok',
+    }
+    const q = allOverQuality(asset, zone)
+    setAllOverAsset(zone, { ...asset, quality: q.quality, effectiveDpi: q.dpi })
+  }, [allOverQuality, setAllOverAsset])
+
   const setRoster = useCallback((rows: RosterEntry[]) => setConfig((c) => ({ ...c, roster: rows })), [])
   const setTextStyle = useCallback((s: Partial<TextStyle>) => setConfig((c) => ({ ...c, textStyle: { ...c.textStyle!, ...s } })), [])
 
@@ -364,6 +484,15 @@ export function useConfigurator(
         out.push({ section: 'graphics', message: `Conferma di aver preso visione della qualità della grafica "${q.area.name}".` })
       }
     }
+    for (const ao of config.allOver ?? []) {
+      const comp = product.kit_items.find((k) => k.id === ao.kitItemId)?.label
+      const label = `Grafica all-over${comp ? ` (${comp})` : ''}`
+      for (const [zone, a] of [['main', ao.asset] as const, ...Object.entries(ao.overrides ?? {})]) {
+        if (a && (a.quality === 'warn' || a.quality === 'poor') && !a.acknowledgedLowQuality) {
+          out.push({ section: 'allover', message: `${label}${zone === 'main' ? '' : `, ${ZONE_LABEL[zone as PrintZone].toLowerCase()}`}: conferma di aver preso visione della qualità della grafica.` })
+        }
+      }
+    }
     for (const [i, e] of (config.elements ?? []).entries()) {
       const label = `${e.kind === 'logo' ? 'Logo' : 'Sponsor'} ${i + 1} (${ZONE_LABEL[e.zone].toLowerCase()})`
       const piece = zonePiece(opts.zones ?? [], e.zone, e.kitItemId ?? null)
@@ -398,22 +527,23 @@ export function useConfigurator(
     const f = document.createElement('canvas')
     const b = document.createElement('canvas')
     const mainKit = product.product_type === 'kit' ? firstKitItem : null
-    drawPanel(f, { ...common, side: 'front', elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
-    drawPanel(b, { ...common, side: 'back', elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
+    drawPanel(f, { ...common, side: 'front', allOver: allOverImage(mainKit, 'front'), elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
+    drawPanel(b, { ...common, side: 'back', allOver: allOverImage(mainKit, 'back'), elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
     const out: Partial<Record<'front' | 'back' | 'sleeveLeft' | 'sleeveRight', Blob>> = {}
     const [front, back] = await Promise.all([canvasToBlob(f), canvasToBlob(b)])
     if (front) out.front = front
     if (back) out.back = back
-    // maniche: solo se hanno loghi o sponsor (pezzo reale con colore di fondo ed elementi)
+    // maniche: solo se hanno loghi, sponsor o grafica all-over (pezzo reale con colore di fondo)
     for (const [zone, key] of [['sleeve_left', 'sleeveLeft'], ['sleeve_right', 'sleeveRight']] as const) {
       const piece = zonePiece(zones, zone, mainKit)
       const els = elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === mainKit)
-      if (!piece || !els.length) continue
-      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor))
+      const fill = allOverImage(mainKit, zone)
+      if (!piece || (!els.length && !fill)) continue
+      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor, fill))
       if (blob) out[key] = blob
     }
     return out
-  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements, zones, elements, elementImages])
+  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements, zones, elements, elementImages, allOverImage])
 
   return {
     product, config, setConfig, patch, setArea, toggleOption, uploadGraphic, pickLibraryAsset, setRoster, setTextStyle,
@@ -427,6 +557,8 @@ export function useConfigurator(
       right: sleeveInfo(zonePiece(zones, 'sleeve_right', elementKit), sleeveRightCanvas),
     },
     addElement, updateElement, removeElement, elementQuality, elementUploading, elementHeightCm,
+    allOverEnabled, allOver, allOverZones, allOverPieces, allOverUploading, allOverQuality,
+    setAllOverAsset, uploadAllOver, pickAllOverLibrary,
   }
 }
 

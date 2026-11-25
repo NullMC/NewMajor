@@ -82,8 +82,22 @@ export function toSilhouette(
 
 const SLEEVE_PX_PER_MM = 3
 
-/** Disegna i soli elementi della manica su un canvas trasparente che copre il pezzo (3 px/mm). */
-export function drawSleeve(canvas: HTMLCanvasElement, piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>) {
+/** Disegna l'immagine in modalità "cover" sul riquadro indicato. */
+function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource, w: number, h: number) {
+  const iw = (img as HTMLImageElement).naturalWidth || (img as { width: number }).width || 1
+  const ih = (img as HTMLImageElement).naturalHeight || (img as { height: number }).height || 1
+  const s = Math.max(w / iw, h / ih)
+  ctx.drawImage(img, (w - iw * s) / 2, (h - ih * s) / 2, iw * s, ih * s)
+}
+
+/**
+ * Disegna gli elementi della manica (ed eventualmente la grafica all-over, ritagliata sul pezzo)
+ * su un canvas trasparente che copre il pezzo (3 px/mm).
+ */
+export function drawSleeve(
+  canvas: HTMLCanvasElement, piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>,
+  fill?: CanvasImageSource | null,
+) {
   const b = bounds(piece.outline)
   const w = Math.max(1, Math.round(b.width * SLEEVE_PX_PER_MM)), h = Math.max(1, Math.round(b.height * SLEEVE_PX_PER_MM))
   if (canvas.width !== w) canvas.width = w
@@ -91,6 +105,19 @@ export function drawSleeve(canvas: HTMLCanvasElement, piece: ZonePiece, elements
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, w, h)
+  if (fill) {
+    ctx.save()
+    ctx.beginPath()
+    piece.outline.forEach(([x, y], i) => {
+      const px = (x - b.minX) * SLEEVE_PX_PER_MM, py = (b.maxY - y) * SLEEVE_PX_PER_MM
+      if (i) ctx.lineTo(px, py)
+      else ctx.moveTo(px, py)
+    })
+    ctx.closePath()
+    ctx.clip()
+    drawCover(ctx, fill, w, h)
+    ctx.restore()
+  }
   for (const e of elements) {
     const img = images[e.id]
     if (!img) continue
@@ -112,9 +139,12 @@ export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement) {
 }
 
 /** Anteprima di una manica per l'ordine: il pezzo reale nel colore di fondo con i suoi elementi. */
-export function drawSleevePreview(piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>, baseColor: string) {
+export function drawSleevePreview(
+  piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>, baseColor: string,
+  fill?: CanvasImageSource | null,
+) {
   const elCanvas = document.createElement('canvas')
-  drawSleeve(elCanvas, piece, elements, images)
+  drawSleeve(elCanvas, piece, elements, images, fill)
   const b = bounds(piece.outline)
   const pad = 40
   const c = document.createElement('canvas')

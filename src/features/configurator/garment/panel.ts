@@ -34,6 +34,8 @@ export interface PanelSpec {
   textStyle: TextStyle
   guides?: boolean
   highlightId?: string | null
+  /** Grafica all-over del cliente: copre l'intero pannello, sotto loghi, nomi e numeri. */
+  allOver?: CanvasImageSource | null
   /** Loghi e sponsor liberi in unità della sagoma (centro, dimensioni, rotazione oraria in gradi). */
   elements?: { image: CanvasImageSource; cx: number; cy: number; w: number; h: number; rotation: number }[]
 }
@@ -136,7 +138,8 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
   const rect = (a: PanelArea) => [(a.x / 100) * w, (a.y / 100) * h, (a.width / 100) * w, (a.height / 100) * h] as const
   const sideLayers = spec.layers.filter((l) => l.area.side === spec.side)
 
-  // 1. Grafiche all-over (riempiono l'area)
+  // 1. Grafiche all-over: quella del cliente copre tutto il pannello, quelle in area riempiono l'area
+  if (spec.allOver) drawImageFit(ctx, spec.allOver, 0, 0, w, h, 'cover')
   for (const l of sideLayers) {
     if (l.area.area_type === 'all_over' && l.image) drawImageFit(ctx, l.image, ...rect(l.area), 'cover')
   }
