@@ -51,13 +51,12 @@ export default function FaqPage() {
   })
 
   const chip = (active: boolean) =>
-    cn('inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors lg:w-full lg:justify-between lg:rounded-xl',
+    cn('inline-flex h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold transition-colors lg:w-full lg:rounded-xl',
       active ? 'bg-ink-950 text-white' : 'bg-white text-ink-700 ring-1 ring-ink-200 hover:ring-ink-400')
 
   return (
     <>
       <PageHero
-        kicker="Domande frequenti"
         title="Hai una domanda?"
         lead="Le risposte su personalizzazione, ordini e pagamenti. Se non trovi quello che cerchi, scrivici."
       >
@@ -81,11 +80,11 @@ export default function FaqPage() {
           {categories.length > 1 && (
             <nav aria-label="Categorie delle domande" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-col lg:px-0">
               <button type="button" className={chip(cat === ALL)} aria-pressed={cat === ALL} onClick={() => setCat(ALL)}>
-                Tutte <span className={cn('font-mono text-xs', cat === ALL ? 'text-gold-400' : 'text-ink-400')}>{faqs?.length ?? 0}</span>
+                Tutte
               </button>
-              {categories.map(([name, n]) => (
+              {categories.map(([name]) => (
                 <button key={name} type="button" className={chip(cat === name)} aria-pressed={cat === name} onClick={() => setCat(name)}>
-                  {name} <span className={cn('font-mono text-xs', cat === name ? 'text-gold-400' : 'text-ink-400')}>{n}</span>
+                  {name}
                 </button>
               ))}
             </nav>
@@ -123,13 +122,9 @@ export default function FaqPage() {
                           aria-expanded={isOpen}
                           aria-controls={`faq-${f.id}`}
                           onClick={() => setOpen(isOpen ? null : f.id)}
-                          className="flex w-full items-start gap-4 px-5 py-5 text-left sm:gap-6 sm:px-7"
+                          className="flex w-full items-center gap-4 px-5 py-5 text-left sm:gap-6 sm:px-7"
                         >
-                          <span className={cn('pt-0.5 font-mono text-sm font-medium tabular-nums transition-colors', isOpen ? 'text-gold-600' : 'text-ink-400')}>{String(i + 1).padStart(2, '0')}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-base font-semibold leading-snug text-ink-950 sm:text-lg">{f.question}</span>
-                            {cat === ALL && categories.length > 1 && <span className="mt-1 block font-mono text-2xs uppercase tracking-[0.14em] text-ink-400">{f.category || 'Generale'}</span>}
-                          </span>
+                          <span className="min-w-0 flex-1 text-base font-semibold leading-snug text-ink-950 sm:text-lg">{f.question}</span>
                           <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-300', isOpen ? 'rotate-45 bg-gold-500 text-ink-950' : 'bg-ink-100 text-ink-600 group-hover:bg-ink-200')}>
                             <Plus className="h-4 w-4" aria-hidden />
                           </span>
@@ -138,7 +133,7 @@ export default function FaqPage() {
                       {/* apertura animata: righe della griglia da 0fr a 1fr */}
                       <div id={`faq-${f.id}`} inert={!isOpen} className={cn('grid transition-[grid-template-rows] duration-300 ease-out', isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
                         <div className="overflow-hidden">
-                          <div className="px-5 pb-6 sm:pl-[4.25rem] sm:pr-16">
+                          <div className="px-5 pb-6 sm:px-7 sm:pr-16">
                             <Markdown source={f.answer} className="text-ink-600" />
                           </div>
                         </div>

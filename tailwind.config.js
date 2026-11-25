@@ -42,6 +42,8 @@ export default {
         'stage-reflect': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(10px)' } },
         'stage-shadow': { '0%, 100%': { transform: 'scale(1)', opacity: '1' }, '50%': { transform: 'scale(.86)', opacity: '.65' } },
         'word-up': { from: { transform: 'translateY(105%)' }, to: { transform: 'translateY(0)' } },
+        // parole delle citazioni: compaiono da una leggera sfocatura
+        'blur-in': { from: { opacity: '0', filter: 'blur(10px)', transform: 'translateY(6px)' }, to: { opacity: '1', filter: 'blur(0)', transform: 'none' } },
         'scene-in': { from: { opacity: '0', transform: 'scale(.94)', filter: 'blur(14px)' }, to: { opacity: '1', transform: 'none', filter: 'blur(0)' } },
         grain: {
           '0%, 100%': { transform: 'translate(0, 0)' }, '20%': { transform: 'translate(-3%, 2%)' }, '40%': { transform: 'translate(2%, -3%)' },
@@ -54,6 +56,7 @@ export default {
         'slide-in-right': 'slide-in-right .28s cubic-bezier(.2,.8,.2,1)',
         shimmer: 'shimmer 1.6s infinite',
         'word-up': 'word-up .9s cubic-bezier(.2,.75,.15,1) both',
+        'blur-in': 'blur-in .8s cubic-bezier(.2,.75,.15,1) both',
         'scene-in': 'scene-in 1.4s cubic-bezier(.2,.75,.15,1) both',
         grain: 'grain .9s steps(5) infinite',
       },

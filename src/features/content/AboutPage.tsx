@@ -3,9 +3,9 @@
 // l'introduzione, una scheda per ogni sezione "## …" del contenuto e i numeri del catalogo
 // letti dal database, e le call to action finali come in home.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Box, Images, LayoutGrid, Phone } from 'lucide-react'
+import { ArrowRight, Box, Images, LayoutGrid, Phone, Quote } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { publicUrl } from '@/lib/storage'
 import { stripMarkdown } from '@/lib/markdown'
@@ -57,37 +57,73 @@ function CountUp({ value }: { value: number }) {
   return <span ref={ref} className="tabular-nums">{n}</span>
 }
 
-/** Posizioni del collage (desktop): foto sparse e leggermente ruotate attorno al centro. */
+type Photo = { src: string; alt: string; caption: string }
+
+/** Posizioni del collage (desktop): polaroid sparse e leggermente ruotate attorno al centro. */
 const SLOTS = [
-  'left-[4%] top-[6%] w-[44%] -rotate-6',
-  'right-[2%] top-0 w-[40%] rotate-[5deg]',
-  'left-[22%] top-[38%] w-[46%] rotate-2 z-10',
-  'right-[6%] bottom-[2%] w-[36%] -rotate-3',
-  'left-0 bottom-[4%] w-[30%] rotate-[7deg]',
+  'left-[2%] top-[4%] w-[40%] -rotate-6',
+  'right-[1%] top-0 w-[37%] rotate-[5deg]',
+  'left-[27%] top-[30%] w-[41%] rotate-2 z-10',
+  'right-[4%] bottom-0 w-[34%] -rotate-3',
+  'left-0 bottom-[2%] w-[31%] rotate-[7deg]',
 ]
 
-function PhotoCollage({ photos }: { photos: { src: string; alt: string }[] }) {
+/** Foto come nel portfolio della home: polaroid color carta con striscia di nastro adesivo. */
+function Polaroid({ photo, eager, className }: { photo: Photo; eager?: boolean; className?: string }) {
+  return (
+    <figure className={cn('relative rounded-md bg-[#F3F1EA] p-[5%] pb-0 shadow-[0_40px_70px_-30px_rgba(0,0,0,.85)]', className)}>
+      <span aria-hidden className="absolute -top-3 left-1/2 z-10 h-7 w-[46%] -translate-x-1/2 -rotate-3 bg-white/60 shadow-sm backdrop-blur-[1px]" />
+      <div className="aspect-[4/5] overflow-hidden bg-ink-800">
+        <img src={photo.src} alt={photo.alt} loading={eager ? 'eager' : 'lazy'} decoding="async" draggable={false} className="h-full w-full object-cover" />
+      </div>
+      <figcaption className="truncate py-2.5 font-serif text-lg italic leading-none text-ink-900 sm:py-3">{photo.caption}</figcaption>
+    </figure>
+  )
+}
+
+function PhotoCollage({ photos }: { photos: Photo[] }) {
   if (!photos.length) return null
   return (
     <>
-      {/* Desktop: foto sparse */}
-      <div className="relative hidden aspect-[5/4] lg:block">
+      {/* Desktop: polaroid sparse */}
+      <div className="relative hidden aspect-[10/9] lg:block">
         {photos.slice(0, SLOTS.length).map((p, i) => (
-          <figure
-            key={p.src}
-            className={cn('group absolute overflow-hidden rounded-2xl bg-ink-800 p-1.5 shadow-[0_30px_60px_-25px_rgba(0,0,0,.8)] ring-1 ring-white/10 transition duration-500 hover:z-20 hover:rotate-0 hover:scale-[1.04]', SLOTS[i])}
-          >
-            <img src={p.src} alt={p.alt} loading="eager" decoding="async" className="aspect-[4/5] w-full rounded-xl object-cover" />
-          </figure>
+          <div key={p.src} className={cn('absolute transition duration-500 hover:z-20 hover:rotate-0 hover:scale-[1.04]', SLOTS[i])}>
+            <Polaroid photo={p} eager />
+          </div>
         ))}
       </div>
-      {/* Mobile e tablet: striscia scorrevole */}
-      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 lg:hidden">
-        {photos.map((p) => (
-          <img key={p.src} src={p.src} alt={p.alt} loading="lazy" decoding="async" className="aspect-[4/5] w-[46vw] max-w-[15rem] shrink-0 snap-start rounded-2xl object-cover ring-1 ring-white/10" />
+      {/* Mobile e tablet: polaroid in una striscia scorrevole */}
+      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 pt-4 lg:hidden">
+        {photos.map((p, i) => (
+          <Polaroid key={p.src} photo={p} className={cn('w-[52vw] max-w-[15rem] shrink-0 snap-start', i % 2 ? 'rotate-2' : '-rotate-2')} />
         ))}
       </div>
     </>
+  )
+}
+
+/** Contenuto dell'intestazione come citazione: virgolette, testo in corsivo che compare parola per parola e firma. */
+function HeroQuote({ text, author }: { text: string; author: string }) {
+  const words = text.trim().split(/\s+/)
+  return (
+    <figure className="max-w-xl">
+      <Quote className="h-9 w-9 fill-gold-500 text-gold-500" aria-hidden />
+      <blockquote className="mt-4 font-serif text-[clamp(1.45rem,3.2vw,2.1rem)] italic leading-[1.25] text-white">
+        <p>
+          {words.map((w, i) => (
+            <Fragment key={i}>
+              <span className="inline-block animate-blur-in motion-reduce:animate-none" style={{ animationDelay: `${450 + i * 45}ms` }}>{w}</span>
+              {i < words.length - 1 ? ' ' : ''}
+            </Fragment>
+          ))}
+        </p>
+      </blockquote>
+      <figcaption className="mt-7 flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white p-1.5"><img src="/brand/logo.png" alt="" className="h-full w-auto" /></span>
+        <span className="font-semibold text-white">{author}</span>
+      </figcaption>
+    </figure>
   )
 }
 
@@ -110,14 +146,14 @@ export default function AboutPage() {
 
   // foto reali: prima i progetti del portfolio, poi le foto dei prodotti in evidenza
   const photos = useMemo(() => {
-    const out: { src: string; alt: string }[] = []
+    const out: Photo[] = []
     for (const p of portfolio ?? []) {
       const src = publicUrl(p.image_path)
-      if (src) out.push({ src, alt: p.image_alt || `${p.team_name}${p.title ? ` – ${p.title}` : ''}` })
+      if (src) out.push({ src, alt: p.image_alt || `${p.team_name}${p.title ? ` – ${p.title}` : ''}`, caption: p.team_name })
     }
     for (const p of featured ?? []) {
       const src = publicUrl(primaryImage(p)?.storage_path)
-      if (src && !out.some((o) => o.src === src)) out.push({ src, alt: p.name })
+      if (src && !out.some((o) => o.src === src)) out.push({ src, alt: p.name, caption: p.name })
     }
     return out.slice(0, 5)
   }, [portfolio, featured])
@@ -140,7 +176,9 @@ export default function AboutPage() {
 
   return (
     <>
-      <PageHero kicker="Chi siamo" title={page.title} lead={page.excerpt} aside={photos.length ? <PhotoCollage photos={photos} /> : undefined} />
+      <PageHero title={page.title} aside={photos.length ? <PhotoCollage photos={photos} /> : undefined}>
+        {page.excerpt && <HeroQuote text={page.excerpt} author={c.name} />}
+      </PageHero>
 
       <section className="container pt-14 sm:pt-20" aria-label="La nostra realtà">
         <div className="grid gap-3 sm:gap-4 md:grid-cols-6">
@@ -149,7 +187,6 @@ export default function AboutPage() {
             <Reveal className="relative overflow-hidden rounded-[1.75rem] bg-white p-6 ring-1 ring-ink-200 sm:rounded-[2rem] sm:p-10 md:col-span-4">
               <span aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gold-100 blur-3xl" />
               <div className="relative">
-                <span aria-hidden className="mb-6 block h-1 w-12 rounded-full bg-gold-500" />
                 <Markdown source={intro} className="text-xl leading-9 text-ink-800 sm:text-2xl sm:leading-[2.6rem] [&_p]:text-inherit" />
                 <Link to="/catalogo" className="group mt-8 inline-flex items-center gap-3 text-sm font-semibold text-ink-900">
                   Scopri il catalogo
@@ -186,8 +223,7 @@ export default function AboutPage() {
                 sections.length === 1 ? 'md:col-span-6' : sections.length === 2 ? 'md:col-span-3' : 'md:col-span-2',
               )}
             >
-              <p className="font-mono text-2xs font-medium uppercase tracking-[0.18em] text-gold-700">{String(i + 1).padStart(2, '0')}</p>
-              <h2 className="display-lg mt-3 text-2xl">{s.title}</h2>
+              <h2 className="display-lg text-2xl">{s.title}</h2>
               {s.body && <Markdown source={s.body} className="mt-4 [&_p]:whitespace-pre-line" />}
             </Reveal>
           ))}

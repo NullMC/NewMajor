@@ -89,14 +89,12 @@ export default function ContactPage() {
   return (
     <>
       <PageHero
-        kicker="Contatti"
         title="Parliamo del tuo progetto"
         lead="Per informazioni, preventivi e richieste su misura scrivici o chiamaci."
         aside={
           <a href={tel(c.phone)} className="group glass glass-clear flex items-center justify-between gap-4 rounded-[1.5rem] p-5 sm:p-6">
             <span>
-              <span className="block font-mono text-2xs uppercase tracking-[0.18em] text-ink-400">Info e ordini</span>
-              <span className="mt-1 block font-display text-[clamp(1.6rem,5vw,2.4rem)] font-bold leading-none text-white" style={{ fontStretch: '112%' }}>{c.phone}</span>
+              <span className="block font-display text-[clamp(1.6rem,5vw,2.4rem)] font-bold leading-none text-white" style={{ fontStretch: '112%' }}>{c.phone}</span>
             </span>
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gold-500 text-ink-950 transition-transform group-hover:scale-105"><Phone className="h-5 w-5" aria-hidden /></span>
           </a>
@@ -106,12 +104,12 @@ export default function ContactPage() {
       <div className="container grid gap-6 pt-10 sm:pt-14 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] lg:gap-10">
         {/* Recapiti */}
         <aside className="space-y-3 lg:order-1">
-          <ContactCard icon={<Phone className="h-5 w-5" />} label="Telefono" copy={c.phone_alt ? undefined : c.phone}>
+          <ContactCard icon={<Phone className="h-5 w-5" />} copy={c.phone_alt ? undefined : c.phone}>
             <a href={tel(c.phone)} className="block text-lg font-semibold hover:text-gold-700">{c.phone}</a>
             {c.phone_alt && <a href={tel(c.phone_alt)} className="mt-0.5 block font-medium text-ink-600 hover:text-gold-700">{c.phone_alt}</a>}
           </ContactCard>
           {c.email && (
-            <ContactCard icon={<Mail className="h-5 w-5" />} label="Email" copy={c.email}>
+            <ContactCard icon={<Mail className="h-5 w-5" />} copy={c.email}>
               <a href={`mailto:${c.email}`} className="block break-all text-lg font-semibold hover:text-gold-700">{c.email}</a>
             </ContactCard>
           )}
@@ -124,8 +122,7 @@ export default function ContactPage() {
               <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gold-500 text-ink-950 shadow-[0_0_0_6px_rgba(194,160,99,.25)]"><MapPin className="h-5 w-5" /></span>
             </div>
             <div className="relative max-w-[70%]">
-              <p className="font-mono text-2xs uppercase tracking-[0.18em] text-gold-400">Sede legale</p>
-              <p className="mt-2 text-lg font-semibold leading-snug">{c.legal_address}</p>
+              <p className="text-lg font-semibold leading-snug">{c.legal_address}</p>
               {c.show_alt_address && c.alt_address && <p className="mt-1 text-sm text-ink-300">{c.alt_address}</p>}
             </div>
             <div className="relative mt-6 flex flex-wrap gap-2">
@@ -136,7 +133,8 @@ export default function ContactPage() {
             </div>
           </div>
 
-          <ContactCard icon={<Building2 className="h-5 w-5" />} label={c.name}>
+          <ContactCard icon={<Building2 className="h-5 w-5" />}>
+            <p className="font-semibold">{c.name}</p>
             <p className="text-sm text-ink-600">P. IVA {c.vat_number} · REA {c.rea}</p>
           </ContactCard>
         </aside>
@@ -224,14 +222,11 @@ export default function ContactPage() {
 }
 
 /** Scheda recapito: icona, etichetta, contenuto ed eventuale pulsante copia. */
-function ContactCard({ icon, label, copy, children }: { icon: React.ReactNode; label: string; copy?: string; children: React.ReactNode }) {
+function ContactCard({ icon, copy, children }: { icon: React.ReactNode; copy?: string; children: React.ReactNode }) {
   return (
-    <div className="group flex items-start gap-4 rounded-[1.5rem] bg-white p-5 ring-1 ring-ink-200 transition hover:ring-ink-400 sm:p-6">
+    <div className="group flex items-center gap-4 rounded-[1.5rem] bg-white p-5 ring-1 ring-ink-200 transition hover:ring-ink-400 sm:p-6">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-100 text-gold-700 transition-colors group-hover:bg-gold-500 group-hover:text-ink-950">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-ink-500">{label}</p>
-        <div className="mt-1">{children}</div>
-      </div>
+      <div className="min-w-0 flex-1">{children}</div>
       {copy && <CopyButton value={copy} />}
     </div>
   )

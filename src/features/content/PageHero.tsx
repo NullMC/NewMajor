@@ -6,8 +6,7 @@ import { cn } from '@/lib/cn'
 import { AccentTitle } from '@/components/fx/Reveal'
 import { Grain } from '@/components/fx/ShaderBackdrop'
 
-export function PageHero({ kicker, title, lead, children, aside, className }: {
-  kicker: string
+export function PageHero({ title, lead, children, aside, className }: {
   title: string
   lead?: ReactNode
   /** Contenuto sotto il testo (es. ricerca, scorciatoie). */
@@ -24,10 +23,7 @@ export function PageHero({ kicker, title, lead, children, aside, className }: {
       <Grain />
       <div className={cn('container relative pb-14 pt-28 sm:pb-20 sm:pt-36', !!aside && 'grid items-end gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)] lg:gap-16')}>
         <div className="min-w-0">
-          <p className="flex items-center gap-3 font-mono text-2xs font-medium uppercase tracking-[0.2em] text-gold-400">
-            <span aria-hidden className="h-px w-8 bg-gold-500/70" />{kicker}
-          </p>
-          <h1 className="display-xl mt-5 text-[clamp(2.4rem,9vw,5.2rem)] text-white [overflow-wrap:break-word]" style={{ fontStretch: '110%' }}>
+          <h1 className="display-xl text-[clamp(2.4rem,9vw,5.2rem)] text-white [overflow-wrap:break-word]" style={{ fontStretch: '110%' }}>
             <AccentTitle text={title} animate accentClassName="text-gold-400" />
           </h1>
           {lead && <div className="mt-6 max-w-xl animate-slide-up text-base leading-7 text-ink-300 [animation-delay:.35s] sm:text-lg sm:leading-8">{lead}</div>}
