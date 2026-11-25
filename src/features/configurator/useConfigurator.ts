@@ -171,7 +171,9 @@ export function useConfigurator(
   [elements, zones, elementImages])
 
   // Grafica all-over ---------------------------------------------------------------
-  const allOverEnabled = !!product.all_over_enabled
+  // nei kit l'admin sceglie i componenti su cui è consentita (es. solo la maglia)
+  const allOverEnabled = !!product.all_over_enabled && (product.product_type !== 'kit' || kitItem?.all_over_enabled !== false)
+  const allOverKitCount = product.kit_items.filter((k) => k.all_over_enabled !== false).length
   const allOver = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === elementKit) ?? null
   /** Immagine all-over per un pezzo del componente indicato: la sostituzione, altrimenti la grafica del capo. */
   const allOverImage = useCallback((kit: string | null, zone: PrintZone): CanvasImageSource | null => {
@@ -557,7 +559,7 @@ export function useConfigurator(
       right: sleeveInfo(zonePiece(zones, 'sleeve_right', elementKit), sleeveRightCanvas),
     },
     addElement, updateElement, removeElement, elementQuality, elementUploading, elementHeightCm,
-    allOverEnabled, allOver, allOverZones, allOverPieces, allOverUploading, allOverQuality,
+    allOverEnabled, allOverKitCount, allOver, allOverZones, allOverPieces, allOverUploading, allOverQuality,
     setAllOverAsset, uploadAllOver, pickAllOverLibrary,
   }
 }

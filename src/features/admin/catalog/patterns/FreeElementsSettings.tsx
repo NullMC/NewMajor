@@ -87,17 +87,26 @@ export function AllOverSettings({ product, onSaved }: { product: ProductDetail; 
   const { toast } = useUi()
   const [enabled, setEnabled] = useState(!!product.all_over_enabled)
   const [price, setPrice] = useState(String(product.all_over_price ?? 0))
+  const isKit = product.product_type === 'kit' && product.kit_items.length > 0
+  // componenti del kit su cui è consentita (es. solo la maglia, non il pantaloncino)
+  const [kitOn, setKitOn] = useState<Record<string, boolean>>(() => Object.fromEntries(product.kit_items.map((k) => [k.id, k.all_over_enabled !== false])))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const save = async () => {
     const p = Number(price.replace(',', '.'))
     if (!(p >= 0)) return setError('Il prezzo deve essere un numero maggiore o uguale a 0.')
+    if (enabled && isKit && !Object.values(kitOn).some(Boolean)) return setError('Scegli almeno un componente del kit, oppure disattiva la grafica all-over.')
     setSaving(true)
     setError(null)
     try {
       const { error: e } = await supabase.from('products').update({ all_over_enabled: enabled, all_over_price: p }).eq('id', product.id)
       if (e) throw e
+      for (const k of product.kit_items) {
+        if ((k.all_over_enabled !== false) === kitOn[k.id]) continue
+        const { error: ke } = await supabase.from('kit_items').update({ all_over_enabled: kitOn[k.id] }).eq('id', k.id)
+        if (ke) throw ke
+      }
       toast('Impostazioni salvate')
       onSaved()
     } catch (e) {
@@ -121,6 +130,23 @@ export function AllOverSettings({ product, onSaved }: { product: ProductDetail; 
         <Field label="Prezzo all-over (€ per capo)" hint="Per i kit si applica a ogni componente con grafica all-over.">
           <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
+        {isKit && enabled && (
+          <fieldset className="sm:col-span-2 lg:col-span-5">
+            <legend className="text-sm font-medium text-ink-800">Componenti con grafica all-over</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {product.kit_items.map((k) => {
+                const on = !!kitOn[k.id]
+                return (
+                  <label key={k.id} className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ${on ? 'bg-ink-900 text-white ring-ink-900' : 'ring-ink-200'}`}>
+                    <input type="checkbox" className="sr-only" checked={on} onChange={() => setKitOn({ ...kitOn, [k.id]: !on })} />
+                    {k.label}
+                  </label>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-xs text-ink-500">Es. per una divisa da calcio solo la maglia. Gli altri componenti restano in tinta unita con loghi, nomi e numeri.</p>
+          </fieldset>
+        )}
         <div className="sm:col-span-2 lg:col-span-5"><FormError message={error} /></div>
         <div className="flex justify-end sm:col-span-2 lg:col-span-5"><Button loading={saving} onClick={() => void save()}>Salva</Button></div>
       </div>

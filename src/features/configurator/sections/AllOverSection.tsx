@@ -96,7 +96,7 @@ export function AllOverSection({ api, library }: { api: ConfiguratorApi; library
             {api.allOverZones.length > 2 ? ' e maniche' : ''}. Loghi, sponsor, nomi e numeri restano stampati sopra.
             {price > 0 && <> Costo: <strong>+{formatPrice(price)}</strong> per capo.</>}
           </p>
-          {kitLabel && <p className="mt-1 text-ink-500">Per gli altri capi del kit selezionali sopra l’anteprima.</p>}
+          {kitLabel && api.allOverKitCount > 1 && <p className="mt-1 text-ink-500">Per gli altri capi del kit selezionali sopra l’anteprima.</p>}
           {!api.allOverPieces.length && (
             <p className="mt-1 text-ink-500">
               Per questo capo non sono ancora disponibili le misure dei pezzi, quindi non possiamo calcolare la risoluzione di stampa:
