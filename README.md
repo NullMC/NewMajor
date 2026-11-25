@@ -74,6 +74,7 @@ Esegui le migration **in ordine** (cartella `supabase/migrations`):
 10. `20261125000010_patterns.sql` – cartamodelli dei prodotti (pezzi per taglia in mm) e bucket privato `patterns` per i file CAD
 11. `20261125000011_free_elements.sql` – loghi e sponsor liberi (più elementi per capo su davanti, dietro e maniche, prezzo per elemento, posizioni in cm) e zone di stampa pubbliche della taglia di riferimento
 12. `20261126000012_models_all_over_images.sql` – nuovi modelli 3D (polo, felpa con cappuccio, giacca e pantalone tuta, giubbotto), grafica all-over scelta dal cliente (prezzo per capo, sostituzioni per pezzo) e immagini prodotto associate a un colore
+13. `20261127000013_supply_mode_kit_all_over.sql` – fornitura del prodotto (disponibilità immediata / print-on-demand, copiata sulle righe d’ordine) e grafica all-over limitata ai componenti del kit scelti
 
 Due modi:
 
@@ -195,7 +196,7 @@ Nessuna libreria di stato globale, form o data-fetching: sono coperti da context
 
 ## 7. Funzionalità implementate
 
-**Sito pubblico**: home gestibile (hero, prodotti in evidenza, sezioni, CTA, banner annunci) · Chi siamo e pagine legali da CMS · catalogo con categorie/sottocategorie, ricerca, filtri (tipologia maglia, tipo, disponibilità, attributi configurabili), ordinamento · pagina prodotto dinamica con galleria che segue il colore scelto, dati strutturati JSON-LD, prodotti correlati · per gli articoli non personalizzabili: ordine neutro con taglie e quantità oppure richiesta di consulenza precompilata (prodotto, colore, taglie) dal modulo contatti · FAQ con ricerca · Contattaci con richieste salvate nel database · banner cookie · SEO (title/description/OG/canonical dinamici, sitemap, robots).
+**Sito pubblico**: home gestibile (hero, prodotti in evidenza, sezioni, CTA, banner annunci) · Chi siamo e pagine legali da CMS · catalogo diviso in disponibilità immediata e print-on-demand, con categorie/sottocategorie, ricerca, filtri (tipologia maglia, tipo, disponibilità, attributi configurabili), ordinamento · pagina prodotto dinamica con galleria che segue il colore scelto, dati strutturati JSON-LD, prodotti correlati · per gli articoli non personalizzabili: ordine neutro con taglie e quantità oppure richiesta di consulenza precompilata (prodotto, colore, taglie) dal modulo contatti · FAQ con ricerca · Contattaci con richieste salvate nel database · banner cookie · SEO (title/description/OG/canonical dinamici, sitemap, robots).
 
 **Configuratore**: tipologia capo (Smarcata, adidas, Mizuno… gestibili), colore base con profili, opzioni con sovrapprezzi, loghi/sponsor/grafiche all-over (upload o libreria), grafica all-over su tutto il capo con sostituzioni per pezzo, nomi e numeri con stile, roster per giocatore con taglie e quantità (anche incolla da Excel), kit composti con taglie per componente, mockup 3D live fronte/retro + vista 2D, **controllo qualità delle grafiche** (DPI effettivi alla dimensione di stampa, avviso sotto 300 dpi, conferma esplicita del cliente, trasparenza, formato e peso), riepilogo prezzi con sconti a scaglioni, anteprime salvate con l’ordine.
 
