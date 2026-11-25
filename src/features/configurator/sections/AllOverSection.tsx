@@ -92,7 +92,7 @@ export function AllOverSection({ api, library }: { api: ConfiguratorApi; library
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-ink-500" aria-hidden />
         <div>
           <p>
-            Una grafica che copre {kitLabel ? <>tutto il <strong>{kitLabel.toLowerCase()}</strong></> : 'tutto il capo'}: davanti, dietro
+            Una grafica che copre {kitLabel ? <>l’intero capo <strong>{kitLabel}</strong></> : 'l’intero capo'}: davanti, dietro
             {api.allOverZones.length > 2 ? ' e maniche' : ''}. Loghi, sponsor, nomi e numeri restano stampati sopra.
             {price > 0 && <> Costo: <strong>+{formatPrice(price)}</strong> per capo.</>}
           </p>

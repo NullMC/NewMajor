@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { CheckCircle2, MapPin, Phone, Mail, Building2, Minus, Plus } from 'lucide-react'
 import { useMeta } from '@/hooks/useMeta'
 import { errorMessage } from '@/lib/errors'
@@ -36,6 +36,10 @@ export default function ContactPage() {
     message: '',
     website: '', // honeypot anti-spam
   })
+  // consulenza: oggetto precompilato con il nome dell'articolo (se il cliente non ne ha scritto uno)
+  useEffect(() => {
+    if (product) setForm((f) => (f.subject ? f : { ...f, subject: `Consulenza: ${product.name}`.slice(0, 160) }))
+  }, [product])
   const [privacy, setPrivacy] = useState(false)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -156,7 +160,7 @@ export default function ContactPage() {
                         {product.sizes.map((sz) => (
                           <li key={sz} className="flex items-center justify-between rounded-xl px-3 py-1.5 ring-1 ring-ink-200">
                             <span className="font-mono text-sm">{sz}</span>
-                            <Qty value={sizes[sz] ?? 0} label={sz} onChange={(n) => setSizes({ ...sizes, [sz]: n })} />
+                            <Qty value={sizes[sz] ?? 0} label={sz} onChange={(f) => setSizes((s) => ({ ...s, [sz]: f(s[sz] ?? 0) }))} />
                           </li>
                         ))}
                       </ul>
@@ -165,7 +169,7 @@ export default function ContactPage() {
                   ) : (
                     <div className="mt-4 flex items-center justify-between rounded-xl px-3 py-1.5 ring-1 ring-ink-200 sm:w-56">
                       <span className="text-sm">Pezzi</span>
-                      <Qty value={pieces} label="pezzi" onChange={setPieces} />
+                      <Qty value={pieces} label="pezzi" onChange={(f) => setPieces((p) => f(p))} />
                     </div>
                   )}
                 </fieldset>
@@ -198,13 +202,15 @@ export default function ContactPage() {
 }
 
 /** Selettore di quantità compatto (0–999). */
-function Qty({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
-  const set = (n: number) => onChange(Math.max(0, Math.min(999, Math.round(n) || 0)))
+function Qty({ value, onChange, label }: { value: number; onChange: (update: (n: number) => number) => void; label: string }) {
+  const clamp = (n: number) => Math.max(0, Math.min(999, Math.round(n) || 0))
+  const set = (n: number) => onChange(() => clamp(n))
+  const step = (d: number) => onChange((n) => clamp(n + d))
   return (
     <div className="flex items-center gap-1">
-      <button type="button" onClick={() => set(value - 1)} disabled={value <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100 disabled:opacity-40" aria-label={`Meno ${label}`}><Minus className="h-3.5 w-3.5" /></button>
+      <button type="button" onClick={() => step(-1)} disabled={value <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100 disabled:opacity-40" aria-label={`Meno ${label}`}><Minus className="h-3.5 w-3.5" /></button>
       <input inputMode="numeric" value={value} onChange={(e) => set(Number(e.target.value.replace(/\D/g, '')))} className="h-7 w-10 rounded-md bg-transparent text-center font-mono text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-gold-500" aria-label={`Quantità ${label}`} />
-      <button type="button" onClick={() => set(value + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100" aria-label={`Più ${label}`}><Plus className="h-3.5 w-3.5" /></button>
+      <button type="button" onClick={() => step(1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100" aria-label={`Più ${label}`}><Plus className="h-3.5 w-3.5" /></button>
     </div>
   )
 }
