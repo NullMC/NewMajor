@@ -16,13 +16,17 @@ import { ModelGarment, useGarmentModel, type SleeveTexture } from './ModelGarmen
 
 function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
   const { gl, invalidate } = useThree()
+  // Una texture WebGL non può cambiare dimensioni dopo il primo caricamento: quando il canvas
+  // viene ridisegnato con proporzioni diverse (es. passaggio maglia → pantaloncino) va ricreata,
+  // altrimenti restano residui della sagoma precedente.
+  const size = canvas ? `${canvas.width}x${canvas.height}` : ''
   const texture = useMemo(() => {
     if (!canvas) return null
     const t = new THREE.CanvasTexture(canvas)
     t.colorSpace = THREE.SRGBColorSpace
     t.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy())
     return t
-  }, [canvas, gl])
+  }, [canvas, gl, size]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (texture) {
       texture.needsUpdate = true
