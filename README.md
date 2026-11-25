@@ -53,7 +53,7 @@ Il sito è disponibile su `http://localhost:5173`. Senza variabili Supabase l’
 | `npm run preview` | Anteprima della build |
 | `npm run typecheck` | Solo controllo TypeScript |
 | `npm run test:unit` | Test di importazione dei cartamodelli (DXF di prova con misure note) e, nelle fasi successive, di posizionamento e disposizione dei pezzi |
-| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (98 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
+| `npm run test:db` | Applica le migration su un Postgres embedded (PGlite) e verifica RLS, prezzi lato server e RPC (oltre 100 controlli; i privilegi dei ruoli replicano quelli di un progetto Supabase nuovo) |
 | `npm run sitemap` | Genera `public/sitemap.xml` e `public/robots.txt` dai contenuti pubblicati |
 
 ## 2. Configurazione Supabase
@@ -73,6 +73,7 @@ Esegui le migration **in ordine** (cartella `supabase/migrations`):
 9. `20261124000009_dashboard_period.sql` – riepilogo della dashboard su un periodo a scelta (7 giorni … 24 mesi)
 10. `20261125000010_patterns.sql` – cartamodelli dei prodotti (pezzi per taglia in mm) e bucket privato `patterns` per i file CAD
 11. `20261125000011_free_elements.sql` – loghi e sponsor liberi (più elementi per capo su davanti, dietro e maniche, prezzo per elemento, posizioni in cm) e zone di stampa pubbliche della taglia di riferimento
+12. `20261126000012_models_all_over_images.sql` – nuovi modelli 3D (polo, felpa con cappuccio, giacca e pantalone tuta, giubbotto), grafica all-over scelta dal cliente (prezzo per capo, sostituzioni per pezzo) e immagini prodotto associate a un colore
 
 Due modi:
 
@@ -156,7 +157,7 @@ supabase/
   migrations/       Schema, RLS, funzioni, storage, seed di base
   tests/            Test del database su PGlite
   seed_demo.sql     Dati dimostrativi facoltativi
-scripts/            Generatore sitemap
+scripts/            Generatore sitemap; models/ per ottimizzare i modelli 3D e generarne le sagome
 docs/               Documentazione tecnica e operativa
 ```
 
@@ -194,9 +195,9 @@ Nessuna libreria di stato globale, form o data-fetching: sono coperti da context
 
 ## 7. Funzionalità implementate
 
-**Sito pubblico**: home gestibile (hero, prodotti in evidenza, sezioni, CTA, banner annunci) · Chi siamo e pagine legali da CMS · catalogo con categorie/sottocategorie, ricerca, filtri (tipologia maglia, tipo, disponibilità, attributi configurabili), ordinamento · pagina prodotto dinamica con galleria, dati strutturati JSON-LD, prodotti correlati · FAQ con ricerca · Contattaci con richieste salvate nel database · banner cookie · SEO (title/description/OG/canonical dinamici, sitemap, robots).
+**Sito pubblico**: home gestibile (hero, prodotti in evidenza, sezioni, CTA, banner annunci) · Chi siamo e pagine legali da CMS · catalogo con categorie/sottocategorie, ricerca, filtri (tipologia maglia, tipo, disponibilità, attributi configurabili), ordinamento · pagina prodotto dinamica con galleria che segue il colore scelto, dati strutturati JSON-LD, prodotti correlati · per gli articoli non personalizzabili: ordine neutro con taglie e quantità oppure richiesta di consulenza precompilata (prodotto, colore, taglie) dal modulo contatti · FAQ con ricerca · Contattaci con richieste salvate nel database · banner cookie · SEO (title/description/OG/canonical dinamici, sitemap, robots).
 
-**Configuratore**: tipologia capo (Smarcata, adidas, Mizuno… gestibili), colore base con profili, opzioni con sovrapprezzi, loghi/sponsor/grafiche all-over (upload o libreria), nomi e numeri con stile, roster per giocatore con taglie e quantità (anche incolla da Excel), kit composti con taglie per componente, mockup 3D live fronte/retro + vista 2D, **controllo qualità delle grafiche** (DPI effettivi alla dimensione di stampa, avviso sotto 300 dpi, conferma esplicita del cliente, trasparenza, formato e peso), riepilogo prezzi con sconti a scaglioni, anteprime salvate con l’ordine.
+**Configuratore**: tipologia capo (Smarcata, adidas, Mizuno… gestibili), colore base con profili, opzioni con sovrapprezzi, loghi/sponsor/grafiche all-over (upload o libreria), grafica all-over su tutto il capo con sostituzioni per pezzo, nomi e numeri con stile, roster per giocatore con taglie e quantità (anche incolla da Excel), kit composti con taglie per componente, mockup 3D live fronte/retro + vista 2D, **controllo qualità delle grafiche** (DPI effettivi alla dimensione di stampa, avviso sotto 300 dpi, conferma esplicita del cliente, trasparenza, formato e peso), riepilogo prezzi con sconti a scaglioni, anteprime salvate con l’ordine.
 
 **Carrello e checkout**: carrello ospite (locale) sincronizzato nell’account al login con upload delle grafiche · modifica configurazioni · indirizzi salvati · fatturazione · pagamento alla consegna o bonifico con istruzioni (IBAN da backoffice) · riferimento ordine `NM26-00001`.
 
@@ -206,7 +207,12 @@ Nessuna libreria di stato globale, form o data-fetching: sono coperti da context
 
 ## 8. Semplificazioni e punti da completare
 
-- **Modelli 3D**: la maglia manica corta usa un modello 3D reale (`public/models/jersey.glb`, derivato da un modello CLO 3D con licenza MIT: vedi `public/models/LICENSE-jersey.txt`), su cui le grafiche sono proiettate da fronte e retro senza bisogno di mappatura UV. Manica lunga, canotta e pantaloncino usano ancora sagome generate proceduralmente. Per aggiungere un modello: file GLB centrato, altezza 1, fronte verso +z, registrato in `GARMENT_MODELS` (`src/features/configurator/garment/ModelGarment.tsx`).
+- **Modelli 3D**: maglia manica corta e lunga, polo, felpa con cappuccio, giacca e pantalone tuta, giubbotto e pantaloncino usano modelli 3D reali (`public/models/`, fonti e licenze in `public/models/CREDITS.md` e nella pagina pubblica `/crediti`, obbligatoria per la licenza CC BY). Le grafiche sono proiettate da fronte e retro senza mappatura UV; le maniche seguono l’asse del braccio di ogni modello. Solo la canotta usa ancora una sagoma procedurale. Per aggiungere un modello:
+  1. `node scripts/models/optimize.mjs originale.glb public/models/nome.glb [ratio] "titolo, autore, licenza"` (toglie texture, applica le trasformazioni, centra a altezza 1; il fronte deve guardare verso +z);
+  2. registrarlo in `MODELS` di `scripts/models/outlines.mjs` e rigenerare `src/features/configurator/garment/outlines.ts` (sagoma frontale e riferimenti delle maniche);
+  3. aggiungerlo a `GARMENT_MODELS` (`ModelGarment.tsx`), al tipo `ModelShape` e, se serve un nuovo valore, all’enum `model_shape` con una migration; aggiornare i crediti.
+  Gli script richiedono `@gltf-transform/*`, `meshoptimizer` e `gl-matrix` in una cartella di lavoro esterna (vedi l’intestazione dei file).
+- **Scala delle maniche nell’anteprima 3D**: ogni modello ha un’altezza reale indicativa (taglia M) usata solo per l’anteprima; il file di produzione usa le misure esatte del cartamodello.
 - **Spedizione**: costo fisso (con soglia di gratuità) oppure “da definire” alla conferma; nessun calcolo per zona o peso.
 - **Immagini responsive**: ottimizzazione lato browser al caricamento (WebP, lato max 2000 px); le trasformazioni server di Supabase richiedono il piano Pro.
 - **Disattivazione utente**: blocca ordini e forza il logout lato app; la revoca server-side delle sessioni Auth richiederebbe una Edge Function con service role (non inclusa).
