@@ -3,6 +3,7 @@
 // così le aree di personalizzazione (in % del riquadro) coincidono ovunque.
 
 import type { ModelShape } from '@/types/db'
+import { MODEL_OUTLINES, type ModelOutline } from './outlines'
 
 export type Pt = [number, number]
 
@@ -39,7 +40,16 @@ export interface GarmentShape {
   trims: { front: Pt[][]; back: Pt[][] }
   /** Spessore relativo del "cuscino" 3D. */
   bulge: number
+  /** Quote dell'orlo del busto e del centro collo sull'asse centrale (sagome dai modelli 3D). */
+  hemY?: number
+  neckY?: number
+  /** Capo inferiore (pantaloncino, pantalone): la scala dei pezzi si misura in vita. */
+  bottom?: boolean
 }
+
+/** Sagome generate dai modelli 3D reali (vedi outlines.ts). */
+const GENERATED: Partial<Record<ModelShape, ModelOutline>> = MODEL_OUTLINES
+const BOTTOMS: ModelShape[] = ['shorts', 'track_pants']
 
 function tshirt(longSleeve: boolean, neckDepth: number): { outline: Pt[]; trims: Pt[][] } {
   const b = new PathBuilder().move(27.5, -10).quad(30.5, 22, 29, 50)
@@ -75,13 +85,6 @@ function tank(neckDepth: number): { outline: Pt[]; trims: Pt[][] } {
   return { outline: mirrorRight(right), trims: [neck, arm, arm.map(([x, y]) => [-x, y] as Pt)] }
 }
 
-function shorts(): { outline: Pt[]; trims: Pt[][] } {
-  const pts: Pt[] = [
-    [-30, 42], [30, 42], [31, 34], [35, 2], [4, 0], [1.5, 13], [0, 15], [-1.5, 13], [-4, 0], [-35, 2], [-31, 34],
-  ]
-  return { outline: pts, trims: [[[-30, 39.5], [30, 39.5]], [[35, 3.5], [4, 1.5]], [[-35, 3.5], [-4, 1.5]]] }
-}
-
 const cache = new Map<ModelShape, GarmentShape>()
 
 export function getShape(kind: ModelShape): GarmentShape {
@@ -90,15 +93,16 @@ export function getShape(kind: ModelShape): GarmentShape {
   let front: { outline: Pt[]; trims: Pt[][] }
   let back: { outline: Pt[]; trims: Pt[][] }
   let bulge = 0.1
-  switch (kind) {
-    case 'longsleeve':
-      front = tshirt(true, 8); back = tshirt(true, 2.5); break
-    case 'tank':
-      front = tank(14); back = tank(6); break
-    case 'shorts':
-      front = shorts(); back = shorts(); bulge = 0.08; break
-    default:
-      front = tshirt(false, 8); back = tshirt(false, 2.5)
+  const gen = GENERATED[kind]
+  if (gen) {
+    // il retro, visto da dietro, è il contorno frontale specchiato
+    front = { outline: gen.outline, trims: [] }
+    back = { outline: gen.outline.map(([x, y]) => [-x, y] as Pt).reverse(), trims: [] }
+    if (BOTTOMS.includes(kind)) bulge = 0.08
+  } else if (kind === 'tank') {
+    front = tank(14); back = tank(6)
+  } else {
+    front = tshirt(false, 8); back = tshirt(false, 2.5)
   }
   const all = [...front.outline, ...back.outline]
   const bounds = {
@@ -110,6 +114,7 @@ export function getShape(kind: ModelShape): GarmentShape {
   const shape: GarmentShape = {
     front: front.outline, back: back.outline, bounds, bulge,
     trims: { front: front.trims, back: back.trims },
+    hemY: gen?.hemY, neckY: gen?.neckY, bottom: BOTTOMS.includes(kind),
   }
   cache.set(kind, shape)
   return shape
@@ -150,4 +155,9 @@ export const SHAPE_LABEL: Record<ModelShape, string> = {
   longsleeve: 'Maglia manica lunga',
   tank: 'Canotta',
   shorts: 'Pantaloncino',
+  polo: 'Polo',
+  hoodie: 'Felpa con cappuccio',
+  track_jacket: 'Giacca tuta',
+  track_pants: 'Pantalone tuta',
+  jacket: 'Giubbotto',
 }

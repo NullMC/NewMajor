@@ -3,7 +3,7 @@
 export type UserRole = 'customer' | 'admin'
 export type ProductType = 'simple' | 'kit'
 export type Availability = 'in_stock' | 'on_request' | 'out_of_stock'
-export type ModelShape = 'tshirt' | 'longsleeve' | 'tank' | 'shorts'
+export type ModelShape = 'tshirt' | 'longsleeve' | 'tank' | 'shorts' | 'polo' | 'hoodie' | 'track_jacket' | 'track_pants' | 'jacket'
 export type AreaSide = 'front' | 'back'
 export type AreaType = 'logo' | 'sponsor' | 'text' | 'number' | 'all_over'
 export type PaymentMethod = 'cash_on_delivery' | 'bank_transfer'

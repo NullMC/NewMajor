@@ -19,6 +19,17 @@ function widthAt(pts: Vec[] | [number, number][], y: number): number {
   return xs.length >= 2 ? Math.max(...xs) - Math.min(...xs) : 0
 }
 
+/** Larghezza del tratto che contiene l'asse centrale (x = 0) alla quota y. */
+function centreWidthAt(pts: [number, number][], y: number): number {
+  const xs: number[] = []
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [x1, y1] = pts[j], [x2, y2] = pts[i]
+    if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) xs.push(x1 + ((y - y1) / (y2 - y1)) * (x2 - x1))
+  }
+  const left = Math.max(...xs.filter((x) => x <= 0)), right = Math.min(...xs.filter((x) => x > 0))
+  return Number.isFinite(left) && Number.isFinite(right) ? right - left : widthAt(pts, y)
+}
+
 /** Bordo superiore della sagoma sull'asse centrale (centro collo). */
 function neckY(pts: [number, number][]): number {
   const ys: number[] = []
@@ -40,9 +51,13 @@ export function silhouetteFrame(shape: ModelShape, side: 'front' | 'back', piece
   const outline = (side === 'front' ? s.front : s.back) as [number, number][]
   const sb = s.bounds
   const pb = bounds(piece.outline)
-  const silHem = widthAt(outline, sb.minY + (sb.maxY - sb.minY) * 0.02)
-  const pieceHem = widthAt(piece.outline, pb.minY + pb.height * 0.02)
-  return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck: neckY(outline), bounds: sb }
+  // capi inferiori: si confronta la vita; altrimenti l'orlo del busto (sulle sagome dai modelli
+  // 3D si misura solo il tratto centrale, perché le maniche possono scendere sotto l'orlo)
+  const silY = s.bottom ? (s.neckY ?? sb.maxY) - (sb.maxY - sb.minY) * 0.02 : (s.hemY ?? sb.minY) + (sb.maxY - sb.minY) * 0.02
+  const pieceY = s.bottom ? pb.maxY - pb.height * 0.02 : pb.minY + pb.height * 0.02
+  const silHem = s.hemY !== undefined ? centreWidthAt(outline, silY) : widthAt(outline, silY)
+  const pieceHem = widthAt(piece.outline, pieceY)
+  return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck: s.neckY ?? neckY(outline), bounds: sb }
 }
 
 /** Elementi di davanti/dietro convertiti in unità della sagoma per il pannello indicato. */
