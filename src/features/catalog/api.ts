@@ -1,11 +1,11 @@
 import { supabase } from '@/lib/supabase'
 import type { ZonePiece } from '@/lib/patterns/placement'
 import type {
-  Availability, Category, CustomizationAsset, GarmentType, Product, ProductDetail, ProductType,
+  Availability, Category, CustomizationAsset, GarmentType, Product, ProductDetail, ProductType, SupplyMode,
 } from '@/types/db'
 
 const LIST_SELECT =
-  'id,name,slug,short_description,product_type,base_price,availability,is_configurable,model_shape,min_quantity,attributes,sort_order,category_id,created_at,updated_at,' +
+  'id,name,slug,short_description,product_type,base_price,availability,supply_mode,is_configurable,model_shape,min_quantity,attributes,sort_order,category_id,created_at,updated_at,' +
   'categories(id,name,slug),product_images(id,storage_path,alt,is_primary,sort_order,width,height)'
 
 const DETAIL_SELECT =
@@ -56,6 +56,8 @@ export interface ProductFilters {
   search?: string
   garmentTypeId?: string
   availability?: Availability
+  /** Sezione principale del catalogo. */
+  supplyMode?: SupplyMode
   productType?: ProductType
   attributes?: Record<string, string>
   sort?: 'default' | 'price_asc' | 'price_desc' | 'newest' | 'name'
@@ -70,6 +72,7 @@ export async function listProducts(f: ProductFilters = {}): Promise<Product[]> {
   if (f.categoryIds?.length) q = q.in('category_id', f.categoryIds)
   if (f.garmentTypeId) q = q.eq('product_garment_types.garment_type_id', f.garmentTypeId)
   if (f.availability) q = q.eq('availability', f.availability)
+  if (f.supplyMode) q = q.eq('supply_mode', f.supplyMode)
   if (f.productType) q = q.eq('product_type', f.productType)
   if (f.attributes && Object.keys(f.attributes).length) q = q.contains('attributes', f.attributes)
   const s = f.search ? cleanSearch(f.search) : ''

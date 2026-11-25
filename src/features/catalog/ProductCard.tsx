@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom'
 import { ArrowUpRight, Shirt } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { Product } from '@/types/db'
-import { formatPrice, AVAILABILITY_LABEL } from '@/lib/format'
+import { formatPrice, AVAILABILITY_LABEL, SUPPLY_LABEL } from '@/lib/format'
 import { publicUrl } from '@/lib/storage'
 
 const MAX_TILT = 7 // gradi
@@ -74,6 +74,7 @@ export function ProductCard({ product, eager }: { product: Product; eager?: bool
         <div className="relative flex flex-wrap items-start gap-1.5 p-2.5 sm:p-3">
           {product.product_type === 'kit' && <span className="glass glass-dark whitespace-nowrap rounded-full px-2.5 py-1 text-2xs font-semibold">Kit</span>}
           {product.is_configurable && <span className="glass glass-light whitespace-nowrap rounded-full px-2.5 py-1 text-2xs font-semibold text-ink-900">Personalizzabile</span>}
+          {product.supply_mode === 'on_demand' && <span className="whitespace-nowrap rounded-full bg-gold-500 px-2.5 py-1 text-2xs font-semibold text-ink-950">{SUPPLY_LABEL.on_demand}</span>}
           {product.availability !== 'in_stock' && (
             <span className={cn('whitespace-nowrap rounded-full px-2.5 py-1 text-2xs font-semibold', product.availability === 'out_of_stock' ? 'bg-danger-600 text-white' : 'glass glass-dark')}>
               {AVAILABILITY_LABEL[product.availability]}

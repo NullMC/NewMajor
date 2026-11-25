@@ -188,6 +188,11 @@ export function OrderItemDetails({ item, showFiles = false, actions }: { item: O
         <PreviewThumbs preview={item.configuration?.preview} />
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{item.product_name}</p>
+          {item.supply_mode === 'on_demand' && (
+            <span className="mt-1 inline-flex rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">
+              {showFiles ? 'Print-on-demand · da ordinare al fornitore' : 'Print-on-demand'}
+            </span>
+          )}
           <p className="text-sm text-ink-500">{item.quantity} × {formatPrice(item.unit_price)} = <span className="font-semibold text-ink-900">{formatPrice(item.line_total)}</span></p>
           {item.configuration?.customDescription && <p className="mt-2 rounded-lg bg-ink-50 p-2 text-sm text-ink-700">{item.configuration.customDescription}</p>}
         </div>

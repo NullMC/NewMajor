@@ -110,7 +110,10 @@ export default function ProductsPage() {
               key: 'name', header: 'Prodotto', cell: (p) => (
                 <div className="min-w-0">
                   <p className="font-medium">{p.name}</p>
-                  <p className="text-xs text-ink-500">{p.categories?.name ?? 'Senza categoria'}{p.product_type === 'kit' ? ' · Kit' : ''}</p>
+                  <p className="text-xs text-ink-500">
+                    {p.categories?.name ?? 'Senza categoria'}{p.product_type === 'kit' ? ' · Kit' : ''}
+                    {p.supply_mode === 'on_demand' && <span className="ml-1.5 rounded-full bg-gold-100 px-2 py-0.5 font-semibold text-gold-800">Print-on-demand</span>}
+                  </p>
                 </div>
               ),
             },

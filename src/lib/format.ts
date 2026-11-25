@@ -46,3 +46,11 @@ export const AVAILABILITY_LABEL = {
   on_request: 'Su richiesta',
   out_of_stock: 'Non disponibile',
 } as const
+
+/** Sezioni principali del catalogo (fornitura del prodotto). */
+export const SUPPLY_LABEL = {
+  immediate: 'Disponibilità immediata',
+  on_demand: 'Print-on-demand',
+} as const
+
+export const ON_DEMAND_NOTE = 'Articolo non stoccato: viene ordinato al fornitore al momento dell’ordine.'

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Search, SlidersHorizontal, X, PackageSearch } from 'lucide-react'
-import type { Availability, ProductType } from '@/types/db'
+import type { Availability, ProductType, SupplyMode } from '@/types/db'
+import { ON_DEMAND_NOTE, SUPPLY_LABEL } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { useQuery } from '@/hooks/useQuery'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -38,6 +39,10 @@ export default function CatalogPage() {
   const topCategories = (categories ?? []).filter((c) => !c.parent_id)
   const subcategories = category ? (categories ?? []).filter((c) => c.parent_id === (category.parent_id ?? category.id)) : []
 
+  // Sezione principale: disponibilità immediata o print-on-demand (?fornitura=immediata|on-demand)
+  const supplyParam = params.get('fornitura')
+  const supply: SupplyMode | undefined = supplyParam === 'immediata' ? 'immediate' : supplyParam === 'on-demand' ? 'on_demand' : undefined
+
   const attributeFilters = settings.catalog.filters ?? []
   const attrs = useMemo(() => {
     const o: Record<string, string> = {}
@@ -55,6 +60,7 @@ export default function CatalogPage() {
     search: debounced,
     garmentTypeId: params.get('tipologia') || undefined,
     availability: (params.get('disponibilita') as Availability) || undefined,
+    supplyMode: supply,
     productType: (params.get('tipo') as ProductType) || undefined,
     attributes: attrs,
     sort: (params.get('ordina') as ProductFilters['sort']) || 'default',
@@ -161,6 +167,26 @@ export default function CatalogPage() {
       <h1 className="display-lg mt-3 text-4xl sm:text-5xl">{category?.name ?? 'Catalogo'}</h1>
       {category?.description && <p className="mt-3 max-w-2xl text-ink-500">{category.description}</p>}
 
+      {/* Sezioni principali: fornitura */}
+      <div className="mt-8 grid grid-cols-3 gap-1 rounded-2xl bg-ink-100 p-1 sm:inline-grid sm:w-auto" role="tablist" aria-label="Sezioni del catalogo">
+        {([['', 'Tutto'], ['immediata', SUPPLY_LABEL.immediate], ['on-demand', SUPPLY_LABEL.on_demand]] as const).map(([v, label]) => {
+          const on = (supplyParam ?? '') === v || (!v && !supply)
+          return (
+            <button
+              key={v || 'all'}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setParam('fornitura', v)}
+              className={cn('min-h-11 rounded-xl px-3 py-2 text-xs font-semibold leading-tight transition-colors sm:px-5 sm:text-sm', on ? 'bg-white text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-900')}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+      {supply === 'on_demand' && <p className="mt-3 max-w-2xl text-sm text-ink-500">{ON_DEMAND_NOTE}</p>}
+
       {/* Categorie */}
       {topCategories.length > 0 && (
         <div className="no-scrollbar -mx-4 mt-8 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0" role="navigation" aria-label="Categorie">
@@ -222,8 +248,8 @@ export default function CatalogPage() {
           ) : (
             <EmptyState
               icon={<PackageSearch className="h-6 w-6" />}
-              title="Nessun prodotto trovato"
-              description={search || activeCount ? 'Prova a modificare la ricerca o i filtri.' : 'Il catalogo è in allestimento. Contattaci per richieste su misura.'}
+              title={supply && !search && !activeCount && !category ? `Nessun articolo ${supply === 'on_demand' ? 'print-on-demand' : 'in disponibilità immediata'} al momento` : 'Nessun prodotto trovato'}
+              description={search || activeCount ? 'Prova a modificare la ricerca o i filtri.' : supply ? 'Guarda l’altra sezione del catalogo o contattaci per richieste su misura.' : 'Il catalogo è in allestimento. Contattaci per richieste su misura.'}
               action={!search && !activeCount ? <Button variant="secondary" onClick={() => navigate('/contatti')}>Contattaci</Button> : undefined}
             />
           )}

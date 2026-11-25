@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Brush, Layers, MessageSquareText, Ruler, Shirt, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { AVAILABILITY_LABEL } from '@/lib/format'
+import { AVAILABILITY_LABEL, ON_DEMAND_NOTE, SUPPLY_LABEL } from '@/lib/format'
 import { publicUrl } from '@/lib/storage'
 import { stripMarkdown } from '@/lib/markdown'
 import { useQuery } from '@/hooks/useQuery'
@@ -98,6 +98,7 @@ export default function ProductPage() {
           <div className="flex flex-wrap gap-2">
             {product.product_type === 'kit' && <Badge tone="dark">Kit da gara</Badge>}
             {product.is_configurable && <Badge tone="gold">Personalizzabile</Badge>}
+            {product.supply_mode === 'on_demand' && <Badge tone="dark">{SUPPLY_LABEL.on_demand}</Badge>}
             <Badge tone={product.availability === 'in_stock' ? 'success' : product.availability === 'out_of_stock' ? 'danger' : 'neutral'}>
               {AVAILABILITY_LABEL[product.availability]}
             </Badge>
@@ -105,6 +106,7 @@ export default function ProductPage() {
           {product.categories?.name && <p className="mt-5 font-mono text-xs uppercase tracking-[.2em] text-ink-500">{product.categories.name}</p>}
           <h1 className="mt-2 font-display text-[clamp(2.1rem,5.4vw,3.6rem)] font-black uppercase leading-[.92] text-ink-950" style={{ fontStretch: '112%' }}>{product.name}</h1>
           {product.short_description && <p className="mt-4 max-w-lg text-lg leading-8 text-ink-600">{product.short_description}</p>}
+          {product.supply_mode === 'on_demand' && <p className="mt-3 max-w-lg text-sm text-ink-500">{ON_DEMAND_NOTE}</p>}
 
           <div className="mt-6 flex flex-wrap items-end gap-x-3 gap-y-1">
             {Number(product.base_price) > 0 ? (

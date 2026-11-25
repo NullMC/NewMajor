@@ -33,7 +33,7 @@ const AREA_TYPES = [
 
 const emptyProduct = {
   name: '', slug: '', category_id: null, short_description: '', description: '', product_type: 'simple', base_price: 0,
-  availability: 'in_stock', is_configurable: true, model_shape: 'tshirt', sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  availability: 'in_stock', supply_mode: 'immediate', is_configurable: true, model_shape: 'tshirt', sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
   min_quantity: 1, is_published: false, sort_order: 0, seo_title: '', seo_description: '', attributes: {},
 } as Record<string, unknown>
 
@@ -73,6 +73,11 @@ export default function ProductEditPage() {
     { key: 'base_price', label: 'Prezzo base (€ / capo o kit)', type: 'number', step: 0.01, min: 0, required: true },
     { key: 'min_quantity', label: 'Quantità minima', type: 'number', step: 1, min: 1 },
     { key: 'availability', label: 'Disponibilità', type: 'select', required: true, options: [{ value: 'in_stock', label: 'Disponibile' }, { value: 'on_request', label: 'Su richiesta' }, { value: 'out_of_stock', label: 'Non disponibile' }] },
+    {
+      key: 'supply_mode', label: 'Fornitura (sezione del catalogo)', type: 'select', required: true,
+      options: [{ value: 'immediate', label: 'Disponibilità immediata (a magazzino)' }, { value: 'on_demand', label: 'Print-on-demand (ordinato al fornitore)' }],
+      hint: 'Print-on-demand: non stoccato, si ordina al fornitore quando arriva l’ordine (segnalato nel dettaglio ordine).',
+    },
     { key: 'model_shape', label: 'Modello 3D', type: 'select', required: true, options: SHAPES, hint: 'Sagoma usata per il mockup (per i kit: modello del componente principale)' },
     { key: 'sizes', label: 'Taglie', type: 'tags', hint: 'Separate da virgola. Per i kit si impostano sui componenti.' },
     { key: 'sort_order', label: 'Ordine nel catalogo', type: 'number', step: 1 },

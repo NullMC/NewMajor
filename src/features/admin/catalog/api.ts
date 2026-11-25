@@ -11,7 +11,7 @@ const bySort = <T extends { sort_order: number }>(a: T, b: T) => a.sort_order - 
 export async function adminListProducts(archived = false): Promise<Product[]> {
   let q = supabase
     .from('products')
-    .select('id,name,slug,base_price,availability,is_published,is_configurable,product_type,sort_order,category_id,deleted_at,updated_at,created_at,categories(id,name,slug),product_images(storage_path,is_primary,sort_order)')
+    .select('id,name,slug,base_price,availability,supply_mode,is_published,is_configurable,product_type,sort_order,category_id,deleted_at,updated_at,created_at,categories(id,name,slug),product_images(storage_path,is_primary,sort_order)')
   q = archived ? q.not('deleted_at', 'is', null) : q.is('deleted_at', null)
   const { data, error } = await q.order('sort_order').order('name')
   if (error) throw error
