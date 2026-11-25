@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Brush, Layers, Ruler, Shirt, Users } from 'lucide-react'
+import { Brush, Layers, MessageSquareText, Ruler, Shirt, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { AVAILABILITY_LABEL } from '@/lib/format'
 import { publicUrl } from '@/lib/storage'
@@ -164,7 +164,7 @@ export default function ProductPage() {
             </div>
           )}
 
-          <div className="mt-8">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {unavailable ? (
               <p className="rounded-xl bg-ink-100 p-4 text-sm text-ink-600">Prodotto al momento non disponibile. <Link to="/contatti" className="font-semibold text-ink-900 underline">Contattaci</Link> per informazioni.</p>
             ) : (
@@ -177,7 +177,24 @@ export default function ProductPage() {
                 {product.is_configurable ? 'Personalizza con anteprima 3D' : 'Scegli taglie e quantità'}
               </ButtonLink>
             )}
+            {/* Articoli non configurabili dalla piattaforma: consulenza dedicata tramite il modulo contatti */}
+            {!product.is_configurable && (
+              <ButtonLink
+                to={`/contatti?prodotto=${encodeURIComponent(product.slug)}${selectedVariant ? `&colore=${encodeURIComponent(selectedVariant)}` : ''}`}
+                variant="secondary"
+                size="lg"
+                className="h-14 w-full rounded-full text-base sm:w-auto sm:px-8"
+                icon={<MessageSquareText className="h-5 w-5" />}
+              >
+                Richiedi una consulenza
+              </ButtonLink>
+            )}
           </div>
+          {!product.is_configurable && (
+            <p className="mt-3 max-w-lg text-sm text-ink-500">
+              Questo articolo non si personalizza online: puoi ordinarlo neutro scegliendo taglie e quantità, oppure chiederci una consulenza per lavorazioni e personalizzazioni dedicate.
+            </p>
+          )}
 
           <div className="mt-10 space-y-5 border-t border-ink-200 pt-6">
             {product.product_type === 'kit' && product.kit_items.length > 0 && (

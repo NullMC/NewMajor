@@ -107,6 +107,14 @@ function Configurator({ product, editLine, initialVariantId }: { product: Produc
         <div>
           <h1 className="display-lg text-2xl sm:text-3xl">{editLine ? 'Modifica configurazione' : product.is_configurable ? 'Personalizza' : 'Configura il tuo ordine'}</h1>
           <p className="mt-1 text-ink-500">{product.name}</p>
+          {!product.is_configurable && !editLine && (
+            <p className="mt-3 rounded-xl bg-ink-100 px-4 py-3 text-sm text-ink-700">
+              Ti serve una lavorazione particolare?{' '}
+              <Link to={`/contatti?prodotto=${encodeURIComponent(product.slug)}${api.config.variantId ? `&colore=${encodeURIComponent(api.config.variantId)}` : ''}`} className="font-semibold text-ink-900 underline underline-offset-4">
+                Richiedi una consulenza
+              </Link>
+            </p>
+          )}
 
           {(product.product_garment_types?.length ?? 0) > 0 && (
             <Step n={++n} title="Tipologia di capo" issues={issuesBy('garment')}><GarmentSection api={api} /></Step>

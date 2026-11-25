@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { CheckCircle2, MapPin, Phone, Mail, Building2 } from 'lucide-react'
+import { CheckCircle2, MapPin, Phone, Mail, Building2, Minus, Plus } from 'lucide-react'
 import { useMeta } from '@/hooks/useMeta'
 import { errorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/Button'
-import { Checkbox, Field, FormError, Input, Textarea } from '@/components/ui/Form'
+import { Checkbox, Field, FormError, Input, Select, Textarea } from '@/components/ui/Form'
+import { useQuery } from '@/hooks/useQuery'
+import { publicUrl } from '@/lib/storage'
+import { getProductBySlug, primaryImage } from '@/features/catalog/api'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useSettings } from '@/features/settings/SettingsProvider'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -16,6 +19,15 @@ export default function ContactPage() {
   const { user, profile } = useAuth()
   const c = settings.company
   const [params] = useSearchParams()
+  // Consulenza per un articolo non configurabile (pulsante della pagina prodotto)
+  const productSlug = params.get('prodotto')
+  const { data: product } = useQuery(productSlug ? `product:${productSlug}` : null, () => getProductBySlug(productSlug!))
+  const variants = (product?.product_variants ?? []).filter((v) => v.is_active)
+  const [variantId, setVariantId] = useState<string | null>(params.get('colore'))
+  const variant = variants.find((v) => v.id === variantId) ?? variants[0] ?? null
+  const [sizes, setSizes] = useState<Record<string, number>>({})
+  const [pieces, setPieces] = useState(0)
+  const total = product?.sizes.length ? Object.values(sizes).reduce((a, b) => a + b, 0) : pieces
   const [form, setForm] = useState({
     name: profile?.full_name ?? '',
     email: profile?.email ?? user?.email ?? '',
@@ -42,7 +54,22 @@ export default function ContactPage() {
     if (!privacy) return setError('Per inviare la richiesta è necessario prendere visione dell’informativa privacy.')
     setSending(true)
     try {
-      await sendContactRequest({ ...form, user_id: user?.id ?? null })
+      // consulenza: prodotto, colore e taglie vengono scritti in testa al messaggio
+      const details = product
+        ? [
+            'Richiesta di consulenza',
+            `Prodotto: ${product.name} (${window.location.origin}/prodotti/${product.slug})`,
+            variant ? `Colore: ${variant.name}` : null,
+            product.sizes.length
+              ? `Taglie: ${Object.entries(sizes).filter(([, n]) => n > 0).map(([sz, n]) => `${sz} × ${n}`).join(', ') || 'da definire'}`
+              : `Pezzi: ${pieces || 'da definire'}`,
+            total ? `Totale pezzi: ${total}` : null,
+            '',
+            '',
+          ].filter((l) => l !== null).join('\n')
+        : ''
+      const subject = form.subject || (product ? `Consulenza: ${product.name}`.slice(0, 160) : '')
+      await sendContactRequest({ ...form, subject, message: (details + form.message).slice(0, 5000), user_id: user?.id ?? null })
       setSent(true)
     } catch (err) {
       setError(errorMessage(err))
@@ -103,13 +130,55 @@ export default function ContactPage() {
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-5" noValidate>
+              {product && (
+                <fieldset className="rounded-2xl border border-ink-200 p-4">
+                  <legend className="px-1 text-sm font-semibold text-ink-900">Consulenza per questo articolo</legend>
+                  <div className="flex items-center gap-3">
+                    {primaryImage(product) && (
+                      <img src={publicUrl(primaryImage(product)!.storage_path) ?? ''} alt="" className="h-16 w-14 shrink-0 rounded-lg bg-ink-100 object-cover" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{product.name}</p>
+                      <p className="text-xs text-ink-500">Colore e taglie vengono aggiunti alla richiesta.</p>
+                    </div>
+                  </div>
+                  {variants.length > 0 && (
+                    <Field label="Colore" className="mt-4">
+                      <Select value={variant?.id ?? ''} onChange={(e) => setVariantId(e.target.value)}>
+                        {variants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      </Select>
+                    </Field>
+                  )}
+                  {product.sizes.length > 0 ? (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-ink-800">Taglie e quantità</p>
+                      <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {product.sizes.map((sz) => (
+                          <li key={sz} className="flex items-center justify-between rounded-xl px-3 py-1.5 ring-1 ring-ink-200">
+                            <span className="font-mono text-sm">{sz}</span>
+                            <Qty value={sizes[sz] ?? 0} label={sz} onChange={(n) => setSizes({ ...sizes, [sz]: n })} />
+                          </li>
+                        ))}
+                      </ul>
+                      {total > 0 && <p className="mt-2 text-xs text-ink-500">Totale: {total} {total === 1 ? 'pezzo' : 'pezzi'}</p>}
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex items-center justify-between rounded-xl px-3 py-1.5 ring-1 ring-ink-200 sm:w-56">
+                      <span className="text-sm">Pezzi</span>
+                      <Qty value={pieces} label="pezzi" onChange={setPieces} />
+                    </div>
+                  )}
+                </fieldset>
+              )}
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Nome e cognome" required><Input value={form.name} onChange={set('name')} autoComplete="name" maxLength={120} /></Field>
                 <Field label="Email" required><Input type="email" value={form.email} onChange={set('email')} autoComplete="email" maxLength={254} /></Field>
                 <Field label="Telefono"><Input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" maxLength={40} /></Field>
                 <Field label="Oggetto"><Input value={form.subject} onChange={set('subject')} maxLength={160} /></Field>
               </div>
-              <Field label="Messaggio" required><Textarea rows={6} value={form.message} onChange={set('message')} maxLength={5000} /></Field>
+              <Field label="Messaggio" required>
+                <Textarea rows={6} value={form.message} onChange={set('message')} maxLength={4500} placeholder={product ? 'Descrivi la lavorazione o la personalizzazione che ti serve' : undefined} />
+              </Field>
               <div className="hidden" aria-hidden>
                 <label>Sito web<input tabIndex={-1} autoComplete="off" value={form.website} onChange={set('website')} /></label>
               </div>
@@ -124,6 +193,18 @@ export default function ContactPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Selettore di quantità compatto (0–999). */
+function Qty({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+  const set = (n: number) => onChange(Math.max(0, Math.min(999, Math.round(n) || 0)))
+  return (
+    <div className="flex items-center gap-1">
+      <button type="button" onClick={() => set(value - 1)} disabled={value <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100 disabled:opacity-40" aria-label={`Meno ${label}`}><Minus className="h-3.5 w-3.5" /></button>
+      <input inputMode="numeric" value={value} onChange={(e) => set(Number(e.target.value.replace(/\D/g, '')))} className="h-7 w-10 rounded-md bg-transparent text-center font-mono text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-gold-500" aria-label={`Quantità ${label}`} />
+      <button type="button" onClick={() => set(value + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100" aria-label={`Più ${label}`}><Plus className="h-3.5 w-3.5" /></button>
     </div>
   )
 }
