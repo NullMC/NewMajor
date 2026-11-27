@@ -394,6 +394,79 @@ console.log('\nFornitura: disponibilità immediata / print-on-demand')
   await as(c1.id, () => q(`delete from cart_items`))
 }
 
+console.log('\nAree di stampa, tecniche, fasce e colori per sezione')
+{
+  const techs = await as(null, () => q(`select code, min_price, max_price, all_over_only from print_techniques order by sort_order`))
+  techs.length === 4 && Number(techs[0].min_price) === 1.5 && Number(techs[0].max_price) === 5 && techs[3].all_over_only
+    ? ok('tecniche: serigrafia, DTF, ricamo (1,50–5,00 €) e sublimazione solo all-over') : fail(JSON.stringify(techs))
+  const { p2 } = await as(admin.id, async () => {
+    const [p2] = await q(`insert into products (name, slug, base_price, is_published) values ('Felpa aree', 'felpa-aree', 10, true) returning id`)
+    await q(`insert into print_zones (product_id, zone, x_cm, y_cm, width_cm, height_cm, max_items, techniques) values ($1, 'front', -15, 5, 30, 20, 2, '{screen,dtf,sublimation}')`, [p2.id])
+    await q(`insert into print_zones (product_id, zone, x_cm, y_cm, width_cm, height_cm, max_items, allow_text, techniques) values ($1, 'sleeve_left', -5, 3, 10, 10, 1, false, '{embroidery}')`, [p2.id])
+    return { p2 }
+  })
+  ok('admin definisce le zone di stampa (area massima, numero, categorie, tecniche)')
+  const pubZones = await as(null, () => q(`select zone from print_zones where product_id = $1`, [p2.id]))
+  pubZones.length === 2 ? ok('zone di stampa leggibili dal pubblico') : fail(JSON.stringify(pubZones))
+
+  const g = (over) => ({ id: 'g' + Math.random(), kind: 'graphic', zone: 'front', technique: 'dtf', asset: { bucket: 'customer-uploads', path: `${c1.id}/graphics/g.png`, name: 'g.png' }, xCm: -7, yCm: 10, widthCm: 10, heightCm: 10, rotation: 0, ...over })
+  const t = (over) => ({ id: 't' + Math.random(), kind: 'text', zone: 'front', technique: 'screen', text: 'ROSSI', font: 'block', color: '#FFFFFF', xCm: 4, yCm: 20, widthCm: 20, heightCm: 5, rotation: 0, ...over })
+  const cfg = (elements, extra = {}) => ({ version: 1, optionValueIds: [], areas: {}, roster: [], elements, ...extra })
+  const price = async (c) => Number((await as(null, () => q(`select compute_unit_price($1, $2) u`, [p2.id, JSON.stringify(c)])))[0].u)
+  const place = (c) => as(c1.id, async () => {
+    await q(`delete from cart_items`)
+    const [cart] = await q(`select id from carts where user_id=$1`, [c1.id])
+    await q(`insert into cart_items (cart_id, product_id, configuration, quantity) values ($1, $2, $3, 1)`, [cart.id, p2.id, JSON.stringify(c)])
+    return (await q(`select * from place_order('cash_on_delivery', $1)`, [JSON.stringify({ full_name: 'M', line1: 'V', city: 'B', postal_code: '70100' })]))[0]
+  })
+
+  // 10×10 = 100 cm² su 30×20 = 600 cm²: 1,50 + 100/600 × 3,50 = 2,08
+  ;(await price(cfg([g()]))) === 12.08 ? ok('prezzo in base all’area: 10 + 1,50 + (100/600) × 3,50 = 12,08') : fail(String(await price(cfg([g()]))))
+  ;(await price(cfg([g({ widthCm: 30, heightCm: 20, xCm: 0, yCm: 15 })]))) === 15 ? ok('area massima piena: prezzo massimo (5,00)') : fail('max')
+  await expectError('area fuori dall’area massima', () => place(cfg([g({ xCm: 12 })])), 'element_outside_zone')
+  await expectError('aree sovrapposte', () => place(cfg([g(), g({ xCm: -3 })])), 'elements_overlap')
+  await expectError('tecnica non ammessa nella zona', () => place(cfg([g({ technique: 'embroidery' })])), 'technique_not_allowed')
+  await expectError('sublimazione senza all-over', () => place(cfg([g({ technique: 'sublimation' })])), 'technique_not_allowed')
+  await expectError('testo dove sono ammesse solo grafiche', () => place(cfg([t({ zone: 'sleeve_left', technique: 'embroidery', xCm: 0, yCm: 8, widthCm: 8, heightCm: 2 })])), 'category_not_allowed')
+  await expectError('troppe aree nella zona', () => place(cfg([g({ xCm: -10, widthCm: 8, heightCm: 8 }), g({ xCm: 0, widthCm: 8, heightCm: 8 }), g({ xCm: 10, widthCm: 8, heightCm: 8 })])), 'too_many_in_zone')
+  await expectError('testo vuoto rifiutato', () => place(cfg([t({ text: '  ' })])), 'invalid_element')
+  await expectError('zona non prevista', () => place(cfg([g({ zone: 'back' })])), 'zone_not_allowed')
+  // ruotata di 90°: l'ingombro diventa 5 × 20 e sta nell'area (y 5–25)
+  const rot = t({ xCm: 0, yCm: 15, widthCm: 20, heightCm: 5, rotation: 90 })
+  const o = await place(cfg([g({ xCm: -10, yCm: 10, widthCm: 8, heightCm: 8 }), rot]))
+  const rows = await q(`select area_name, area_type, asset_meta from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1 order by area_name`, [o.order_id])
+  rows.length === 2 && rows[0].area_name === 'Grafica 1' && rows[0].asset_meta.technique === 'dtf' && rows[1].area_type === 'text' && rows[1].asset_meta.text === 'ROSSI' && Number(rows[1].asset_meta.price) === 2.08
+    ? ok(`ordine ${o.reference}: grafica DTF e testo serigrafato (ruotato) salvati con tecnica, misure e prezzo`) : fail(JSON.stringify(rows))
+
+  // fasce
+  await expectError('fascia non attiva sul prodotto', () => place(cfg([], { bands: [{ mode: 'color', color: '#C62828' }] })), 'invalid_band')
+  await as(admin.id, () => q(`update products set band_enabled = true, band_price = 1.5 where id = $1`, [p2.id]))
+  ;(await price(cfg([], { bands: [{ mode: 'color', color: '#C62828' }] }))) === 11.5 ? ok('fascia colorata: +1,50 €') : fail('band price')
+  await expectError('fascia con colore non valido', () => place(cfg([], { bands: [{ mode: 'color', color: 'rosso' }] })), 'invalid_band')
+  await expectError('fascia con grafica di un altro utente', () => place(cfg([], { bands: [{ mode: 'graphic', asset: { bucket: 'customer-uploads', path: `${c2.id}/x.png` } }] })), 'invalid_asset_path')
+  const ob = await place(cfg([], { bands: [{ mode: 'graphic', asset: { bucket: 'customer-uploads', path: `${c1.id}/graphics/band.png` } }] }))
+  const [band] = await q(`select area_name, asset_meta from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1`, [ob.order_id])
+  band?.asset_meta.band === true && band.asset_meta.mode === 'graphic' ? ok('fascia stampata salvata con l’ordine') : fail(JSON.stringify(band))
+
+  // colori per sezione nell'all-over e sublimazione con all-over attivo
+  await as(admin.id, () => q(`update products set all_over_enabled = true where id = $1`, [p2.id]))
+  const ao = (colors) => [{ asset: { bucket: 'customer-uploads', path: `${c1.id}/graphics/all.png` }, colors }]
+  await expectError('colore per sezione non valido', () => place(cfg([], { allOver: ao({ collar: '#000000' }) })), 'invalid_all_over')
+  const oc = await place(cfg([g({ technique: 'sublimation' })], { allOver: ao({ sleeve_left: '#1E4FD8', front: '#C62828' }) }))
+  const colorRows = await q(`select area_name, asset_meta from order_item_customizations c join order_items i on i.id = c.order_item_id where i.order_id = $1 and (c.asset_meta->>'color') is not null order by area_name`, [oc.order_id])
+  colorRows.length === 2 && colorRows[0].area_name === 'Colore · davanti' && colorRows[1].asset_meta.color === '#1E4FD8'
+    ? ok('colori per sezione salvati (davanti, manica sinistra); sublimazione ammessa con all-over') : fail(JSON.stringify(colorRows))
+
+  // duplicazione e pezzi gamba
+  const [dup3] = await as(admin.id, () => q(`select admin_duplicate_product($1) id`, [p2.id]))
+  const [{ n: dz }] = await q(`select count(*)::int n from print_zones where product_id = $1`, [dup3.id])
+  dz === 2 ? ok('la duplicazione copia le zone di stampa') : fail(`zone copiate ${dz}`)
+  const [set] = await as(admin.id, () => q(`insert into pattern_sets (product_id, reference_size) values ($1, 'M') returning id`, [p2.id]))
+  await as(admin.id, () => q(`insert into pattern_pieces (pattern_set_id, size, piece, name, outline) values ($1, 'M', 'leg_left', 'Gamba sinistra', '[[0,0],[500,0],[500,500]]')`, [set.id]))
+  ok('pezzo "gamba" del pantaloncino accettato')
+  await as(c1.id, () => q(`delete from cart_items`))
+}
+
 console.log('\nSeed dimostrativo')
 await db.exec(fs.readFileSync(path.join(dir, '..', 'seed_demo.sql'), 'utf8'))
 const [demo] = await q(`select p.is_published, (select count(*)::int from customization_areas a where a.product_id = p.id) areas from products p where slug = 'prodotto-dimostrativo'`)
