@@ -30,6 +30,13 @@ import { ColorSection, GarmentSection, OptionsSection, TextStyleSection } from '
 import { GraphicsSection } from '@/features/configurator/sections/GraphicsSection'
 import { RosterSection } from '@/features/configurator/sections/RosterSection'
 import { storePreviews } from '@/features/cart/assets'
+import { PrintAreasSection } from '@/features/configurator/sections/PrintAreasSection'
+import { BandSection } from '@/features/configurator/sections/BandSection'
+import { AllOverSection } from '@/features/configurator/sections/AllOverSection'
+import { getPrintZones } from '@/features/catalog/api'
+import { useTechniques } from '@/features/catalog/techniques'
+import { elementPrice, TECHNIQUE_LABEL } from '@/lib/printing'
+import type { TechniqueCode } from '@/types/config'
 import { adminGetProduct, adminListProducts } from '../catalog/api'
 
 interface DraftItem {
@@ -46,7 +53,9 @@ function AdminItemConfigurator({ product, onAdd, onCancel }: { product: ProductD
   const { user } = useAuth()
   const { settings } = useSettings()
   const { data: library } = useQuery('assets:library', listLibraryAssets)
-  const api = useConfigurator(product, { userId: user?.id ?? null, quality: settings.quality })
+  const { data: zones } = useQuery(`print-zones:${product.id}`, () => getPrintZones(product.id))
+  const techniques = useTechniques()
+  const api = useConfigurator(product, { zones: zones ?? [], techniques, userId: user?.id ?? null, quality: settings.quality })
   const [unit, setUnit] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const suggested = api.qty ? Math.round((api.price.total / api.qty) * 100) / 100 : api.price.unit
@@ -73,6 +82,9 @@ function AdminItemConfigurator({ product, onAdd, onCancel }: { product: ProductD
         <ColorSection api={api} />
         <OptionsSection api={api} />
         <GraphicsSection api={api} library={library ?? []} />
+        {api.allOverEnabled && <AllOverSection api={api} library={library ?? []} />}
+        {api.printEnabled && <PrintAreasSection api={api} library={library ?? []} />}
+        {api.bandEnabled && <BandSection api={api} />}
         <RosterSection api={api} />
         <TextStyleSection api={api} />
         {api.issues.length > 0 && (
@@ -103,6 +115,7 @@ function CustomItemForm({ onAdd, onCancel }: { onAdd: (item: DraftItem) => void;
   const [description, setDescription] = useState('')
   const [unit, setUnit] = useState('0')
   const [qty, setQty] = useState('1')
+  const techniques = useTechniques()
   const [baseColor, setBaseColor] = useState('#FFFFFF')
   const [areas, setAreas] = useState<CustomArea[]>([])
   const [rosterText, setRosterText] = useState('')
@@ -128,14 +141,27 @@ function CustomItemForm({ onAdd, onCancel }: { onAdd: (item: DraftItem) => void;
     }
   }
 
+  const setArea = (i: number, patch: Partial<CustomArea>) => setAreas((a) => a.map((x, j) => (j === i ? { ...x, ...patch } : x)))
+  const num = (v: string) => (v.trim() === '' ? undefined : Number(v.replace(',', '.')))
+  const priceOf = (a: CustomArea) => {
+    const t = techniques.find((x) => x.code === a.technique)
+    if (!t || !(a.widthCm && a.heightCm)) return 0
+    const zone = { width_cm: a.maxWidthCm || a.widthCm, height_cm: a.maxHeightCm || a.heightCm }
+    return elementPrice({ widthCm: a.widthCm, heightCm: a.heightCm }, zone, t)
+  }
+  const printTotal = Math.round(areas.reduce((s, a) => s + priceOf(a), 0) * 100) / 100
+  const unitTotal = Math.round((Math.max(0, Number(unit) || 0) + printTotal) * 100) / 100
+
   const add = () => {
     if (!name.trim()) return toast('Inserisci il nome dell’articolo', 'error')
+    const bad = areas.find((a) => a.maxWidthCm && a.widthCm && (a.widthCm > a.maxWidthCm || (a.heightCm ?? 0) > (a.maxHeightCm ?? Infinity)))
+    if (bad) return toast(`${bad.name || 'Personalizzazione'}: le misure superano l’area massima.`, 'error')
     const roster = rosterText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
       const [n = '', num = '', size = '', q = ''] = l.split(/\t|;|,/).map((s) => s.trim())
       return { id: uid(), name: n.slice(0, 40), number: num.replace(/\D/g, '').slice(0, 4), size: size || undefined, quantity: Math.max(1, Number(q) || 1) }
     })
-    const config: Configuration = { ...emptyConfiguration(), baseColor, customAreas: areas, roster, customDescription: description.trim() || undefined }
-    onAdd({ key: uid(), product_id: null, product_name: name.trim(), configuration: config, quantity: roster.length ? roster.reduce((s, r) => s + r.quantity, 0) : Math.max(1, Number(qty) || 1), unit_price: Math.max(0, Number(unit) || 0) })
+    const config: Configuration = { ...emptyConfiguration(), baseColor, customAreas: areas.map((a) => ({ ...a, price: a.technique ? priceOf(a) : undefined })), roster, customDescription: description.trim() || undefined }
+    onAdd({ key: uid(), product_id: null, product_name: name.trim(), configuration: config, quantity: roster.length ? roster.reduce((s, r) => s + r.quantity, 0) : Math.max(1, Number(qty) || 1), unit_price: unitTotal })
   }
 
   return (
@@ -143,7 +169,7 @@ function CustomItemForm({ onAdd, onCancel }: { onAdd: (item: DraftItem) => void;
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nome articolo" required><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} /></Field>
         <Field label="Colore base"><div className="flex gap-2"><input type="color" value={baseColor} onChange={(e) => setBaseColor(e.target.value.toUpperCase())} className="h-11 w-14 rounded-xl border border-ink-200 p-1" aria-label="Colore base" /><Input value={baseColor} onChange={(e) => setBaseColor(e.target.value)} /></div></Field>
-        <Field label="Prezzo unitario (€)" required><Input type="number" step="0.01" min={0} value={unit} onChange={(e) => setUnit(e.target.value)} /></Field>
+        <Field label="Prezzo del capo (€)" required hint={printTotal > 0 ? `Con le stampe: ${formatPrice(unitTotal)} a capo` : 'Le stampe con tecnica si sommano in automatico'}><Input type="number" step="0.01" min={0} value={unit} onChange={(e) => setUnit(e.target.value)} /></Field>
         <Field label="Quantità" hint="Ignorata se compili l’elenco giocatori"><Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
         <Field label="Descrizione / specifiche di produzione" className="sm:col-span-2"><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} /></Field>
       </div>
@@ -159,6 +185,26 @@ function CustomItemForm({ onAdd, onCancel }: { onAdd: (item: DraftItem) => void;
               <option value="front">Fronte</option><option value="back">Retro</option>
             </Select>
             <button type="button" onClick={() => setAreas(areas.filter((_, j) => j !== i))} className="rounded-lg p-2 text-ink-400 hover:text-danger-600" aria-label="Rimuovi area"><X className="h-4 w-4" /></button>
+            <div className="grid gap-2 sm:col-span-4 sm:grid-cols-4">
+              <Select value={a.technique ?? ''} onChange={(e) => setArea(i, { technique: (e.target.value || undefined) as TechniqueCode | undefined })} aria-label="Tecnica">
+                <option value="">Tecnica: da definire</option>
+                {techniques.filter((t) => t.is_active).map((t) => <option key={t.code} value={t.code}>{t.name || TECHNIQUE_LABEL[t.code]}</option>)}
+              </Select>
+              <Input inputMode="decimal" value={a.widthCm ?? ''} onChange={(e) => setArea(i, { widthCm: num(e.target.value) })} placeholder="Larghezza cm" aria-label="Larghezza in cm" />
+              <Input inputMode="decimal" value={a.heightCm ?? ''} onChange={(e) => setArea(i, { heightCm: num(e.target.value) })} placeholder="Altezza cm" aria-label="Altezza in cm" />
+              <Input inputMode="decimal" value={a.rotation ?? ''} onChange={(e) => setArea(i, { rotation: num(e.target.value) })} placeholder="Rotazione °" aria-label="Rotazione in gradi" />
+              <Input inputMode="decimal" value={a.xCm ?? ''} onChange={(e) => setArea(i, { xCm: num(e.target.value) })} placeholder="X dal centro cm" aria-label="Posizione orizzontale dal centro in cm" />
+              <Input inputMode="decimal" value={a.yCm ?? ''} onChange={(e) => setArea(i, { yCm: num(e.target.value) })} placeholder="Y dal collo cm" aria-label="Posizione verticale dal collo in cm" />
+              <Input inputMode="decimal" value={a.maxWidthCm ?? ''} onChange={(e) => setArea(i, { maxWidthCm: num(e.target.value) })} placeholder="Area max: largh. cm" aria-label="Larghezza area massima in cm" />
+              <Input inputMode="decimal" value={a.maxHeightCm ?? ''} onChange={(e) => setArea(i, { maxHeightCm: num(e.target.value) })} placeholder="Area max: alt. cm" aria-label="Altezza area massima in cm" />
+            </div>
+            {a.technique && (
+              <p className="text-xs text-ink-500 sm:col-span-4">
+                {a.widthCm && a.heightCm
+                  ? <>Stampa {TECHNIQUE_LABEL[a.technique].toLowerCase()} {a.widthCm}×{a.heightCm} cm: <strong className="text-ink-800">{formatPrice(priceOf(a))}</strong> a capo{a.maxWidthCm && a.maxHeightCm ? ` (in proporzione all’area massima ${a.maxWidthCm}×${a.maxHeightCm} cm)` : ' (area massima non indicata: prezzo massimo della tecnica)'}</>
+                  : 'Indica larghezza e altezza per calcolare il prezzo della stampa.'}
+              </p>
+            )}
             <Input value={a.note ?? ''} onChange={(e) => setAreas(areas.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)))} placeholder="Note (posizione, colori…)" className="sm:col-span-3" aria-label="Note area" />
             <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-ink-200 px-3 text-xs font-semibold hover:border-ink-400">
               {uploading === i ? 'Caricamento…' : a.asset ? 'File caricato ✓' : 'Carica file'}
