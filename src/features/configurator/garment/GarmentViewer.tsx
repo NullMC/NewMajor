@@ -12,9 +12,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ModelShape } from '@/types/db'
 import { getShape } from './shapes'
 import { buildPanelGeometry } from './geometry'
-import { ModelGarment, useGarmentModel, type SleeveTexture } from './ModelGarment'
+import { hasPieceMeshes, ModelGarment, PieceGarment, useGarmentModel, type SleeveTexture } from './ModelGarment'
+import type { PieceCanvases } from './pieces'
 
-function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
+function usePanelTexture(canvas: HTMLCanvasElement | null, version: number, flipY = true) {
   const { gl, invalidate } = useThree()
   // Una texture WebGL non può cambiare dimensioni dopo il primo caricamento: quando il canvas
   // viene ridisegnato con proporzioni diverse (es. passaggio maglia → pantaloncino) va ricreata,
@@ -23,10 +24,11 @@ function usePanelTexture(canvas: HTMLCanvasElement | null, version: number) {
   const texture = useMemo(() => {
     if (!canvas) return null
     const t = new THREE.CanvasTexture(canvas)
+    t.flipY = flipY // i pezzi hanno v = 0 in alto (collo, testa della manica)
     t.colorSpace = THREE.SRGBColorSpace
     t.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy())
     return t
-  }, [canvas, gl, size]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canvas, gl, size, flipY]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (texture) {
       texture.needsUpdate = true
@@ -45,11 +47,18 @@ function useSleeve(s: SleeveCanvas | null | undefined, version: number): SleeveT
   return useMemo(() => (texture && s ? { texture, rect: s.rect, anchor: s.anchor } : null), [texture, rectKey]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-function Garment({ shape, front, back, version, view, baseColor, sleeves }: {
+function Garment({ shape, front, back, version, view, baseColor, sleeves, pieces, trimColor }: {
   shape: ModelShape; front: HTMLCanvasElement | null; back: HTMLCanvasElement | null; version: number; view: 'front' | 'back'; baseColor: string
   sleeves?: { left?: SleeveCanvas | null; right?: SleeveCanvas | null }
+  pieces?: PieceCanvases | null; trimColor?: string
 }) {
   const model = useGarmentModel(shape)
+  // pezzi del cartamodello (ricostruzione): una texture per pezzo
+  const pFront = usePanelTexture(pieces?.front ?? null, version, false)
+  const pBack = usePanelTexture(pieces?.back ?? null, version, false)
+  const pSleeveL = usePanelTexture(pieces?.sleeve_left ?? null, version, false)
+  const pSleeveR = usePanelTexture(pieces?.sleeve_right ?? null, version, false)
+  const pieceTextures = useMemo(() => (pFront && pBack ? { front: pFront, back: pBack, sleeve_left: pSleeveL ?? undefined, sleeve_right: pSleeveR ?? undefined } : null), [pFront, pBack, pSleeveL, pSleeveR])
   const sleeveLeft = useSleeve(sleeves?.left, version)
   const sleeveRight = useSleeve(sleeves?.right, version)
   const s = getShape(shape)
@@ -75,7 +84,9 @@ function Garment({ shape, front, back, version, view, baseColor, sleeves }: {
 
   return (
     <group ref={group} position={[0, -0.08, 0]}>
-      {model.status === 'ready' && frontTex && backTex ? (
+      {model.status === 'ready' && pieceTextures && hasPieceMeshes(model.geos) ? (
+        <PieceGarment geos={model.geos} textures={pieceTextures} baseColor={baseColor} trimColor={trimColor ?? baseColor} />
+      ) : model.status === 'ready' && frontTex && backTex ? (
         <ModelGarment shape={shape} geos={model.geos} front={frontTex} back={backTex} baseColor={baseColor} sleeveLeft={sleeveLeft} sleeveRight={sleeveRight} />
       ) : (
         <>
@@ -142,9 +153,12 @@ export interface GarmentViewerProps {
   sleeves?: { left?: SleeveCanvas | null; right?: SleeveCanvas | null }
   resetToken?: number
   className?: string
+  /** Pezzi del cartamodello già disegnati (ricostruzione del capo dai pezzi) e colore delle finiture. */
+  pieces?: PieceCanvases | null
+  trimColor?: string
 }
 
-export default function GarmentViewer({ shape, front, back, version, view, baseColor, sleeves, resetToken = 0, className }: GarmentViewerProps) {
+export default function GarmentViewer({ shape, front, back, version, view, baseColor, sleeves, resetToken = 0, className, pieces, trimColor }: GarmentViewerProps) {
   return (
     <Canvas
       className={className}
@@ -159,7 +173,7 @@ export default function GarmentViewer({ shape, front, back, version, view, baseC
       <directionalLight position={[2.5, 3, 4]} intensity={1.6} />
       <directionalLight position={[-3, 1.5, -3]} intensity={0.9} />
       <directionalLight position={[0, -2, 3]} intensity={0.25} />
-      <Garment shape={shape} front={front} back={back} version={version} view={view} baseColor={baseColor} sleeves={sleeves} />
+      <Garment shape={shape} front={front} back={back} version={version} view={view} baseColor={baseColor} sleeves={sleeves} pieces={pieces} trimColor={trimColor} />
       <Controls resetKey={`${view}-${shape}-${resetToken}`} />
     </Canvas>
   )

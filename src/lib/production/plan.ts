@@ -142,6 +142,8 @@ export interface PlanInput {
   bleedMm: number
   /** Tecniche con i prezzi, per il riepilogo (facoltative). */
   techniques?: PrintTechnique[]
+  /** Anteprima del configuratore: tutte le aree sul pezzo, qualunque sia la tecnica. */
+  preview?: boolean
 }
 
 export interface PlanResult { jobs: PieceJob[]; transfers: TransferItem[]; specs: SpecSheet[]; warnings: string[] }
@@ -293,7 +295,7 @@ export function buildPlan(input: PlanInput): PlanResult {
           }
         }
         // aree del cliente stampate sul pezzo: sulle gambe sia il davanti sia il dietro
-        const onPiece = elements.filter(printedOnPiece).filter((e) => (isLeg(p.piece) ? e.zone === 'front' || e.zone === 'back' : e.zone === p.piece))
+        const onPiece = elements.filter((e) => input.preview || printedOnPiece(e)).filter((e) => (isLeg(p.piece) ? e.zone === 'front' || e.zone === 'back' : e.zone === p.piece))
         for (const e of onPiece) placements.push(elementPlacement(e, p, isLeg(p.piece) ? (e.zone as 'front' | 'back') : 'front'))
 
         // grafica all-over del cliente: colore o grafica della sezione, altrimenti quella del capo

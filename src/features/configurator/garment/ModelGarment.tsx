@@ -5,6 +5,10 @@
 // pannello fronte, quelle all'indietro il retro, con una sfumatura sui fianchi. Non serve
 // la mappatura UV del modello, quindi funziona con qualunque maglia in formato GLB.
 // Dove il pannello è trasparente (fuori dalla sagoma 2D) si usa il colore base.
+//
+// Ricostruzione dai pezzi: per i modelli preparati con scripts/models/piece_uv.mjs (mesh nominate
+// front, back, sleeve_left, sleeve_right con UV normalizzate sul pezzo) e un prodotto con il
+// cartamodello, ogni mesh mostra il pezzo corrispondente disegnato come nel file di produzione.
 
 import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
@@ -69,6 +73,7 @@ export function loadModel(url: string) {
         if (!mesh.isMesh) return
         const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld)
         if (!g.attributes.normal) g.computeVertexNormals()
+        g.userData.piece = mesh.name // pezzo del cartamodello (modelli ricostruiti dai pezzi)
         geos.push(g)
       })
       return geos
@@ -197,6 +202,39 @@ diffuseColor.rgb *= col;`,
   }
   return { mat, uniforms }
 }
+
+/** Capo ricostruito dai pezzi: ogni mesh con la texture del suo pezzo, le finiture nel colore dei profili. */
+export function PieceGarment({ geos, textures, baseColor, trimColor }: {
+  geos: THREE.BufferGeometry[]; textures: Partial<Record<string, THREE.Texture>>; baseColor: string; trimColor: string
+}) {
+  const mats = useMemo(() => {
+    const out = new Map<string, THREE.MeshStandardMaterial>()
+    for (const [k, t] of Object.entries(textures)) if (t) out.set(k, new THREE.MeshStandardMaterial({ map: t, roughness: 0.86, metalness: 0, side: THREE.DoubleSide }))
+    return out
+  }, [textures])
+  const trim = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.86, metalness: 0, side: THREE.DoubleSide }), [])
+  const plain = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.86, metalness: 0, side: THREE.DoubleSide }), [])
+  useEffect(() => { trim.color.set(trimColor); plain.color.set(baseColor) }, [trim, plain, trimColor, baseColor])
+  useEffect(() => () => { for (const m of mats.values()) m.dispose() }, [mats])
+  useEffect(() => () => { trim.dispose(); plain.dispose() }, [trim, plain])
+  const scale = useMemo(() => {
+    const box = new THREE.Box3()
+    for (const g of geos) { g.computeBoundingBox(); box.union(g.boundingBox!) }
+    return Math.min(1.78, 2.3 / Math.max(0.01, box.max.x - box.min.x))
+  }, [geos])
+  return (
+    <group scale={scale} position={[0, 0.02, 0]}>
+      {geos.map((g, i) => {
+        const piece = g.userData.piece as string
+        return <mesh key={i} geometry={g} material={mats.get(piece) ?? (piece === 'trim' ? trim : plain)} castShadow receiveShadow />
+      })}
+    </group>
+  )
+}
+
+/** Il modello ha le mesh dei pezzi (front, back...) con le UV per la ricostruzione? */
+export const hasPieceMeshes = (geos: THREE.BufferGeometry[]) =>
+  geos.some((g) => g.userData.piece === 'front' && g.attributes.uv) && geos.some((g) => g.userData.piece === 'back' && g.attributes.uv)
 
 export function ModelGarment({ shape, geos, front, back, baseColor, sleeveLeft, sleeveRight }: {
   shape: ModelShape; geos: THREE.BufferGeometry[]; front: THREE.Texture; back: THREE.Texture; baseColor: string
