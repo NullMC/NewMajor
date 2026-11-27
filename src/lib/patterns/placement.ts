@@ -5,16 +5,19 @@
 // valgono per tutte le taglie: sul pezzo di ogni taglia l'elemento si colloca alla stessa
 // distanza dal suo riferimento (come si fa in produzione).
 
-import type { PlacedElement, PrintZone } from '@/types/config'
-import { bounds, pointInPolygon, type Vec } from './geometry'
+import type { PlacedElement, PrintZone, SectionKey } from '@/types/config'
+import { bounds, pointInPolygon, type PieceAnchor, type Vec } from './geometry'
+import { heightOf } from '@/lib/printing'
 
 export interface ZonePiece {
   kitItemId: string | null
-  zone: PrintZone
+  zone: SectionKey
   size: string
   name: string
   outline: Vec[]
-  anchor: { x?: number; y?: number }
+  anchor: PieceAnchor
+  /** Pezzo indicativo (capo senza cartamodello): solo anteprima, non per la produzione. */
+  virtual?: boolean
 }
 
 export const ZONE_LABEL: Record<PrintZone, string> = {
@@ -24,21 +27,29 @@ export const ZONE_LABEL: Record<PrintZone, string> = {
   sleeve_right: 'Manica destra',
 }
 
-/** Altezza dell'elemento in cm, dal rapporto dell'immagine (1:1 se ignoto). */
-export function elementHeightCm(el: Pick<PlacedElement, 'widthCm' | 'asset'>): number {
-  const { width, height } = el.asset
-  return width > 0 && height > 0 ? (el.widthCm * height) / width : el.widthCm
+/** Sezioni del capo (all-over): le zone più le gambe del pantaloncino. */
+export const SECTION_LABEL: Record<SectionKey, string> = {
+  ...ZONE_LABEL,
+  leg_left: 'Gamba sinistra',
+  leg_right: 'Gamba destra',
 }
 
-export function anchorOf(piece: Pick<ZonePiece, 'anchor' | 'outline'>): Vec {
+/** Altezza dell'elemento in cm: quella indicata, altrimenti dal rapporto dell'immagine (1:1 se ignoto). */
+export function elementHeightCm(el: Pick<PlacedElement, 'widthCm' | 'heightCm' | 'asset'>): number {
+  return heightOf(el)
+}
+
+/** Riferimento del pezzo; per le gambe `side` sceglie il centro davanti (default) o dietro. */
+export function anchorOf(piece: Pick<ZonePiece, 'anchor' | 'outline'>, side: 'front' | 'back' = 'front'): Vec {
+  if (side === 'back' && piece.anchor?.bx != null && piece.anchor?.by != null) return [piece.anchor.bx, piece.anchor.by]
   if (piece.anchor?.x != null && piece.anchor?.y != null) return [piece.anchor.x, piece.anchor.y]
   const b = bounds(piece.outline)
   return [b.minX + b.width / 2, b.maxY]
 }
 
 /** Centro dell'elemento nelle coordinate del pezzo (mm, y verso l'alto). */
-export function elementCenterMm(el: Pick<PlacedElement, 'xCm' | 'yCm'>, piece: Pick<ZonePiece, 'anchor' | 'outline'>): Vec {
-  const [ax, ay] = anchorOf(piece)
+export function elementCenterMm(el: Pick<PlacedElement, 'xCm' | 'yCm'>, piece: Pick<ZonePiece, 'anchor' | 'outline'>, side: 'front' | 'back' = 'front'): Vec {
+  const [ax, ay] = anchorOf(piece, side)
   return [ax + el.xCm * 10, ay - el.yCm * 10]
 }
 
@@ -81,11 +92,11 @@ export function distanceToOutline([x, y]: Vec, pts: Vec[]): number {
 
 /** DPI effettivi dell'immagine alla larghezza di stampa (null per i vettoriali). */
 export function elementDpi(el: Pick<PlacedElement, 'widthCm' | 'asset'>): number | null {
-  if (el.asset.isVector || !el.asset.width) return null
+  if (!el.asset || el.asset.isVector || !el.asset.width) return null
   return Math.round(el.asset.width / (el.widthCm / 2.54))
 }
 
 /** Pezzo della zona per il componente indicato (o per il capo principale). */
-export function zonePiece(zones: ZonePiece[], zone: PrintZone, kitItemId: string | null): ZonePiece | null {
+export function zonePiece(zones: ZonePiece[], zone: SectionKey, kitItemId: string | null): ZonePiece | null {
   return zones.find((z) => z.zone === zone && (z.kitItemId ?? null) === (kitItemId ?? null)) ?? null
 }

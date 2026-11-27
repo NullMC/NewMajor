@@ -21,7 +21,9 @@ import { useConfigurator } from './useConfigurator'
 import { ConfiguratorViewer } from './ConfiguratorViewer'
 import { ColorSection, GarmentSection, OptionsSection, TextStyleSection } from './sections/BasicSections'
 import { GraphicsSection } from './sections/GraphicsSection'
-import { ElementsSection } from './sections/ElementsSection'
+import { PrintAreasSection } from './sections/PrintAreasSection'
+import { BandSection } from './sections/BandSection'
+import { useTechniques } from '@/features/catalog/techniques'
 import { AllOverSection } from './sections/AllOverSection'
 import { RosterSection } from './sections/RosterSection'
 
@@ -50,9 +52,13 @@ function Configurator({ product, editLine, initialVariantId }: { product: Produc
   const navigate = useNavigate()
   const { data: library } = useQuery('assets:library', listLibraryAssets, { staleMs: 5 * 60_000 })
   // pezzi della taglia di riferimento, solo se il prodotto consente loghi e sponsor liberi o l'all-over
-  const { data: zones } = useQuery(Number(product.free_elements_max) > 0 || product.all_over_enabled ? `print-zones:${product.id}` : null, () => getPrintZones(product.id), { staleMs: 5 * 60_000 })
+  // pezzi della taglia di riferimento del cartamodello (se c'è): posizionamento reale delle aree,
+  // all-over e fasce sulle maniche
+  const { data: zones } = useQuery(`print-zones:${product.id}`, () => getPrintZones(product.id), { staleMs: 5 * 60_000 })
+  const techniques = useTechniques()
   const api = useConfigurator(product, {
     zones: zones ?? [],
+    techniques,
     initial: editLine?.configuration ?? null,
     initialQuantity: editLine?.quantity,
     initialVariantId,
@@ -135,9 +141,14 @@ function Configurator({ product, editLine, initialVariantId }: { product: Produc
               <AllOverSection api={api} library={library ?? []} />
             </Step>
           )}
-          {api.freeEnabled && (
-            <Step n={++n} title="Loghi e sponsor" issues={issuesBy('elements')}>
-              <ElementsSection api={api} library={library ?? []} />
+          {api.printEnabled && (
+            <Step n={++n} title="Aree di stampa" issues={issuesBy('elements')}>
+              <PrintAreasSection api={api} library={library ?? []} />
+            </Step>
+          )}
+          {api.bandEnabled && (
+            <Step n={++n} title={api.isBottomShape ? 'Fascia sul fondo' : 'Fasce sulle maniche'} issues={issuesBy('bands')}>
+              <BandSection api={api} />
             </Step>
           )}
           <Step n={++n} title={api.roster ? 'Nomi, numeri, taglie e quantità' : 'Quantità'} issues={issuesBy('roster')}>

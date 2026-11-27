@@ -41,6 +41,7 @@ export const GARMENT_MODELS: Partial<Record<ModelShape, GarmentModel>> = {
   track_jacket: fromOutline('/models/track_jacket.glb', MODEL_OUTLINES.track_jacket),
   track_pants: fromOutline('/models/track_pants.glb', MODEL_OUTLINES.track_pants),
   jacket: fromOutline('/models/puffer.glb', MODEL_OUTLINES.jacket),
+  puffer: fromOutline('/models/puffer.glb', MODEL_OUTLINES.jacket),
   shorts: fromOutline('/models/shorts.glb', MODEL_OUTLINES.shorts),
 }
 

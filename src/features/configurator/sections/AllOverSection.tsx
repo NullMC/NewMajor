@@ -2,15 +2,15 @@
 // visualizzato) e, facoltativamente, una grafica diversa per singoli pezzi.
 
 import { useState } from 'react'
-import { AlertTriangle, Info, Library, Replace, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Info, Library, Palette, Replace, Trash2, Upload } from 'lucide-react'
 import type { CustomizationAsset } from '@/types/db'
-import type { AssetRef, PrintZone } from '@/types/config'
+import type { AssetRef, SectionKey } from '@/types/config'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatPrice } from '@/lib/format'
 import { ACCEPTED_GRAPHIC_TYPES } from '@/lib/imageQuality'
 import { publicUrl } from '@/lib/storage'
 import { errorMessage } from '@/lib/errors'
-import { ZONE_LABEL } from '@/lib/patterns/placement'
+import { SECTION_LABEL } from '@/lib/patterns/placement'
 import { Dropzone } from '@/components/ui/Dropzone'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Form'
@@ -19,7 +19,7 @@ import { useSettings } from '@/features/settings/SettingsProvider'
 import type { ConfiguratorApi } from '../useConfigurator'
 import { QualityBadge, Thumb } from './GraphicsSection'
 
-type Slot = PrintZone | 'main'
+type Slot = SectionKey | 'main'
 
 function FileInputButton({ label, icon, onFile, disabled }: { label: string; icon: React.ReactNode; onFile: (f: File) => void; disabled?: boolean }) {
   return (
@@ -135,15 +135,21 @@ export function AllOverSection({ api, library }: { api: ConfiguratorApi; library
 
       {ao && (
         <div className="rounded-2xl border border-ink-200 bg-white p-4">
-          <p className="font-semibold text-ink-900">Grafica diversa su un pezzo <span className="font-normal text-ink-500">(facoltativa)</span></p>
+          <p className="font-semibold text-ink-900">Grafica o colore diversi per sezione <span className="font-normal text-ink-500">(facoltativi)</span></p>
           <ul className="mt-3 divide-y divide-ink-100">
             {api.allOverZones.map((zone) => {
               const asset = ao.overrides?.[zone]
+              const color = ao.colors?.[zone]
               return (
                 <li key={zone} className="py-3 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-ink-900">{ZONE_LABEL[zone]}</p>
-                    {asset ? (
+                    <p className="text-sm font-medium text-ink-900">{SECTION_LABEL[zone]}</p>
+                    {color ? (
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={color} onChange={(e) => api.setAllOverColor(zone, e.target.value.toUpperCase())} aria-label={`Colore ${SECTION_LABEL[zone].toLowerCase()}`} className="h-9 w-14 cursor-pointer rounded-lg border border-ink-200 bg-white p-1" />
+                        <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={() => api.setAllOverColor(zone, null)}>Usa la grafica del capo</Button>
+                      </div>
+                    ) : asset ? (
                       <div className="flex gap-2">
                         <FileInputButton label="Sostituisci" icon={<Replace className="h-4 w-4" />} disabled={!!api.allOverUploading} onFile={(f) => void upload(zone, f)} />
                         <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={() => api.setAllOverAsset(zone, null)}>Usa quella del capo</Button>
@@ -152,6 +158,7 @@ export function AllOverSection({ api, library }: { api: ConfiguratorApi; library
                       <div className="flex gap-2">
                         <FileInputButton label={api.allOverUploading === zone ? 'Caricamento…' : 'Usa una grafica diversa'} icon={<Upload className="h-4 w-4" />} disabled={!!api.allOverUploading} onFile={(f) => void upload(zone, f)} />
                         {libItems.length > 0 && <Button variant="ghost" size="sm" icon={<Library className="h-4 w-4" />} onClick={() => setLibFor(zone)}>Libreria</Button>}
+                        <Button variant="ghost" size="sm" icon={<Palette className="h-4 w-4" />} onClick={() => api.setAllOverColor(zone, api.secondaryColor ?? api.baseColor)}>Colore</Button>
                       </div>
                     )}
                   </div>

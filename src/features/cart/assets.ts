@@ -98,14 +98,25 @@ export async function uploadPendingAssets(
     const asset = await upload(area.asset)
     next.areas[areaId] = asset ? { ...area, asset } : { ...area, asset: null, enabled: false }
   }
-  // loghi e sponsor liberi: quelli il cui file locale è andato perso vengono tolti
+  // aree di stampa: i testi non hanno file; le grafiche il cui file locale è andato perso vengono tolte
   if (config.elements?.length) {
     const elements = []
     for (const e of config.elements) {
+      if (!e.asset) { elements.push(e); continue }
       const asset = await upload(e.asset)
       if (asset) elements.push({ ...e, asset })
     }
     next.elements = elements
+  }
+  // fasce con grafica: senza file la fascia viene tolta
+  if (config.bands?.length) {
+    const bands = []
+    for (const b of config.bands) {
+      if (b.mode !== 'graphic' || !b.asset) { bands.push(b); continue }
+      const asset = await upload(b.asset)
+      if (asset) bands.push({ ...b, asset })
+    }
+    next.bands = bands
   }
   // grafica all-over e sostituzioni per pezzo
   if (config.allOver?.length) {
@@ -141,11 +152,12 @@ export async function uploadPendingAssets(
 export const hasPendingAssets = (config: Configuration) =>
   configAssets(config).some((a) => a.localKey && !a.path)
 
-/** Tutti i file grafici di una configurazione: aree attive, loghi e sponsor liberi, all-over. */
+/** Tutti i file grafici di una configurazione: aree attive, aree di stampa, all-over, fasce. */
 export function configAssets(config: Configuration): AssetRef[] {
   const out: AssetRef[] = []
   for (const a of Object.values(config.areas)) if (a.enabled && a.asset) out.push(a.asset)
-  for (const e of config.elements ?? []) out.push(e.asset)
+  for (const e of config.elements ?? []) if (e.asset) out.push(e.asset)
+  for (const b of config.bands ?? []) if (b.asset) out.push(b.asset)
   for (const ao of config.allOver ?? []) {
     out.push(ao.asset)
     for (const a of Object.values(ao.overrides ?? {})) if (a) out.push(a)

@@ -2,7 +2,8 @@
 // È solo indicativo: al checkout il database ricalcola tutto.
 
 import type { Configuration } from '@/types/config'
-import type { ProductDetail } from '@/types/db'
+import type { PrintTechnique, ProductDetail } from '@/types/db'
+import { elementPrice, findZone, TECHNIQUE_LABEL } from './printing'
 
 export function configQuantity(config: Configuration, fallback = 1): number {
   if (config.roster?.length) return config.roster.reduce((sum, r) => sum + Math.max(1, Number(r.quantity) || 1), 0)
@@ -20,7 +21,7 @@ export interface PriceBreakdown {
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
-export function computePrice(product: ProductDetail, config: Configuration, fallbackQty = 1): PriceBreakdown {
+export function computePrice(product: ProductDetail, config: Configuration, fallbackQty = 1, techniques: PrintTechnique[] = []): PriceBreakdown {
   const lines: PriceBreakdown['lines'] = []
   const base = Number(product.base_price)
 
@@ -47,7 +48,22 @@ export function computePrice(product: ProductDetail, config: Configuration, fall
     }
   }
 
-  const els = config.elements ?? []
+  const all = config.elements ?? []
+  // aree di stampa con tecnica: prezzo in base all'area, raggruppato per tecnica
+  const byTech = new Map<string, { n: number; amount: number }>()
+  for (const e of all) {
+    if (!e.technique) continue
+    const z = findZone(product.print_zones ?? [], e.zone, e.kitItemId)
+    const t = techniques.find((x) => x.code === e.technique)
+    if (!z || !t) continue
+    const cur = byTech.get(e.technique) ?? { n: 0, amount: 0 }
+    byTech.set(e.technique, { n: cur.n + 1, amount: cur.amount + elementPrice(e, z, t) })
+  }
+  for (const [code, v] of byTech) {
+    if (v.amount) lines.push({ label: `${TECHNIQUE_LABEL[code as keyof typeof TECHNIQUE_LABEL]} (${v.n} ${v.n === 1 ? 'area' : 'aree'})`, amount: round2(v.amount) })
+  }
+  // loghi e sponsor liberi delle versioni precedenti (senza tecnica)
+  const els = all.filter((e) => !e.technique)
   const logos = els.filter((e) => e.kind === 'logo').length
   const sponsors = els.filter((e) => e.kind === 'sponsor').length
   if (logos && Number(product.free_logo_price)) lines.push({ label: logos === 1 ? 'Logo aggiuntivo' : `${logos} loghi aggiuntivi`, amount: logos * Number(product.free_logo_price) })
@@ -56,6 +72,13 @@ export function computePrice(product: ProductDetail, config: Configuration, fall
   const allOver = config.allOver?.length ?? 0
   if (allOver && Number(product.all_over_price)) {
     lines.push({ label: allOver === 1 ? 'Grafica all-over' : `Grafica all-over (${allOver} capi del kit)`, amount: allOver * Number(product.all_over_price) })
+  }
+
+  // fasce su maniche o pantaloncino
+  for (const b of config.bands ?? []) {
+    const k = b.kitItemId ? product.kit_items.find((x) => x.id === b.kitItemId) : null
+    const p = Number(k ? k.band_price ?? 0 : product.band_price ?? 0)
+    if (p) lines.push({ label: `Fascia${k ? ` (${k.label})` : ''}`, amount: p })
   }
 
   const unit = round2(base + lines.reduce((s, l) => s + l.amount, 0))

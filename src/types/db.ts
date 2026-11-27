@@ -5,7 +5,7 @@ export type ProductType = 'simple' | 'kit'
 export type Availability = 'in_stock' | 'on_request' | 'out_of_stock'
 /** Fornitura: a magazzino (disponibilità immediata) o ordinato al fornitore al momento dell'ordine. */
 export type SupplyMode = 'immediate' | 'on_demand'
-export type ModelShape = 'tshirt' | 'longsleeve' | 'tank' | 'shorts' | 'polo' | 'hoodie' | 'track_jacket' | 'track_pants' | 'jacket'
+export type ModelShape = 'tshirt' | 'longsleeve' | 'tank' | 'shorts' | 'polo' | 'hoodie' | 'track_jacket' | 'track_pants' | 'jacket' | 'puffer'
 export type AreaSide = 'front' | 'back'
 export type AreaType = 'logo' | 'sponsor' | 'text' | 'number' | 'all_over'
 export type PaymentMethod = 'cash_on_delivery' | 'bank_transfer'
@@ -134,6 +134,10 @@ export interface KitItem {
   sort_order: number
   /** Grafica all-over consentita su questo componente (se attiva sul prodotto). */
   all_over_enabled?: boolean
+  /** Fascia sulle maniche o sul fondo gamba di questo componente. */
+  band_enabled?: boolean
+  band_height_cm?: number
+  band_price?: number
 }
 
 export interface CustomizationArea {
@@ -207,6 +211,10 @@ export interface Product {
   /** Grafica all-over scelta dal cliente (su tutto il capo, con sostituzioni per pezzo). */
   all_over_enabled?: boolean
   all_over_price?: number
+  /** Fascia su maniche o fondo gamba: attiva, altezza in cm, prezzo. */
+  band_enabled?: boolean
+  band_height_cm?: number
+  band_price?: number
   deleted_at: string | null
   created_at: string
   updated_at: string
@@ -221,6 +229,39 @@ export interface ProductDetail extends Product {
   customization_areas: CustomizationArea[]
   kit_items: KitItem[]
   price_tiers: PriceTier[]
+  /** Zone di stampa (area massima) definite dall'admin. */
+  print_zones?: PrintZoneRow[]
+}
+
+/** Tecnica di stampa con prezzo minimo e massimo (in base all'area della grafica o del testo). */
+export interface PrintTechnique {
+  code: import('./config').TechniqueCode
+  name: string
+  min_price: number
+  max_price: number
+  all_over_only: boolean
+  is_active: boolean
+  sort_order: number
+}
+
+/**
+ * Area di stampa massima di una zona: rettangolo in cm dal punto di riferimento del pezzo
+ * (angolo in alto a sinistra, x verso destra, y verso il basso).
+ */
+export interface PrintZoneRow {
+  id: string
+  product_id: string
+  kit_item_id: string | null
+  zone: import('./config').PrintZone
+  x_cm: number
+  y_cm: number
+  width_cm: number
+  height_cm: number
+  max_items: number
+  allow_graphic: boolean
+  allow_text: boolean
+  techniques: import('./config').TechniqueCode[]
+  sort_order: number
 }
 
 export interface OrderStatus {

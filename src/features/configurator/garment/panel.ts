@@ -41,6 +41,12 @@ export interface PanelSpec {
   highlightId?: string | null
   /** Grafica all-over del cliente: copre l'intero pannello, sotto loghi, nomi e numeri. */
   allOver?: CanvasImageSource | null
+  /** Fascia sul fondo (pantaloncini e pantaloni): immagine o colore pieno, altezza in unità della sagoma. */
+  hemBand?: { image: CanvasImageSource; height: number } | null
+  /** Metà sinistra e destra con grafica/colore propri (gambe del pantaloncino). */
+  allOverHalves?: { left: CanvasImageSource | null; right: CanvasImageSource | null } | null
+  /** Aree massime di stampa (guide), in unità della sagoma: centro e dimensioni. */
+  zoneRects?: { cx: number; cy: number; w: number; h: number }[]
   /** Loghi e sponsor liberi in unità della sagoma (centro, dimensioni, rotazione oraria in gradi). */
   elements?: { image: CanvasImageSource; cx: number; cy: number; w: number; h: number; rotation: number }[]
 }
@@ -169,6 +175,13 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
 
   // 1. Grafiche all-over: quella del cliente copre tutto il pannello, quelle in area riempiono l'area
   if (spec.allOver) drawImageFit(ctx, spec.allOver, 0, 0, w, h, 'cover')
+  if (spec.allOverHalves?.left) drawImageFit(ctx, spec.allOverHalves.left, 0, 0, w / 2, h, 'cover')
+  if (spec.allOverHalves?.right) drawImageFit(ctx, spec.allOverHalves.right, w / 2, 0, w / 2, h, 'cover')
+  // fascia sul fondo (gambe), ritagliata dalla sagoma
+  if (spec.hemBand && spec.hemBand.height > 0) {
+    const bandH = (spec.hemBand.height / (shape.bounds.maxY - shape.bounds.minY)) * h
+    drawImageFit(ctx, spec.hemBand.image, 0, h - bandH, w, bandH, 'cover')
+  }
   for (const l of sideLayers) {
     if (l.area.area_type === 'all_over' && l.image) drawImageFit(ctx, l.image, ...rect(l.area), 'cover')
   }
@@ -212,6 +225,17 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
 
   // 5. Ombreggiatura dei bordi (profondità nella vista piana)
   if (spec.edges !== false) strokeEdges(ctx, outline, shape, w, h)
+
+  // 6a. Aree massime di stampa del cliente (guide tratteggiate oro)
+  for (const r of spec.zoneRects ?? []) {
+    const [cx, cy] = toCanvas([r.cx, r.cy], shape.bounds, w, h)
+    const sx = w / (shape.bounds.maxX - shape.bounds.minX)
+    ctx.setLineDash([unit * 1, unit * 0.8])
+    ctx.lineWidth = unit * 0.4
+    ctx.strokeStyle = 'rgba(194,160,99,.85)'
+    ctx.strokeRect(cx - (r.w * sx) / 2, cy - (r.h * sx) / 2, r.w * sx, r.h * sx)
+    ctx.setLineDash([])
+  }
 
   // 6. Guide delle aree (solo in modifica)
   if (spec.guides) {

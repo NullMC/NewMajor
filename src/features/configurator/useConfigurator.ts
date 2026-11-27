@@ -1,15 +1,40 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AssetRef, AreaConfig, Configuration, PlacedElement, PrintZone, RosterEntry, TextStyle } from '@/types/config'
+import type { AssetRef, AreaConfig, BandConfig, Configuration, PlacedElement, PrintZone, RosterEntry, SectionKey, TextStyle } from '@/types/config'
 import { emptyConfiguration } from '@/types/config'
-import type { CustomizationArea, CustomizationAsset, ModelShape, ProductDetail, QualitySettings } from '@/types/db'
+import type { CustomizationArea, CustomizationAsset, ModelShape, PrintTechnique, PrintZoneRow, ProductDetail, QualitySettings } from '@/types/db'
 import { computePrice, configQuantity } from '@/lib/pricing'
-import { evaluateQuality, effectiveDpi, readImageInfo } from '@/lib/imageQuality'
+import { evaluateQuality, effectiveDpi, readImageInfo, type QualityReport } from '@/lib/imageQuality'
 import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
+import { centerIn, elementIssues, elementLabel, findZone, fitSize, heightOf, nextSlot, zoneBox, type ElementIssue } from '@/lib/printing'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
-import { canvasToBlob, drawPanel, ensureFonts, LIVE_PANEL_WIDTH, type PanelLayer } from './garment/panel'
-import { drawSleeve, drawSleevePreview, sleeveInfo, toSilhouette } from './garment/elements'
-import { elementDpi, elementHeightCm, placementIssue, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
+import { canvasToBlob, drawPanel, ensureFonts, isDark, LIVE_PANEL_WIDTH, type PanelLayer } from './garment/panel'
+import { drawSleeve, drawSleevePreview, silhouetteUnitsPerMm, sleeveInfo, toSilhouette, virtualPiece, withTextImages } from './garment/elements'
+import { elementDpi, elementHeightCm, SECTION_LABEL, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
+
+const solidCache = new Map<string, HTMLCanvasElement>()
+/** Immagine 1×1 di un colore pieno (colori per sezione, fasce colorate). */
+export function solidImage(color: string): HTMLCanvasElement {
+  let c = solidCache.get(color)
+  if (!c) {
+    c = document.createElement('canvas')
+    c.width = c.height = 4
+    const ctx = c.getContext('2d')
+    if (ctx) { ctx.fillStyle = color; ctx.fillRect(0, 0, 4, 4) }
+    solidCache.set(color, c)
+  }
+  return c
+}
+
+const ISSUE_TEXT: Record<ElementIssue, string> = {
+  no_zone: 'la zona non prevede aree di stampa',
+  outside: 'esce dall’area di stampa: spostala o riducila',
+  overlap: 'si sovrappone a un’altra area',
+  technique: 'tecnica non disponibile in questa zona',
+  category: 'questo tipo di contenuto non è ammesso in questa zona',
+  too_many: 'troppe aree in questa zona',
+  empty_text: 'scrivi il testo',
+}
 
 export const DEFAULT_BASE = '#F4F4F2'
 
@@ -45,7 +70,7 @@ export interface ValidationIssue { section: string; message: string }
 
 const kitKey = (kit: string | null | undefined) => kit ?? '_'
 /** Chiave immagine della grafica all-over: `ao:<componente>:main` o `ao:<componente>:<pezzo>`. */
-export const allOverKey = (kit: string | null | undefined, zone: PrintZone | 'main') => `ao:${kitKey(kit)}:${zone}`
+export const allOverKey = (kit: string | null | undefined, zone: SectionKey | 'main') => `ao:${kitKey(kit)}:${zone}`
 
 /** Tutti i file all-over della configurazione con la loro chiave immagine. */
 function allOverAssets(config: Configuration): [string, AssetRef][] {
@@ -65,7 +90,7 @@ function pieceCm(piece: ZonePiece) {
 
 export function useConfigurator(
   product: ProductDetail,
-  opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number; initialVariantId?: string | null; zones?: ZonePiece[] },
+  opts: { initial?: Configuration | null; userId: string | null; quality: QualitySettings; initialQuantity?: number; initialVariantId?: string | null; zones?: ZonePiece[]; techniques?: PrintTechnique[] },
 ) {
   const roster = usesRoster(product)
   const [config, setConfig] = useState<Configuration>(() => {
@@ -121,13 +146,21 @@ export function useConfigurator(
   // Caricamento immagini delle aree ------------------------------------------------
   const assetKey = Object.entries(config.areas)
     .map(([id, a]) => `${id}:${a.enabled ? a.asset?.path ?? a.asset?.localKey ?? '' : ''}`)
-    .concat((config.elements ?? []).map((e) => `el:${e.id}:${e.asset.path ?? e.asset.localKey ?? ''}`))
+    .concat((config.elements ?? []).map((e) => `el:${e.id}:${e.asset?.path ?? e.asset?.localKey ?? ''}`))
     .concat(allOverAssets(config).map(([k, a]) => `${k}:${a.path ?? a.localKey ?? ''}`))
+    .concat((config.bands ?? []).map((b) => `band:${b.kitItemId ?? '_'}:${b.asset?.path ?? b.asset?.localKey ?? ''}`))
     .join('|')
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const next: Record<string, HTMLImageElement> = {}
+      for (const b of config.bands ?? []) {
+        if (b.mode !== 'graphic' || !b.asset) continue
+        try {
+          const url = await assetDisplayUrl(b.asset)
+          if (url) next[`band:${b.kitItemId ?? '_'}`] = await loadImage(url)
+        } catch { /* immagine non disponibile */ }
+      }
       for (const [key, asset] of allOverAssets(config)) {
         try {
           const url = await assetDisplayUrl(asset)
@@ -142,6 +175,7 @@ export function useConfigurator(
         } catch { /* immagine non disponibile */ }
       }
       for (const e of config.elements ?? []) {
+        if (!e.asset) continue
         try {
           const url = await assetDisplayUrl(e.asset)
           if (url) next[`el:${e.id}`] = await loadImage(url)
@@ -152,23 +186,53 @@ export function useConfigurator(
     return () => { cancelled = true }
   }, [assetKey])
 
-  // Loghi e sponsor liberi ---------------------------------------------------------
+  // Aree di stampa del cliente ------------------------------------------------------
   const zones = opts.zones ?? []
+  const techniques = opts.techniques ?? []
   const elementKit = product.product_type === 'kit' ? activeKitItem : null
-  const freeMax = Number(product.free_elements_max ?? 0)
-  /** Zone consentite che hanno un pezzo nel cartamodello del componente visualizzato. */
-  const freeZones = useMemo(() => (product.free_zones ?? ['front', 'back', 'sleeve_left', 'sleeve_right'])
-    .filter((z) => zonePiece(zones, z, elementKit)) as PrintZone[], [product.free_zones, zones, elementKit])
-  const freeEnabled = freeMax > 0 && freeZones.length > 0
+  const shapeOf = useCallback((kit: string | null) =>
+    ((kit ? product.kit_items.find((k) => k.id === kit)?.model_shape : null) ?? product.model_shape) as ModelShape, [product])
+  /** Pezzo della zona: quello del cartamodello o, in mancanza, un pezzo indicativo dalla sagoma. */
+  const pieceFor = useCallback((zone: PrintZone, kit: string | null): ZonePiece =>
+    zonePiece(zones, zone, kit) ?? virtualPiece(shapeOf(kit), zone, kit), [zones, shapeOf])
+  /** Zone di stampa (area massima) del componente visualizzato. */
+  const printZones = useMemo(() => (product.print_zones ?? []).filter((z) => (z.kit_item_id ?? null) === elementKit), [product.print_zones, elementKit])
+  const printEnabled = printZones.length > 0
+  const allOverAllowedFor = useCallback((kit: string | null) =>
+    !!product.all_over_enabled && (!kit || product.kit_items.find((k) => k.id === kit)?.all_over_enabled !== false), [product])
+  /** Tecniche ammesse in una zona (la sublimazione solo dove è consentito l'all-over). */
+  const techniquesFor = useCallback((z: PrintZoneRow) => techniques.filter((t) =>
+    t.is_active && z.techniques.includes(t.code) && (!t.all_over_only || allOverAllowedFor(z.kit_item_id ?? null))), [techniques, allOverAllowedFor])
   const elements = config.elements ?? []
   const elementImages = useMemo(() => {
     const out: Record<string, CanvasImageSource> = {}
     for (const e of elements) if (images[`el:${e.id}`]) out[e.id] = images[`el:${e.id}`]
-    return out
+    return withTextImages(elements, out)
   }, [elements, images])
   const silhouetteElements = useCallback((side: 'front' | 'back', forShape: ModelShape, kit: string | null) =>
-    toSilhouette(forShape, side, elements.filter((e) => (e.kitItemId ?? null) === kit), zonePiece(zones, side, kit), elementImages),
-  [elements, zones, elementImages])
+    toSilhouette(forShape, side, elements.filter((e) => (e.kitItemId ?? null) === kit), pieceFor(side, kit), elementImages),
+  [elements, pieceFor, elementImages])
+
+  // Fasce su maniche o pantaloncino -------------------------------------------------
+  const bandSource = product.product_type === 'kit' ? kitItem : product
+  const bandEnabled = !!bandSource?.band_enabled
+  const bandHeightCm = Number(bandSource?.band_height_cm ?? 4)
+  const band = (config.bands ?? []).find((b) => (b.kitItemId ?? null) === elementKit) ?? null
+  const isBottom = (s: ModelShape) => s === 'shorts' || s === 'track_pants'
+  /** Fascia del componente indicato come immagine (colore pieno o grafica). */
+  const bandImage = useCallback((kit: string | null): CanvasImageSource | null => {
+    const b = (config.bands ?? []).find((x) => (x.kitItemId ?? null) === kit)
+    if (!b) return null
+    if (b.mode === 'color') return b.color ? solidImage(b.color) : null
+    return images[`band:${kit ?? '_'}`] ?? null
+  }, [config.bands, images])
+
+  /** Rettangoli delle aree massime di stampa del lato indicato, in unità della sagoma (guide). */
+  const zoneRectsFor = useCallback((side: 'front' | 'back') => printZones.filter((z) => z.zone === side).flatMap((z) => {
+    const w = Number(z.width_cm), h = Number(z.height_cm)
+    const pseudo: PlacedElement = { id: 'zone', kind: 'graphic', zone: side, kitItemId: elementKit, xCm: Number(z.x_cm) + w / 2, yCm: Number(z.y_cm) + h / 2, widthCm: w, heightCm: h, rotation: 0 }
+    return toSilhouette(shape, side, [pseudo], pieceFor(side, elementKit), { zone: solidImage('#000000') }).map((r) => ({ cx: r.cx, cy: r.cy, w: r.w, h: r.h }))
+  }), [printZones, elementKit, shape, pieceFor])
 
   // Grafica all-over ---------------------------------------------------------------
   // nei kit l'admin sceglie i componenti su cui è consentita (es. solo la maglia)
@@ -176,11 +240,25 @@ export function useConfigurator(
   const allOverKitCount = product.kit_items.filter((k) => k.all_over_enabled !== false).length
   const allOver = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === elementKit) ?? null
   /** Immagine all-over per un pezzo del componente indicato: la sostituzione, altrimenti la grafica del capo. */
-  const allOverImage = useCallback((kit: string | null, zone: PrintZone): CanvasImageSource | null => {
+  const allOverImage = useCallback((kit: string | null, zone: SectionKey): CanvasImageSource | null => {
     const ao = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === kit)
     if (!ao) return null
+    const color = ao.colors?.[zone]
+    if (color) return solidImage(color) // colore pieno al posto della grafica per questa sezione
     return (ao.overrides?.[zone] ? images[allOverKey(kit, zone)] : images[allOverKey(kit, 'main')]) ?? null
   }, [config.allOver, images])
+
+  /**
+   * Gambe del pantaloncino con grafica o colore diversi: metà sinistra e destra del pannello (viste
+   * dall'esterno). Davanti la metà sinistra è la gamba destra di chi indossa, dietro la sinistra.
+   */
+  const legHalves = useCallback((kit: string | null, side: 'front' | 'back') => {
+    const ao = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === kit)
+    if (!ao) return null
+    const pick = (leg: 'leg_left' | 'leg_right') => (ao.overrides?.[leg] || ao.colors?.[leg] ? allOverImage(kit, leg) : null)
+    const left = pick(side === 'front' ? 'leg_right' : 'leg_left'), right = pick(side === 'front' ? 'leg_left' : 'leg_right')
+    return left || right ? { left, right } : null
+  }, [config.allOver, allOverImage])
 
   // Ridisegno pannelli --------------------------------------------------------------
   const row = config.roster[Math.min(previewRow, Math.max(0, config.roster.length - 1))]
@@ -208,18 +286,23 @@ export function useConfigurator(
         // pannelli usati anche come texture 3D: senza ombreggiatura del contorno (la aggiunge la vista
         // piana) e con le guide solo sul lato inquadrato, così sui fianchi del modello, dove davanti e
         // dietro si fondono, non compaiono le guide dell'altro lato
-        const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, highlightId: highlightArea, edges: false }
-        drawPanel(frontCanvas, { ...common, side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), elements: silhouetteElements('front', shape, elementKit) }, LIVE_PANEL_WIDTH)
-        drawPanel(backCanvas, { ...common, side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), elements: silhouetteElements('back', shape, elementKit) }, LIVE_PANEL_WIDTH)
+        const hemBand = isBottom(shape) && bandImage(elementKit)
+          ? { image: bandImage(elementKit)!, height: bandHeightCm * 10 * silhouetteUnitsPerMm(shape) } : null
+        const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, highlightId: highlightArea, edges: false, hemBand }
+        const legs = (side: 'front' | 'back') => isBottom(shape) ? legHalves(elementKit, side) : null
+        drawPanel(frontCanvas, { ...common, side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), allOverHalves: legs('front'), elements: silhouetteElements('front', shape, elementKit), zoneRects: guides ? zoneRectsFor('front') : [] }, LIVE_PANEL_WIDTH)
+        drawPanel(backCanvas, { ...common, side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), allOverHalves: legs('back'), elements: silhouetteElements('back', shape, elementKit), zoneRects: guides ? zoneRectsFor('back') : [] }, LIVE_PANEL_WIDTH)
         for (const [zone, canvas] of [['sleeve_left', sleeveLeftCanvas], ['sleeve_right', sleeveRightCanvas]] as const) {
-          const piece = zonePiece(zones, zone, elementKit)
-          if (piece) drawSleeve(canvas, piece, elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages, allOverImage(elementKit, zone))
+          // maniche: pezzo del cartamodello o pezzo indicativo; fascia sul fondo manica (capi superiori)
+          const sleeveBand = !isBottom(shape) ? bandImage(elementKit) : null
+          drawSleeve(canvas, pieceFor(zone, elementKit), elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages,
+            allOverImage(elementKit, zone), sleeveBand ? { image: sleeveBand, heightMm: bandHeightCm * 10 } : null)
         }
         setVersion((v) => v + 1)
       })
     }, 16)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, view, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, zones, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage])
+  }, [areas, buildLayers, shape, baseColor, secondaryColor, config.textStyle, guides, view, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, pieceFor, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage, bandImage, bandHeightCm, zoneRectsFor, legHalves])
 
   // Azioni --------------------------------------------------------------------------
   const patch = useCallback((p: Partial<Configuration>) => setConfig((c) => ({ ...c, ...p })), [])
@@ -303,92 +386,198 @@ export function useConfigurator(
 
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
   const [elementUploading, setElementUploading] = useState(false)
-  const minW = Number(product.free_min_width_cm ?? 2), maxW = Number(product.free_max_width_cm ?? 40)
 
-  /** Qualità di un elemento alla sua larghezza di stampa attuale. */
-  const elementQuality = useCallback((e: Pick<PlacedElement, 'widthCm' | 'asset'>): AssetRef['quality'] => {
+  /** Qualità di un'area alla sua dimensione di stampa (i testi sono vettoriali). */
+  const elementQuality = useCallback((e: Pick<PlacedElement, 'widthCm' | 'asset' | 'kind'>): AssetRef['quality'] => {
+    if (e.kind === 'text' || !e.asset) return 'vector'
     const dpi = elementDpi(e)
     if (dpi == null) return 'vector'
     return dpi >= opts.quality.min_dpi ? 'ok' : dpi >= opts.quality.warn_dpi ? 'warn' : 'poor'
   }, [opts.quality])
 
+  /**
+   * Modifica un'area. Con le proporzioni bloccate (predefinito per le grafiche) larghezza e
+   * altezza cambiano insieme; cambiando dimensione la conferma sulla qualità va ripetuta.
+   */
   const updateElement = useCallback((id: string, p: Partial<PlacedElement>) => {
     setConfig((c) => ({ ...c, elements: (c.elements ?? []).map((e) => {
       if (e.id !== id) return e
       const next = { ...e, ...p }
-      if (p.widthCm != null) next.widthCm = Math.round(Math.min(maxW, Math.max(minW, p.widthCm)) * 10) / 10
-      // cambiando dimensione la qualità va riconfermata
-      if (p.widthCm != null && p.widthCm !== e.widthCm) next.asset = { ...next.asset, acknowledgedLowQuality: false }
+      const h0 = heightOf(e)
+      const lock = e.kind !== 'text' && e.lockRatio !== false
+      if (p.widthCm != null) {
+        next.widthCm = Math.max(0.5, Math.round(p.widthCm * 10) / 10)
+        if (lock && p.heightCm == null) next.heightCm = Math.max(0.5, Math.round(((h0 * next.widthCm) / e.widthCm) * 10) / 10)
+      }
+      if (p.heightCm != null) {
+        next.heightCm = Math.max(0.5, Math.round(p.heightCm * 10) / 10)
+        if (lock && p.widthCm == null) next.widthCm = Math.max(0.5, Math.round(((e.widthCm * next.heightCm) / h0) * 10) / 10)
+      }
+      if ((p.widthCm != null || p.heightCm != null) && next.asset && (next.widthCm !== e.widthCm || next.heightCm !== e.heightCm)) {
+        next.asset = { ...next.asset, acknowledgedLowQuality: false }
+      }
       return next
     }) }))
-  }, [minW, maxW])
+  }, [])
 
   const removeElement = useCallback((id: string) => {
     setConfig((c) => ({ ...c, elements: (c.elements ?? []).filter((e) => e.id !== id) }))
     setSelectedElement((s) => (s === id ? null : s))
   }, [])
 
-  /** Aggiunge un logo o uno sponsor da file caricato o dalla libreria. */
-  const addElement = useCallback(async (kind: PlacedElement['kind'], zone: PrintZone, source: { file: File } | { library: CustomizationAsset }) => {
-    if ((config.elements ?? []).length >= freeMax) return { error: `Puoi aggiungere al massimo ${freeMax} loghi e sponsor.` }
-    const widthCm = Math.min(maxW, Math.max(minW, kind === 'logo' ? 8 : 20))
-    let asset: AssetRef
-    if ('file' in source) {
-      setElementUploading(true)
-      try {
-        const info = await readImageInfo(source.file)
-        const ratio = info.width && info.height ? info.height / info.width : 1
-        const report = evaluateQuality(info, { print_width_cm: widthCm, print_height_cm: widthCm * ratio, area_type: kind }, opts.quality)
-        if (report.blocking) return { report }
-        const stored = await storeGraphic(source.file, opts.userId)
-        asset = {
-          ...stored, name: source.file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
-          isVector: info.isVector, effectiveDpi: report.effectiveDpi, metadataDpi: report.metadataDpi, quality: report.quality, acknowledgedLowQuality: false,
+  /** Centra un'area nell'area massima della sua zona, in orizzontale o in verticale. */
+  const centerElement = useCallback((id: string, axis: 'x' | 'y') => {
+    const e = (config.elements ?? []).find((x) => x.id === id)
+    const z = e ? findZone(product.print_zones ?? [], e.zone, e.kitItemId) : null
+    if (e && z) updateElement(id, centerIn(zoneBox(z), axis))
+  }, [config.elements, product.print_zones, updateElement])
+
+  /**
+   * Aggiunge un'area di stampa (grafica caricata o dalla libreria, oppure testo) nella zona
+   * indicata, accanto (asse orizzontale) o sotto (asse verticale) all'ultima, finché c'è spazio
+   * nell'area massima. La dimensione si adatta alle proporzioni della grafica.
+   */
+  const addElement = useCallback(async (
+    kind: 'graphic' | 'text', zone: PrintZone, axis: 'x' | 'y', source?: { file: File } | { library: CustomizationAsset },
+  ): Promise<{ error?: string; report?: QualityReport; element?: PlacedElement }> => {
+    const z = findZone(product.print_zones ?? [], zone, elementKit)
+    if (!z) return { error: 'Questa zona non prevede aree di stampa.' }
+    if (kind === 'text' && !z.allow_text) return { error: 'In questa zona non si possono inserire testi.' }
+    if (kind === 'graphic' && !z.allow_graphic) return { error: 'In questa zona non si possono inserire grafiche.' }
+    const existing = (config.elements ?? []).filter((e) => e.technique && e.zone === zone && (e.kitItemId ?? null) === elementKit)
+    if (existing.length >= z.max_items) return { error: `In questa zona puoi inserire al massimo ${z.max_items} ${z.max_items === 1 ? 'area' : 'aree'}.` }
+    const tech = techniquesFor(z)[0]
+    if (!tech) return { error: 'Nessuna tecnica di stampa disponibile per questa zona.' }
+    const zb = zoneBox(z)
+
+    let asset: AssetRef | undefined
+    let ratio = kind === 'text' ? 0.25 : 1
+    if (kind === 'graphic' && source) {
+      if ('file' in source) {
+        setElementUploading(true)
+        try {
+          const info = await readImageInfo(source.file)
+          ratio = info.width && info.height ? info.height / info.width : 1
+          const w0 = Math.min(10, zb.x2 - zb.x1)
+          const report = evaluateQuality(info, { print_width_cm: w0, print_height_cm: w0 * ratio, area_type: 'logo' }, opts.quality)
+          if (report.blocking) return { report }
+          const stored = await storeGraphic(source.file, opts.userId)
+          asset = {
+            ...stored, name: source.file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
+            isVector: info.isVector, effectiveDpi: report.effectiveDpi, metadataDpi: report.metadataDpi, quality: report.quality, acknowledgedLowQuality: false,
+          }
+        } finally {
+          setElementUploading(false)
         }
-      } finally {
-        setElementUploading(false)
-      }
-    } else {
-      const a = source.library
-      const isVector = a.storage_path.toLowerCase().endsWith('.svg') || !a.width
-      asset = {
-        bucket: PUBLIC_BUCKET, path: a.storage_path, libraryAssetId: a.id, name: a.name, mime: isVector ? 'image/svg+xml' : 'image/png',
-        width: a.width ?? 0, height: a.height ?? 0, sizeBytes: 0, isVector, effectiveDpi: null, metadataDpi: null, quality: isVector ? 'vector' : 'ok',
+      } else {
+        const a = source.library
+        const isVector = a.storage_path.toLowerCase().endsWith('.svg') || !a.width
+        ratio = a.width && a.height ? a.height / a.width : 1
+        asset = {
+          bucket: PUBLIC_BUCKET, path: a.storage_path, libraryAssetId: a.id, name: a.name, mime: isVector ? 'image/svg+xml' : 'image/png',
+          width: a.width ?? 0, height: a.height ?? 0, sizeBytes: 0, isVector, effectiveDpi: null, metadataDpi: null, quality: isVector ? 'vector' : 'ok',
+        }
       }
     }
+    // dimensione iniziale: 10 cm di larghezza (fino a 20 per i testi), ridotta per stare nell'area massima
+    const w0 = kind === 'text' ? Math.min(20, zb.x2 - zb.x1) : 10
+    const size = fitSize(w0, w0 * ratio, zb)
+    const slot = nextSlot(zb, existing, size.w, size.h, axis)
+    if (!slot) return { error: 'Non c’è più spazio nell’area di stampa: riduci o sposta le aree presenti.' }
     const el: PlacedElement = {
-      id: uid(), kind, zone, kitItemId: elementKit, asset, widthCm,
-      xCm: 0, yCm: zone === 'front' || zone === 'back' ? (kind === 'logo' ? 10 : 18) : 6, rotation: 0,
+      id: uid(), kind, zone, kitItemId: elementKit, xCm: slot.xCm, yCm: slot.yCm, widthCm: size.w, heightCm: size.h, rotation: 0,
+      technique: tech.code, lockRatio: kind === 'graphic',
+      ...(kind === 'graphic' ? { asset } : { text: 'Testo', font: 'block' as const, color: isDark(baseColor) ? '#FFFFFF' : '#111111' }),
     }
-    el.asset = { ...asset, quality: elementQuality(el), effectiveDpi: elementDpi(el) }
+    if (el.asset) el.asset = { ...el.asset, quality: elementQuality(el), effectiveDpi: elementDpi(el) }
     setConfig((c) => ({ ...c, elements: [...(c.elements ?? []), el] }))
     setSelectedElement(el.id)
     if (zone === 'front' || zone === 'back') setView(zone)
     return { element: el }
-  }, [config.elements, freeMax, minW, maxW, opts.quality, opts.userId, elementKit, elementQuality])
+  }, [product.print_zones, config.elements, elementKit, techniquesFor, opts.quality, opts.userId, baseColor, elementQuality])
+
+  /** Sostituisce la grafica di un'area mantenendo posizione e larghezza (altezza dalle nuove proporzioni). */
+  const replaceElementAsset = useCallback(async (id: string, file: File): Promise<{ error?: string; report?: QualityReport }> => {
+    const e = (config.elements ?? []).find((x) => x.id === id)
+    if (!e) return { error: 'Area non trovata.' }
+    setElementUploading(true)
+    try {
+      const info = await readImageInfo(file)
+      const ratio = info.width && info.height ? info.height / info.width : 1
+      const report = evaluateQuality(info, { print_width_cm: e.widthCm, print_height_cm: e.widthCm * ratio, area_type: 'logo' }, opts.quality)
+      if (report.blocking) return { report }
+      const stored = await storeGraphic(file, opts.userId)
+      const asset: AssetRef = {
+        ...stored, name: file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
+        isVector: info.isVector, effectiveDpi: report.effectiveDpi, metadataDpi: report.metadataDpi, quality: report.quality, acknowledgedLowQuality: false,
+      }
+      setConfig((c) => ({ ...c, elements: (c.elements ?? []).map((x) => (x.id === id ? { ...x, asset, heightCm: Math.round(x.widthCm * ratio * 10) / 10 } : x)) }))
+      return {}
+    } finally {
+      setElementUploading(false)
+    }
+  }, [config.elements, opts.quality, opts.userId])
+
+  // Fasce: azioni -------------------------------------------------------------------
+  const setBand = useCallback((next: Omit<BandConfig, 'kitItemId'> | null) => {
+    setConfig((c) => {
+      const rest = (c.bands ?? []).filter((b) => (b.kitItemId ?? null) !== elementKit)
+      return { ...c, bands: next ? [...rest, { ...next, kitItemId: elementKit }] : rest }
+    })
+  }, [elementKit])
+
+  const uploadBand = useCallback(async (file: File) => {
+    const info = await readImageInfo(file)
+    const report = evaluateQuality(info, { print_width_cm: 40, print_height_cm: bandHeightCm, area_type: 'all_over' }, opts.quality)
+    if (report.blocking) return report
+    const stored = await storeGraphic(file, opts.userId)
+    setBand({ mode: 'graphic', asset: {
+      ...stored, name: file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
+      isVector: info.isVector, effectiveDpi: report.effectiveDpi, metadataDpi: report.metadataDpi, quality: report.quality, acknowledgedLowQuality: true,
+    } })
+    return report
+  }, [bandHeightCm, opts.quality, opts.userId, setBand])
 
   // Grafica all-over: azioni e qualità -------------------------------------------------
-  const [allOverUploading, setAllOverUploading] = useState<PrintZone | 'main' | null>(null)
+  const [allOverUploading, setAllOverUploading] = useState<SectionKey | 'main' | null>(null)
   /** Pezzi del componente visualizzato (taglia di riferimento del cartamodello), se caricati. */
   const allOverPieces = useMemo(
-    () => (['front', 'back', 'sleeve_left', 'sleeve_right'] as PrintZone[]).map((z) => zonePiece(zones, z, elementKit)).filter((p): p is ZonePiece => !!p),
+    () => (['front', 'back', 'sleeve_left', 'sleeve_right', 'leg_left', 'leg_right'] as SectionKey[]).map((z) => zonePiece(zones, z, elementKit)).filter((p): p is ZonePiece => !!p),
     [zones, elementKit],
   )
-  /** Pezzi sostituibili: davanti e dietro sempre, le maniche solo se esiste il loro pezzo. */
-  const allOverZones = useMemo<PrintZone[]>(
-    () => ['front', 'back', ...(['sleeve_left', 'sleeve_right'] as PrintZone[]).filter((z) => allOverPieces.some((p) => p.zone === z))],
-    [allOverPieces],
+  /**
+   * Sezioni personalizzabili: per i capi superiori davanti e dietro sempre e le maniche se esiste il
+   * loro pezzo; per pantaloncini e pantaloni le due gambe.
+   */
+  const allOverZones = useMemo<SectionKey[]>(
+    () => isBottom(shape) ? ['leg_left', 'leg_right']
+      : ['front', 'back', ...(['sleeve_left', 'sleeve_right'] as SectionKey[]).filter((z) => allOverPieces.some((p) => p.zone === z))],
+    [allOverPieces, shape],
   )
 
+  /** Colore pieno al posto della grafica per una sezione (null lo toglie). */
+  const setAllOverColor = useCallback((zone: SectionKey, color: string | null) => {
+    setConfig((c) => {
+      const list = [...(c.allOver ?? [])]
+      const i = list.findIndex((x) => (x.kitItemId ?? null) === elementKit)
+      if (i < 0) return c
+      const colors = { ...(list[i].colors ?? {}) }
+      const overrides = { ...(list[i].overrides ?? {}) }
+      if (color) { colors[zone] = color; delete overrides[zone] } else delete colors[zone]
+      list[i] = { ...list[i], colors, overrides }
+      return { ...c, allOver: list }
+    })
+  }, [elementKit])
+
   /** DPI minimi della grafica sui pezzi che la usano; null se vettoriale o senza cartamodello. */
-  const allOverDpi = useCallback((asset: AssetRef, zone: PrintZone | 'main', overrides = allOver?.overrides): number | null => {
+  const allOverDpi = useCallback((asset: AssetRef, zone: SectionKey | 'main', overrides = allOver?.overrides): number | null => {
     if (asset.isVector || !asset.width || !asset.height) return null
     const target = zone === 'main' ? allOverPieces.filter((p) => !overrides?.[p.zone]) : allOverPieces.filter((p) => p.zone === zone)
     if (!target.length) return null
     return Math.min(...target.map((p) => { const c = pieceCm(p); return effectiveDpi(asset.width, asset.height, c.w, c.h, 1, 'cover') }))
   }, [allOverPieces, allOver])
 
-  const allOverQuality = useCallback((asset: AssetRef, zone: PrintZone | 'main'): { quality: AssetRef['quality']; dpi: number | null } => {
+  const allOverQuality = useCallback((asset: AssetRef, zone: SectionKey | 'main'): { quality: AssetRef['quality']; dpi: number | null } => {
     if (asset.isVector) return { quality: 'vector', dpi: null }
     const dpi = allOverDpi(asset, zone)
     if (dpi == null) return { quality: 'ok', dpi: null }
@@ -396,7 +585,7 @@ export function useConfigurator(
   }, [allOverDpi, opts.quality])
 
   /** Imposta o rimuove (asset null) la grafica del capo o la sostituzione di un pezzo, per il componente visualizzato. */
-  const setAllOverAsset = useCallback((zone: PrintZone | 'main', asset: AssetRef | null) => {
+  const setAllOverAsset = useCallback((zone: SectionKey | 'main', asset: AssetRef | null) => {
     setConfig((c) => {
       const list = [...(c.allOver ?? [])]
       const i = list.findIndex((x) => (x.kitItemId ?? null) === elementKit)
@@ -409,16 +598,16 @@ export function useConfigurator(
       }
       if (i < 0) return c
       const overrides = { ...(list[i].overrides ?? {}) }
-      if (asset) overrides[zone] = asset
-      else delete overrides[zone]
-      list[i] = { ...list[i], overrides }
+      const colors = { ...(list[i].colors ?? {}) }
+      if (asset) { overrides[zone] = asset; delete colors[zone] } else delete overrides[zone]
+      list[i] = { ...list[i], overrides, colors }
       return { ...c, allOver: list }
     })
     if (zone === 'front' || zone === 'back') setView(zone)
   }, [elementKit])
 
   /** Carica una grafica all-over (per il capo o per un pezzo) con controllo del file. */
-  const uploadAllOver = useCallback(async (zone: PrintZone | 'main', file: File) => {
+  const uploadAllOver = useCallback(async (zone: SectionKey | 'main', file: File) => {
     setAllOverUploading(zone)
     try {
       const info = await readImageInfo(file)
@@ -440,7 +629,7 @@ export function useConfigurator(
     }
   }, [allOverPieces, allOverQuality, opts.quality, opts.userId, setAllOverAsset])
 
-  const pickAllOverLibrary = useCallback((zone: PrintZone | 'main', a: CustomizationAsset) => {
+  const pickAllOverLibrary = useCallback((zone: SectionKey | 'main', a: CustomizationAsset) => {
     const isVector = a.storage_path.toLowerCase().endsWith('.svg') || !a.width
     const asset: AssetRef = {
       bucket: PUBLIC_BUCKET, path: a.storage_path, libraryAssetId: a.id, name: a.name, mime: isVector ? 'image/svg+xml' : 'image/png',
@@ -455,7 +644,7 @@ export function useConfigurator(
 
   // Derivati ------------------------------------------------------------------------
   const qty = roster ? configQuantity(config, 1) : quantity
-  const price = useMemo(() => computePrice(product, config, qty), [product, config, qty])
+  const price = useMemo(() => computePrice(product, config, qty, opts.techniques ?? []), [product, config, qty, opts.techniques])
 
   const qualityIssues = useMemo(() => {
     const out: { area: CustomizationArea; asset: AssetRef; quality: AssetRef['quality']; dpi: number | null }[] = []
@@ -494,16 +683,25 @@ export function useConfigurator(
       const label = `Grafica all-over${comp ? ` (${comp})` : ''}`
       for (const [zone, a] of [['main', ao.asset] as const, ...Object.entries(ao.overrides ?? {})]) {
         if (a && (a.quality === 'warn' || a.quality === 'poor') && !a.acknowledgedLowQuality) {
-          out.push({ section: 'allover', message: `${label}${zone === 'main' ? '' : `, ${ZONE_LABEL[zone as PrintZone].toLowerCase()}`}: conferma di aver preso visione della qualità della grafica.` })
+          out.push({ section: 'allover', message: `${label}${zone === 'main' ? '' : `, ${SECTION_LABEL[zone as SectionKey].toLowerCase()}`}: conferma di aver preso visione della qualità della grafica.` })
         }
       }
     }
-    for (const [i, e] of (config.elements ?? []).entries()) {
-      const label = `${e.kind === 'logo' ? 'Logo' : 'Sponsor'} ${i + 1} (${ZONE_LABEL[e.zone].toLowerCase()})`
-      const piece = zonePiece(opts.zones ?? [], e.zone, e.kitItemId ?? null)
-      if (piece && placementIssue(e, piece, 0) === 'outside') out.push({ section: 'elements', message: `${label}: esce dal pezzo, spostalo o riducilo.` })
+    const els = config.elements ?? []
+    for (const [i, e] of els.entries()) {
+      const comp = product.kit_items.find((k) => k.id === e.kitItemId)?.label
+      const label = `${elementLabel(e, i)} (${ZONE_LABEL[e.zone].toLowerCase()}${comp ? `, ${comp}` : ''})`
+      for (const issue of elementIssues(e, els, product.print_zones ?? [], opts.techniques ?? [], allOverAllowedFor(e.kitItemId ?? null))) {
+        out.push({ section: 'elements', message: `${label}: ${ISSUE_TEXT[issue]}.` })
+      }
       const q = elementQuality(e)
-      if ((q === 'warn' || q === 'poor') && !e.asset.acknowledgedLowQuality) out.push({ section: 'elements', message: `${label}: conferma di aver preso visione della qualità della grafica.` })
+      if ((q === 'warn' || q === 'poor') && e.asset && !e.asset.acknowledgedLowQuality) out.push({ section: 'elements', message: `${label}: conferma di aver preso visione della qualità della grafica.` })
+    }
+    for (const b of config.bands ?? []) {
+      if (b.mode === 'graphic' && !b.asset) {
+        const comp = product.kit_items.find((k) => k.id === b.kitItemId)?.label
+        out.push({ section: 'bands', message: `Fascia${comp ? ` (${comp})` : ''}: carica la grafica o scegli un colore.` })
+      }
     }
     if (roster) {
       if (!config.roster.length) out.push({ section: 'roster', message: 'Aggiungi almeno un capo.' })
@@ -528,27 +726,33 @@ export function useConfigurator(
       ? product.customization_areas.filter((a) => a.is_active && (a.kit_item_id ?? firstKitItem) === (firstKitItem))
       : product.customization_areas.filter((a) => a.is_active))
     const mainShape = (product.kit_items[0]?.model_shape ?? product.model_shape) as ModelShape
-    const common = { shape: mainShape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides: false }
+    const mainBottom = isBottom(mainShape)
+    const hem = mainBottom ? bandImage(product.product_type === 'kit' ? firstKitItem : null) : null
+    const common = {
+      shape: mainShape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides: false,
+      hemBand: hem ? { image: hem, height: Number((product.product_type === 'kit' ? product.kit_items[0] : product)?.band_height_cm ?? 4) * 10 * silhouetteUnitsPerMm(mainShape) } : null,
+    }
     const f = document.createElement('canvas')
     const b = document.createElement('canvas')
     const mainKit = product.product_type === 'kit' ? firstKitItem : null
-    drawPanel(f, { ...common, side: 'front', allOver: allOverImage(mainKit, 'front'), elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
-    drawPanel(b, { ...common, side: 'back', allOver: allOverImage(mainKit, 'back'), elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
+    drawPanel(f, { ...common, side: 'front', allOver: allOverImage(mainKit, 'front'), allOverHalves: mainBottom ? legHalves(mainKit, 'front') : null, elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
+    drawPanel(b, { ...common, side: 'back', allOver: allOverImage(mainKit, 'back'), allOverHalves: mainBottom ? legHalves(mainKit, 'back') : null, elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
     const out: Partial<Record<'front' | 'back' | 'sleeveLeft' | 'sleeveRight', Blob>> = {}
     const [front, back] = await Promise.all([canvasToBlob(f), canvasToBlob(b)])
     if (front) out.front = front
     if (back) out.back = back
-    // maniche: solo se hanno loghi, sponsor o grafica all-over (pezzo reale con colore di fondo)
+    // maniche: solo se hanno aree di stampa, grafica all-over o fascia (pezzo con colore di fondo)
+    const mainBand = !isBottom(mainShape) ? bandImage(mainKit) : null
     for (const [zone, key] of [['sleeve_left', 'sleeveLeft'], ['sleeve_right', 'sleeveRight']] as const) {
-      const piece = zonePiece(zones, zone, mainKit)
+      const piece = pieceFor(zone, mainKit)
       const els = elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === mainKit)
       const fill = allOverImage(mainKit, zone)
-      if (!piece || (!els.length && !fill)) continue
-      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor, fill))
+      if (!els.length && !fill && !mainBand) continue
+      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor, fill, mainBand ? { image: mainBand, heightMm: bandHeightCm * 10 } : null))
       if (blob) out[key] = blob
     }
     return out
-  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements, zones, elements, elementImages, allOverImage])
+  }, [buildLayers, product, firstKitItem, baseColor, secondaryColor, config.textStyle, silhouetteElements, pieceFor, elements, elementImages, allOverImage, bandImage, bandHeightCm, legHalves])
 
   return {
     product, config, setConfig, patch, setArea, toggleOption, uploadGraphic, pickLibraryAsset, setRoster, setTextStyle,
@@ -556,14 +760,16 @@ export function useConfigurator(
     kitItem, activeKitItem, setActiveKitItem, shape, areas, view, setView, previewRow, setPreviewRow,
     highlightArea, setHighlightArea, uploading, frontCanvas, backCanvas, version, guides, setGuides,
     baseColor, secondaryColor, renderPreviews,
-    zones, freeEnabled, freeZones, freeMax, elements, elementKit, selectedElement, setSelectedElement,
+    zones, elements, elementKit, selectedElement, setSelectedElement, pieceFor,
+    printZones, printEnabled, techniques, techniquesFor,
     sleeveCanvases: {
-      left: sleeveInfo(zonePiece(zones, 'sleeve_left', elementKit), sleeveLeftCanvas),
-      right: sleeveInfo(zonePiece(zones, 'sleeve_right', elementKit), sleeveRightCanvas),
+      left: sleeveInfo(pieceFor('sleeve_left', elementKit), sleeveLeftCanvas),
+      right: sleeveInfo(pieceFor('sleeve_right', elementKit), sleeveRightCanvas),
     },
-    addElement, updateElement, removeElement, elementQuality, elementUploading, elementHeightCm,
+    addElement, updateElement, removeElement, centerElement, replaceElementAsset, elementQuality, elementUploading, elementHeightCm,
+    bandEnabled, bandHeightCm, band, setBand, uploadBand, isBottomShape: isBottom(shape),
     allOverEnabled, allOverKitCount, allOver, allOverZones, allOverPieces, allOverUploading, allOverQuality,
-    setAllOverAsset, uploadAllOver, pickAllOverLibrary,
+    setAllOverAsset, setAllOverColor, uploadAllOver, pickAllOverLibrary,
   }
 }
 

@@ -4,10 +4,12 @@
 // larghezza all'orlo. Il file di produzione usa invece le misure esatte del pezzo.
 
 import type { ModelShape } from '@/types/db'
-import type { PlacedElement } from '@/types/config'
+import type { PlacedElement, PrintZone } from '@/types/config'
 import { anchorOf, elementCenterMm, elementHeightCm, type ZonePiece } from '@/lib/patterns/placement'
 import { bounds, type Vec } from '@/lib/patterns/geometry'
 import { getShape } from './shapes'
+import { MODEL_OUTLINES } from './outlines'
+import { drawFittedText } from './panel'
 
 /** Larghezza del poligono alla quota y (distanza tra la prima e l'ultima intersezione). */
 function widthAt(pts: Vec[] | [number, number][], y: number): number {
@@ -61,6 +63,63 @@ export function silhouetteFrame(shape: ModelShape, side: 'front' | 'back', piece
   return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck, bounds: sb }
 }
 
+/**
+ * Unità della sagoma per millimetro reale, per i capi senza cartamodello: dai modelli 3D
+ * (altezza reale indicativa, taglia M) o, per le sagome disegnate, dalla maglia di riferimento
+ * (sagoma alta 86,5 unità per 706 mm).
+ */
+export function silhouetteUnitsPerMm(shape: ModelShape): number {
+  const gen = (MODEL_OUTLINES as Partial<Record<ModelShape, { unitPerMm: number }>>)[shape]
+  return gen ? gen.unitPerMm * 100 : 86.5 / 706
+}
+
+/**
+ * Pezzo "virtuale" per i capi senza cartamodello: davanti e dietro hanno il contorno della
+ * sagoma convertito in mm attorno al centro collo, le maniche un rettangolo indicativo. Serve
+ * a posizionare le aree in cm e all'anteprima; il file di produzione richiede il cartamodello.
+ */
+export function virtualPiece(shape: ModelShape, zone: PrintZone, kitItemId: string | null): ZonePiece {
+  if (zone === 'sleeve_left' || zone === 'sleeve_right') {
+    const long = !['tshirt', 'polo', 'tank', 'shorts', 'track_pants'].includes(shape)
+    const h = long ? 600 : 250
+    return { kitItemId, zone, size: '—', name: 'Manica', outline: [[-190, 0], [190, 0], [190, -h], [-190, -h]], anchor: { x: 0, y: 0 }, virtual: true }
+  }
+  const s = getShape(shape)
+  const k = silhouetteUnitsPerMm(shape)
+  const outline = (zone === 'front' ? s.front : s.back) as [number, number][]
+  const neck = (zone === 'back' ? s.backNeckY : s.neckY) ?? neckY(outline)
+  return {
+    kitItemId, zone, size: '—', name: zone === 'front' ? 'Davanti' : 'Dietro',
+    outline: outline.map(([x, y]) => [x / k, (y - neck) / k] as Vec), anchor: { x: 0, y: 0 }, virtual: true,
+  }
+}
+
+const textCache = new Map<string, HTMLCanvasElement>()
+
+/** Immagine di un testo (canvas trasparente nelle proporzioni dell'area), per anteprime e 3D. */
+export function textImage(el: Pick<PlacedElement, 'text' | 'font' | 'color' | 'widthCm' | 'heightCm'>): HTMLCanvasElement {
+  const w = Math.max(1, el.widthCm), h = Math.max(0.5, el.heightCm ?? el.widthCm / 4)
+  const px = 40 // pixel per cm
+  const key = `${el.text}|${el.font}|${el.color}|${w}|${h}`
+  const hit = textCache.get(key)
+  if (hit) return hit
+  const c = document.createElement('canvas')
+  c.width = Math.round(w * px)
+  c.height = Math.round(h * px)
+  const ctx = c.getContext('2d')
+  if (ctx) drawFittedText(ctx, (el.text ?? '').toUpperCase(), 0, 0, c.width, c.height, { color: el.color || '#FFFFFF', outline: null, font: el.font ?? 'block' }, 'text')
+  if (textCache.size > 200) textCache.clear()
+  textCache.set(key, c)
+  return c
+}
+
+/** Immagini per tutte le aree: le grafiche caricate e i testi disegnati. */
+export function withTextImages(elements: PlacedElement[], images: Record<string, CanvasImageSource>): Record<string, CanvasImageSource> {
+  const out = { ...images }
+  for (const e of elements) if (e.kind === 'text' && e.text?.trim()) out[e.id] = textImage(e)
+  return out
+}
+
 /** Elementi di davanti/dietro convertiti in unità della sagoma per il pannello indicato. */
 export function toSilhouette(
   shape: ModelShape,
@@ -70,7 +129,10 @@ export function toSilhouette(
   images: Record<string, CanvasImageSource>,
 ): SilhouetteElement[] {
   if (!piece) return []
-  const { k, neck: n } = silhouetteFrame(shape, side, piece)
+  const frame = piece.virtual ? null : silhouetteFrame(shape, side, piece)
+  const k = frame ? frame.k : silhouetteUnitsPerMm(shape)
+  const s = getShape(shape)
+  const n = frame ? frame.neck : ((side === 'back' ? s.backNeckY : s.neckY) ?? neckY((side === 'front' ? s.front : s.back) as [number, number][]))
   if (!k) return []
   const [ax, ay] = anchorOf(piece)
   return elements
@@ -98,6 +160,7 @@ function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource, w: num
 export function drawSleeve(
   canvas: HTMLCanvasElement, piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>,
   fill?: CanvasImageSource | null,
+  band?: { image: CanvasImageSource; heightMm: number } | null,
 ) {
   const b = bounds(piece.outline)
   const w = Math.max(1, Math.round(b.width * SLEEVE_PX_PER_MM)), h = Math.max(1, Math.round(b.height * SLEEVE_PX_PER_MM))
@@ -106,7 +169,7 @@ export function drawSleeve(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, w, h)
-  if (fill) {
+  if (fill || band) {
     ctx.save()
     ctx.beginPath()
     piece.outline.forEach(([x, y], i) => {
@@ -116,7 +179,15 @@ export function drawSleeve(
     })
     ctx.closePath()
     ctx.clip()
-    drawCover(ctx, fill, w, h)
+    if (fill) drawCover(ctx, fill, w, h)
+    // fascia sul fondo della manica (polsino), alta band.heightMm
+    if (band) {
+      const bh = Math.min(h, band.heightMm * SLEEVE_PX_PER_MM)
+      ctx.save()
+      ctx.translate(0, h - bh)
+      drawCover(ctx, band.image, w, bh)
+      ctx.restore()
+    }
     ctx.restore()
   }
   for (const e of elements) {
@@ -143,9 +214,10 @@ export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement) {
 export function drawSleevePreview(
   piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>, baseColor: string,
   fill?: CanvasImageSource | null,
+  band?: { image: CanvasImageSource; heightMm: number } | null,
 ) {
   const elCanvas = document.createElement('canvas')
-  drawSleeve(elCanvas, piece, elements, images, fill)
+  drawSleeve(elCanvas, piece, elements, images, fill, band)
   const b = bounds(piece.outline)
   const pad = 40
   const c = document.createElement('canvas')

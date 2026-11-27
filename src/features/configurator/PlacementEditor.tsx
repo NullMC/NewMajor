@@ -1,7 +1,8 @@
-// Editor di posizionamento dei loghi e sponsor liberi sul pezzo reale (taglia di riferimento).
-// Coordinate in millimetri del cartamodello: trascina per spostare, maniglia d'angolo per
-// ridimensionare (proporzioni bloccate), maniglia superiore per ruotare. Tastiera: frecce per
-// spostare (Maiusc = 1 cm), + e − per la dimensione, [ e ] per ruotare, Canc per eliminare.
+// Editor di posizionamento delle aree di stampa sul pezzo (cartamodello della taglia di
+// riferimento o pezzo indicativo dalla sagoma). Coordinate in millimetri: trascina per spostare,
+// maniglia d'angolo per ridimensionare, maniglia superiore per ruotare. Il rettangolo oro è
+// l'area massima di stampa della zona. Tastiera: frecce per spostare (Maiusc = 1 cm), + e − per
+// la dimensione, [ e ] per ruotare, Canc per eliminare.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { RotateCw } from 'lucide-react'
@@ -9,6 +10,8 @@ import type { PlacedElement, PrintZone } from '@/types/config'
 import { cn } from '@/lib/cn'
 import { bounds, outlinePath, round } from '@/lib/patterns/geometry'
 import { anchorOf, elementCenterMm, elementHeightCm, placementIssue, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
+import { elementIssues, findZone, zoneBox } from '@/lib/printing'
+import { textImage } from './garment/elements'
 import { assetDisplayUrl } from '@/features/cart/assets'
 import type { ConfiguratorApi } from './useConfigurator'
 
@@ -16,10 +19,10 @@ const fmt = (v: number) => String(round(v, 1)).replace('.', ',')
 
 function useAssetUrls(elements: PlacedElement[]) {
   const [urls, setUrls] = useState<Record<string, string>>({})
-  const key = elements.map((e) => `${e.id}:${e.asset.path ?? e.asset.localKey}`).join('|')
+  const key = elements.map((e) => `${e.id}:${e.asset?.path ?? e.asset?.localKey ?? ''}`).join('|')
   useEffect(() => {
     let alive = true
-    void Promise.all(elements.map(async (e) => [e.id, await assetDisplayUrl(e.asset)] as const)).then((pairs) => {
+    void Promise.all(elements.filter((e) => e.asset).map(async (e) => [e.id, await assetDisplayUrl(e.asset!)] as const)).then((pairs) => {
       if (alive) setUrls(Object.fromEntries(pairs.filter(([, u]) => u)) as Record<string, string>)
     })
     return () => { alive = false }
@@ -34,7 +37,10 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
   const drag = useRef<Drag | null>(null)
   const [snapX, setSnapX] = useState(false)
   const els = api.elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === api.elementKit)
-  const urls = useAssetUrls(els)
+  const assetUrls = useAssetUrls(els)
+  const urls: Record<string, string> = { ...assetUrls }
+  for (const e of els) if (e.kind === 'text' && e.text?.trim()) urls[e.id] = textImage(e).toDataURL()
+  const zoneRow = findZone(api.product.print_zones ?? [], zone, api.elementKit)
   const b = bounds(piece.outline)
   const pad = Math.max(b.width, b.height) * 0.05
   const [ax, ay] = anchorOf(piece)
@@ -73,7 +79,8 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
     } else if (d.mode === 'resize') {
       const r0 = Math.hypot(d.startX - d.cx, d.startY - d.cy) || 1
       const r1 = Math.hypot(p.x - d.cx, p.y - d.cy)
-      api.updateElement(d.id, { widthCm: d.el.widthCm * (r1 / r0) })
+      const k = r1 / r0
+      api.updateElement(d.id, { widthCm: d.el.widthCm * k, heightCm: elementHeightCm(d.el) * k })
     } else {
       // angolo orario rispetto alla verticale verso l'alto
       const ang = (Math.atan2(p.x - d.cx, p.y - d.cy) * 180) / Math.PI
@@ -90,7 +97,7 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
     const map: Record<string, Partial<PlacedElement>> = {
       ArrowLeft: { xCm: round(sel.xCm - step, 1) }, ArrowRight: { xCm: round(sel.xCm + step, 1) },
       ArrowUp: { yCm: round(sel.yCm - step, 1) }, ArrowDown: { yCm: round(sel.yCm + step, 1) },
-      '+': { widthCm: sel.widthCm + 0.5 }, '=': { widthCm: sel.widthCm + 0.5 }, '-': { widthCm: sel.widthCm - 0.5 },
+      '+': { widthCm: sel.widthCm + 0.5 }, '=': { widthCm: sel.widthCm + 0.5 }, '-': { widthCm: Math.max(0.5, sel.widthCm - 0.5) },
       ']': { rotation: ((sel.rotation + 5 + 540) % 360) - 180 }, '[': { rotation: ((sel.rotation - 5 + 540) % 360) - 180 },
     }
     if (map[e.key]) { e.preventDefault(); api.updateElement(sel.id, map[e.key]) }
@@ -99,7 +106,9 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
   }
 
   const handle = Math.max(b.width, b.height) * 0.022
-  const issue = sel ? placementIssue(sel, piece) : null
+  // fuori dall'area massima o sovrapposta (bloccante); vicino alla cucitura solo sui pezzi reali
+  const selIssues = sel ? elementIssues(sel, api.elements, api.product.print_zones ?? [], api.techniques, true) : []
+  const issue = selIssues.includes('outside') || selIssues.includes('overlap') ? 'outside' : sel && !piece.virtual ? placementIssue(sel, piece) : null
 
   return (
     <div className="flex h-full flex-col">
@@ -126,6 +135,11 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
           {/* asse centrale e punto di riferimento */}
           <line x1={sax} y1={-pad} x2={sax} y2={b.height + pad} className={snapX ? 'stroke-gold-500' : 'stroke-ink-900/25'} strokeWidth={snapX ? 2 : 1} strokeDasharray="6 5" vectorEffect="non-scaling-stroke" />
           <circle cx={sax} cy={say} r={handle * 0.45} className="fill-gold-500" />
+          {zoneRow && (() => {
+            const zb = zoneBox(zoneRow)
+            const [zx, zy] = toSvg(ax + zb.x1 * 10, ay - zb.y1 * 10)
+            return <rect x={zx} y={zy} width={(zb.x2 - zb.x1) * 10} height={(zb.y2 - zb.y1) * 10} fill="rgba(194,160,99,.08)" className="stroke-gold-500" strokeWidth={1.5} strokeDasharray="8 6" vectorEffect="non-scaling-stroke" />
+          })()}
           <g clipPath={`url(#clip-${zone})`}>
             {els.map((el) => {
               const [cx, cy] = elementCenterMm(el, piece)
@@ -166,12 +180,12 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
             </span>
             {issue && (
               <span className={cn('font-semibold', issue === 'outside' ? 'text-danger-600' : 'text-warning-700')}>
-                {issue === 'outside' ? 'Esce dal pezzo' : 'Vicino alla cucitura'}
+                {issue === 'outside' ? (selIssues.includes('overlap') ? 'Si sovrappone a un’altra area' : 'Fuori dall’area di stampa') : 'Vicino alla cucitura'}
               </span>
             )}
           </>
         ) : (
-          <span className="flex items-center gap-1.5"><RotateCw className="h-3.5 w-3.5" aria-hidden />Seleziona un elemento per spostarlo, ridimensionarlo o ruotarlo.</span>
+          <span className="flex items-center gap-1.5"><RotateCw className="h-3.5 w-3.5" aria-hidden />Seleziona un’area per spostarla, ridimensionarla o ruotarla. Il riquadro oro è l’area di stampa.</span>
         )}
       </div>
     </div>

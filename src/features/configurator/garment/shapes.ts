@@ -160,5 +160,6 @@ export const SHAPE_LABEL: Record<ModelShape, string> = {
   hoodie: 'Felpa con cappuccio',
   track_jacket: 'Giacca tuta',
   track_pants: 'Pantalone tuta',
-  jacket: 'Giubbotto',
+  jacket: 'Giubbotto con cappuccio',
+  puffer: 'Piumino con cappuccio',
 }
