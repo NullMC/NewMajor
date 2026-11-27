@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Download, ImageOff, Landmark, Copy } from 'lucide-react'
 import type { AddressSnapshot, Order, OrderItem, OrderStatus, ProductDetail, BankTransferSettings } from '@/types/db'
-import type { Configuration } from '@/types/config'
+import type { Configuration, TechniqueCode } from '@/types/config'
+import { TECHNIQUE_LABEL } from '@/lib/printing'
 import { cn } from '@/lib/cn'
 import { formatPrice, PAYMENT_STATUS_LABEL } from '@/lib/format'
 import { downloadUrl, signedUrl, UPLOADS_BUCKET } from '@/lib/storage'
@@ -117,12 +118,36 @@ function Row({ label, value, onCopy, mono }: { label: string; value: string; onC
 
 /** Zona e, per loghi/sponsor liberi, misure e posizione in cm. */
 function placementText(side: string | null, m: Record<string, unknown>) {
-  const zones: Record<string, string> = { front: 'Fronte', back: 'Retro', sleeve_left: 'Manica sinistra', sleeve_right: 'Manica destra' }
+  const zones: Record<string, string> = {
+    front: 'Fronte', back: 'Retro', sleeve_left: 'Manica sinistra', sleeve_right: 'Manica destra', leg_left: 'Gamba sinistra', leg_right: 'Gamba destra',
+  }
+  if (m.band) return m.mode === 'color' ? 'Fascia in colore' : 'Fascia con grafica'
   const zone = (m.zone as string) ?? side ?? 'front'
-  if (!m.free) return zones[zone] ?? zone
-  const x = Number(m.xCm), y = Number(m.yCm)
   const fmt = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',')
-  return `${zones[zone] ?? zone} · ${fmt(Number(m.widthCm))} cm di larghezza · ${x === 0 ? 'centrato' : `${fmt(Math.abs(x))} cm a ${x > 0 ? 'destra' : 'sinistra'}`} · ${fmt(y)} cm ${zone.startsWith('sleeve') ? 'dalla spalla' : 'sotto il collo'}${Number(m.rotation) ? ` · ${m.rotation}°` : ''}`
+  const technique = m.technique ? TECHNIQUE_LABEL[m.technique as TechniqueCode] ?? String(m.technique) : null
+  if (!m.free) {
+    // aree libere degli ordini manuali: tecnica e misure se indicate
+    const size = m.widthCm && m.heightCm ? `${fmt(Number(m.widthCm))} × ${fmt(Number(m.heightCm))} cm` : null
+    return [zones[zone] ?? zone, technique, size].filter(Boolean).join(' · ')
+  }
+  const x = Number(m.xCm), y = Number(m.yCm)
+  const size = m.heightCm ? `${fmt(Number(m.widthCm))} × ${fmt(Number(m.heightCm))} cm` : `${fmt(Number(m.widthCm))} cm di larghezza`
+  return `${zones[zone] ?? zone}${technique ? ` · ${technique}` : ''} · ${size} · ${x === 0 ? 'centrato' : `${fmt(Math.abs(x))} cm a ${x > 0 ? 'destra' : 'sinistra'}`} · ${fmt(y)} cm ${zone.startsWith('sleeve') ? 'dalla spalla' : zone === 'back' ? 'sotto il collo (dietro)' : 'sotto il collo'}${Number(m.rotation) ? ` · ${m.rotation}°` : ''}`
+}
+
+/** Aree di stampa raggruppate per tecnica, con il prezzo a capo. */
+function techniqueSummary(rows: NonNullable<OrderItem['order_item_customizations']>) {
+  const out = new Map<string, { count: number; price: number; priced: boolean }>()
+  for (const c of rows) {
+    const m = c.asset_meta as { technique?: string; price?: number }
+    if (!m.technique) continue
+    const k = TECHNIQUE_LABEL[m.technique as TechniqueCode] ?? m.technique
+    const g = out.get(k) ?? { count: 0, price: 0, priced: false }
+    g.count++
+    if (typeof m.price === 'number') { g.price += m.price; g.priced = true }
+    out.set(k, g)
+  }
+  return [...out]
 }
 
 // Anteprime -----------------------------------------------------------------------
@@ -204,6 +229,11 @@ export function OrderItemDetails({ item, showFiles = false, actions }: { item: O
           <ul className="mt-2 divide-y divide-ink-100 rounded-xl border border-ink-200">
             {customizations.map((c) => <CustomizationRow key={c.id} c={c} showFiles={showFiles} />)}
           </ul>
+          {techniqueSummary(customizations).length > 0 && (
+            <p className="mt-2 text-xs text-ink-500">
+              {techniqueSummary(customizations).map(([k, g]) => `${k}: ${g.count} ${g.count === 1 ? 'area' : 'aree'}${g.priced ? ` (${formatPrice(g.price)} a capo)` : ''}`).join(' · ')}
+            </p>
+          )}
         </div>
       )}
       {roster.length > 0 && (
@@ -238,7 +268,10 @@ function CustomizationRow({ c, showFiles }: { c: NonNullable<OrderItem['order_it
   useEffect(() => {
     if (c.asset_path && c.asset_bucket) void signedUrl(c.asset_bucket, c.asset_path).then(setThumb)
   }, [c.asset_path, c.asset_bucket])
-  const meta = c.asset_meta as { name?: string; width?: number; height?: number; effectiveDpi?: number | null; quality?: string; acknowledgedLowQuality?: boolean; isVector?: boolean }
+  const meta = c.asset_meta as {
+    name?: string; width?: number; height?: number; effectiveDpi?: number | null; quality?: string; acknowledgedLowQuality?: boolean; isVector?: boolean
+    text?: string; font?: string; color?: string; price?: number
+  }
   const download = async () => {
     if (!c.asset_path) return
     const url = await downloadUrl(c.asset_bucket ?? UPLOADS_BUCKET, c.asset_path)
@@ -250,6 +283,8 @@ function CustomizationRow({ c, showFiles }: { c: NonNullable<OrderItem['order_it
         <div className="checker flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-ink-200">
           {thumb && <img src={thumb} alt="" className="max-h-full max-w-full object-contain" />}
         </div>
+      ) : meta.color && !meta.text ? (
+        <span className="h-12 w-12 shrink-0 rounded-lg border border-ink-200" style={{ backgroundColor: meta.color }} aria-hidden />
       ) : null}
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-medium">{c.area_name} <span className="font-normal text-ink-500">· {placementText(c.side, c.asset_meta as Record<string, unknown>)}</span></p>
@@ -259,11 +294,19 @@ function CustomizationRow({ c, showFiles }: { c: NonNullable<OrderItem['order_it
             {meta.effectiveDpi ? ` · ≈${meta.effectiveDpi} dpi` : ''}
           </p>
         )}
+        {meta.text && (
+          <p className="flex items-center gap-1.5 text-xs text-ink-600">
+            “{meta.text}”{meta.font ? ` · carattere ${meta.font}` : ''}
+            {meta.color && <><span className="h-3 w-3 rounded-full border border-ink-200" style={{ backgroundColor: meta.color }} aria-hidden /> {meta.color}</>}
+          </p>
+        )}
+        {meta.color && !meta.text && <p className="text-xs text-ink-500">Colore {meta.color}</p>}
         {(meta.quality === 'warn' || meta.quality === 'poor') && (
           <p className="text-xs font-medium text-warning-700">Qualità {meta.quality === 'poor' ? 'insufficiente' : 'limitata'}{meta.acknowledgedLowQuality ? ' — accettata dal cliente' : ''}</p>
         )}
         {typeof (c.asset_meta as { note?: string }).note === 'string' && <p className="text-xs text-ink-500">{(c.asset_meta as { note?: string }).note}</p>}
       </div>
+      {typeof meta.price === 'number' && <span className="shrink-0 text-sm text-ink-600">{formatPrice(meta.price)}</span>}
       {showFiles && c.asset_path && (
         <button type="button" onClick={download} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink-200 px-3 text-xs font-semibold hover:border-ink-900">
           <Download className="h-3.5 w-3.5" /> Originale
