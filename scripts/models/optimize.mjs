@@ -1,7 +1,7 @@
 // Prepara un modello 3D di capo per il web: niente texture (la grafica viene proiettata dal
 // configuratore), trasformazioni dei nodi applicate, centrato e scalato ad altezza 1,
 // semplificato e compresso con meshopt. Il fronte del capo deve guardare verso +z.
-// Uso: node optimize.mjs <input.glb> <output.glb> [ratio] ["nota licenza"]  (SIMPLIFY_ERROR=0.004 per semplificare di più)
+// Uso: node optimize.mjs <input.glb> <output.glb> [ratio] ["nota licenza"]  (SIMPLIFY_ERROR=0.004 per semplificare di più, KEEP_UV=1 per le UV dei pezzi)
 // Dipendenze (fuori dal progetto, in una cartella di lavoro):
 //   npm i @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions meshoptimizer gl-matrix
 import { NodeIO } from '@gltf-transform/core'
@@ -24,7 +24,9 @@ for (const t of root.listTextures()) t.dispose()
 const mat = doc.createMaterial('Fabric').setBaseColorFactor([1, 1, 1, 1]).setRoughnessFactor(0.85).setMetallicFactor(0).setDoubleSided(true)
 for (const mesh of root.listMeshes()) for (const p of mesh.listPrimitives()) {
   p.setMaterial(mat)
-  for (const name of p.listSemantics()) if (name !== 'POSITION' && name !== 'NORMAL') p.setAttribute(name, null)
+  // KEEP_UV=1: conserva le UV dei pezzi (modelli preparati con piece_uv.mjs)
+  const keep = ['POSITION', 'NORMAL', ...(process.env.KEEP_UV ? ['TEXCOORD_0'] : [])]
+  for (const name of p.listSemantics()) if (!keep.includes(name)) p.setAttribute(name, null)
 }
 for (const m of root.listMaterials()) if (m !== mat) m.dispose()
 for (const ext of root.listExtensionsUsed()) if (!['EXT_meshopt_compression', 'KHR_mesh_quantization'].includes(ext.extensionName)) ext.dispose()
@@ -59,7 +61,7 @@ await doc.transform(
   dedup(),
   weld(),
   simplify({ simplifier: MeshoptSimplifier, ratio, error: Number(process.env.SIMPLIFY_ERROR ?? 0.0008) }),
-  prune(),
+  prune({ keepAttributes: !!process.env.KEEP_UV }), // le UV senza texture verrebbero tolte
   quantize(),
 )
 doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE })
