@@ -22,8 +22,9 @@ import { adminGetProduct, adminListProducts, isFeatured } from './api'
 import { ProductImages } from './ProductImages'
 import { AreaCanvasEditor } from './AreaCanvasEditor'
 import { PatternsTab } from './patterns/PatternsTab'
+import { PrintZonesTab } from './PrintZonesTab'
 
-type TabKey = 'general' | 'images' | 'configurator' | 'areas' | 'kit' | 'patterns' | 'pricing' | 'related'
+type TabKey = 'general' | 'images' | 'configurator' | 'areas' | 'kit' | 'print' | 'patterns' | 'pricing' | 'related'
 
 const SHAPES = Object.entries(SHAPE_LABEL).map(([value, label]) => ({ value, label }))
 const AREA_TYPES = [
@@ -145,6 +146,7 @@ export default function ProductEditPage() {
       { value: 'configurator' as const, label: 'Tipologie, colori, opzioni' },
       { value: 'areas' as const, label: 'Aree personalizzazione', count: p?.customization_areas.length },
       ...(isKit ? [{ value: 'kit' as const, label: 'Componenti kit', count: p?.kit_items.length }] : []),
+      { value: 'print' as const, label: 'Aree di stampa', count: p?.print_zones?.length },
       { value: 'patterns' as const, label: 'Cartamodelli' },
       { value: 'pricing' as const, label: 'Sconti quantità' },
       { value: 'related' as const, label: 'Correlati' },
@@ -178,7 +180,8 @@ export default function ProductEditPage() {
         </Card>
       )}
 
-      {tab === 'patterns' && p && <PatternsTab product={p} onProductChanged={refresh} />}
+      {tab === 'patterns' && p && <PatternsTab product={p} />}
+      {tab === 'print' && p && <PrintZonesTab product={p} onChanged={refresh} />}
 
       {tab === 'images' && p && <ProductImages productId={p.id} images={p.product_images ?? []} variants={p.product_variants ?? []} onChanged={refresh} />}
 

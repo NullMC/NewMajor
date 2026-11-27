@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Download, FileUp, Pencil, Trash2 } from 'l
 import type { ProductDetail } from '@/types/db'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
-import { autoAnchor, bounds, mirrorX, normalizeOrigin, PIECE_LABEL, round, type PieceKind } from '@/lib/patterns/geometry'
+import { bounds, defaultAnchor, mirrorX, normalizeOrigin, PIECE_LABEL, round, type PieceAnchor, type PieceKind } from '@/lib/patterns/geometry'
 import { parseDxf, type ImportedPiece, type SourceUnit } from '@/lib/patterns/dxf'
 import { parseSvg } from '@/lib/patterns/svg'
 import { useQuery } from '@/hooks/useQuery'
@@ -20,14 +20,13 @@ import {
   type NewPiece, type PatternPiece, type PatternSet,
 } from './api'
 import { PieceShape } from './PieceShape'
-import { AllOverSettings, FreeElementsSettings } from './FreeElementsSettings'
 
 const KINDS = Object.keys(PIECE_LABEL) as PieceKind[]
 const cm = (mm: number) => `${round(mm / 10, 1)}`.replace('.', ',')
 
 interface Target { kitItemId: string | null; label: string; sizes: string[] }
 
-export function PatternsTab({ product, onProductChanged }: { product: ProductDetail; onProductChanged: () => void }) {
+export function PatternsTab({ product }: { product: ProductDetail }) {
   const targets: Target[] = useMemo(() => (
     product.product_type === 'kit' && product.kit_items.length
       ? product.kit_items.map((k) => ({ kitItemId: k.id, label: k.label, sizes: k.sizes.length ? k.sizes : product.sizes }))
@@ -68,8 +67,6 @@ export function PatternsTab({ product, onProductChanged }: { product: ProductDet
         />
       )}
 
-      <FreeElementsSettings key={product.id} product={product} onSaved={onProductChanged} />
-      <AllOverSettings key={`ao-${product.id}`} product={product} onSaved={onProductChanged} />
     </div>
   )
 }
@@ -162,7 +159,7 @@ function PatternSetView({ set, target, productId, onChanged }: { set: PatternSet
                   <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
                     <Select value={p.piece} onChange={(e) => {
                       const piece = e.target.value as PieceKind
-                      void patch(p, { piece, anchor: (() => { const [x, y] = autoAnchor(p.outline, piece); return { x, y } })() })
+                      void patch(p, { piece, anchor: defaultAnchor(p.outline, piece) })
                     }} aria-label="Tipo di pezzo" className="h-9 text-sm">
                       {KINDS.map((k) => <option key={k} value={k}>{PIECE_LABEL[k]}</option>)}
                     </Select>
@@ -193,10 +190,11 @@ function PatternSetView({ set, target, productId, onChanged }: { set: PatternSet
 }
 
 function AnchorEditor({ piece, onClose, onSave }: { piece: PatternPiece; onClose: () => void; onSave: (c: Partial<PatternPiece>) => Promise<void> }) {
-  const [anchor, setAnchor] = useState<{ x: number; y: number }>(() => {
-    if (piece.anchor?.x != null && piece.anchor?.y != null) return { x: piece.anchor.x, y: piece.anchor.y }
-    const [x, y] = autoAnchor(piece.outline, piece.piece)
-    return { x, y }
+  const isLeg = piece.piece === 'leg_left' || piece.piece === 'leg_right'
+  const [anchor, setAnchor] = useState<PieceAnchor & { x: number; y: number }>(() => {
+    const auto = defaultAnchor(piece.outline, piece.piece) as PieceAnchor & { x: number; y: number }
+    if (piece.anchor?.x != null && piece.anchor?.y != null) return { ...auto, ...piece.anchor, x: piece.anchor.x, y: piece.anchor.y }
+    return auto
   })
   const [grain, setGrain] = useState(piece.grain_angle)
   const [saving, setSaving] = useState(false)
@@ -204,18 +202,22 @@ function AnchorEditor({ piece, onClose, onSave }: { piece: PatternPiece; onClose
   const isSleeve = piece.piece === 'sleeve_left' || piece.piece === 'sleeve_right'
   return (
     <Modal open onClose={onClose} size="lg" title={`${piece.name} · taglia ${piece.size}`}
-      description={isSleeve ? 'Trascina il punto sulla sommità della testa della manica: le grafiche delle maniche si misurano da qui.' : 'Trascina il punto sul centro del collo: le grafiche si misurano da qui, lungo la linea centrale.'}
+      description={isLeg ? 'Gamba con davanti e dietro uniti: il punto trascinabile è il centro davanti in vita; il centro dietro in vita si imposta nei campi. Le grafiche del davanti e del dietro si misurano da questi due punti.' : isSleeve ? 'Trascina il punto sulla sommità della testa della manica: le grafiche delle maniche si misurano da qui.' : 'Trascina il punto sul centro del collo: le grafiche si misurano da qui, lungo la linea centrale.'}
       footer={<>
-        <Button variant="ghost" onClick={() => { const [x, y] = autoAnchor(piece.outline, piece.piece); setAnchor({ x, y }) }}>Proposta automatica</Button>
+        <Button variant="ghost" onClick={() => setAnchor(defaultAnchor(piece.outline, piece.piece) as PieceAnchor & { x: number; y: number })}>Proposta automatica</Button>
         <Button loading={saving} onClick={async () => { setSaving(true); await onSave({ anchor, grain_angle: grain }); setSaving(false) }}>Salva</Button>
       </>}>
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_12rem]">
         <div className="rounded-xl bg-ink-50 p-3">
-          <PieceShape outline={piece.outline} anchor={anchor} onAnchor={setAnchor} grainAngle={grain} className="mx-auto h-[min(60vh,28rem)] w-full touch-none" />
+          <PieceShape outline={piece.outline} anchor={anchor} onAnchor={(a) => setAnchor({ ...anchor, ...a })} grainAngle={grain} className="mx-auto h-[min(60vh,28rem)] w-full touch-none" />
         </div>
         <div className="space-y-4 text-sm">
-          <Field label="Riferimento X (mm)"><Input type="number" step="0.5" value={anchor.x} onChange={(e) => setAnchor({ ...anchor, x: Number(e.target.value) })} /></Field>
-          <Field label="Riferimento Y (mm)"><Input type="number" step="0.5" value={anchor.y} onChange={(e) => setAnchor({ ...anchor, y: Number(e.target.value) })} /></Field>
+          <Field label={isLeg ? 'Centro davanti X (mm)' : 'Riferimento X (mm)'}><Input type="number" step="0.5" value={anchor.x} onChange={(e) => setAnchor({ ...anchor, x: Number(e.target.value) })} /></Field>
+          <Field label={isLeg ? 'Centro davanti Y (mm)' : 'Riferimento Y (mm)'}><Input type="number" step="0.5" value={anchor.y} onChange={(e) => setAnchor({ ...anchor, y: Number(e.target.value) })} /></Field>
+          {isLeg && <>
+            <Field label="Centro dietro X (mm)"><Input type="number" step="0.5" value={anchor.bx ?? ''} onChange={(e) => setAnchor({ ...anchor, bx: Number(e.target.value) })} /></Field>
+            <Field label="Centro dietro Y (mm)"><Input type="number" step="0.5" value={anchor.by ?? ''} onChange={(e) => setAnchor({ ...anchor, by: Number(e.target.value) })} /></Field>
+          </>}
           <Field label="Drittofilo (°)" hint="0 = verticale"><Input type="number" step="0.5" min={-90} max={90} value={grain} onChange={(e) => setGrain(Number(e.target.value))} /></Field>
           <p className="font-mono text-xs text-ink-500">Pezzo {cm(b.width)} × {cm(b.height)} cm</p>
         </div>
@@ -262,8 +264,7 @@ function ImportButton({ productId, target, set, onDone }: { productId: string; t
       const rows: NewPiece[] = []
       drafts.filter((d) => d.include).forEach((d, i) => {
         const mk = (kind: PieceKind, outline = d.outline, quantity = d.quantity, suffix = ''): NewPiece => {
-          const [x, y] = autoAnchor(outline, kind)
-          return { size: sizeOf(d), piece: kind, name: `${d.name}${suffix}`.slice(0, 120), quantity, outline, anchor: { x, y }, mirror: false, grain_angle: d.grainAngle, sort_order: i * 2 }
+          return { size: sizeOf(d), piece: kind, name: `${d.name}${suffix}`.slice(0, 120), quantity, outline, anchor: defaultAnchor(outline, kind), mirror: false, grain_angle: d.grainAngle, sort_order: i * 2 }
         }
         if (d.splitSleeves) {
           // una manica tagliata in coppia diventa sinistra + destra (specchiata), per grafiche diverse sui due lati

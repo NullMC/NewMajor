@@ -4,7 +4,7 @@ import type { Product, ProductDetail } from '@/types/db'
 const ADMIN_DETAIL =
   '*,categories(id,name,slug),product_images(*),product_variants(*),' +
   'product_options(*,product_option_values(*)),customization_areas(*),kit_items!kit_items_kit_id_fkey(*),price_tiers(*),' +
-  'product_garment_types(garment_type_id,price_delta,sort_order,garment_types(*))'
+  'product_garment_types(garment_type_id,price_delta,sort_order,garment_types(*)),print_zones(*)'
 
 const bySort = <T extends { sort_order: number }>(a: T, b: T) => a.sort_order - b.sort_order
 

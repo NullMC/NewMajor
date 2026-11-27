@@ -11,6 +11,7 @@ import { Card, CardHeader, PageHeader, Skeleton } from '@/components/ui/Display'
 import { Field, Input, Select, Switch, Textarea } from '@/components/ui/Form'
 import { useUi } from '@/components/ui/Toast'
 import { DEFAULT_SETTINGS, useSettings } from '@/features/settings/SettingsProvider'
+import { TechniquesCard } from './TechniquesCard'
 
 type K = keyof SettingsMap
 
@@ -62,7 +63,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Impostazioni" description="Dati aziendali, pagamenti, spedizioni, qualità grafiche, catalogo e cookie." />
+      <PageHeader title="Impostazioni" description="Dati aziendali, pagamenti, spedizioni, qualità grafiche, tecniche di stampa, catalogo e cookie." />
 
       <Card>
         <CardHeader title="Dati aziendali" description="Mostrati nel footer, nella pagina contatti e nelle pagine legali." />
@@ -137,6 +138,8 @@ export default function SettingsPage() {
         </div>
         <SaveBtn k="quality" />
       </Card>
+
+      <TechniquesCard />
 
       <Card>
         <CardHeader title="Filtri del catalogo" description="Attributi aggiuntivi filtrabili (es. Sport, Genere). Il valore per prodotto si imposta nella scheda prodotto." />
