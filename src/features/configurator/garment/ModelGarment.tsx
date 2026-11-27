@@ -17,7 +17,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import type { ModelShape } from '@/types/db'
 import { getShape } from './shapes'
 import { MODEL_OUTLINES } from './outlines'
-import { legUv, type PieceShapes } from './pieces'
+import { legUv, rowFitUv, type PieceShapes } from './pieces'
 
 export interface GarmentModel {
   url: string
@@ -74,7 +74,10 @@ export function loadModel(url: string) {
         if (!mesh.isMesh) return
         const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld)
         if (!g.attributes.normal) g.computeVertexNormals()
-        g.userData.piece = mesh.name // pezzo del cartamodello (modelli ricostruiti dai pezzi)
+        // pezzo del cartamodello (modelli ricostruiti dai pezzi); il loader aggiunge _1, _2… alle
+        // primitive delle mesh composte e ai nomi ripetuti
+        g.userData.piece = mesh.name.replace(/_\d+$/, '')
+        g.userData.pieceRows = mesh.userData.pieceRows // larghezza del pezzo del modello riga per riga
         geos.push(g)
       })
       return geos
@@ -222,18 +225,20 @@ diffuseColor.rgb *= col;`,
 export function PieceGarment({ geos, textures, shapes, baseColor, trimColor }: {
   geos: THREE.BufferGeometry[]; textures: Partial<Record<string, THREE.Texture>>; shapes: PieceShapes; baseColor: string; trimColor: string
 }) {
-  // gambe: UV adattate al contorno del pezzo del prodotto (le altre mesh hanno già le UV del pezzo)
+  // UV adattate al contorno del pezzo del prodotto: le gambe per giro e altezza, gli altri pezzi riga per riga
   const shapeKey = JSON.stringify(Object.keys(shapes).map((k) => [k, shapes[k as keyof PieceShapes]?.outline.length, shapes[k as keyof PieceShapes]?.anchor]))
   const fitted = useMemo(() => geos.map((g) => {
     const piece = g.userData.piece as string
-    const sh = (piece === 'leg_left' || piece === 'leg_right') ? shapes[piece] : undefined
-    if (!sh || !g.attributes.uv) return g
+    const leg = piece === 'leg_left' || piece === 'leg_right'
+    const sh = shapes[piece as keyof PieceShapes]
+    const rows = g.userData.pieceRows as [number, number][] | undefined
+    if (!sh || !g.attributes.uv || (!leg && !rows?.length)) return g
     const out = g.clone()
     // UV quantizzate (interi normalizzati): lette con getX/getY, che le riportano a 0..1
     const src = g.attributes.uv
     const ts = new Float32Array(src.count * 2)
     for (let i = 0; i < src.count; i++) { ts[i * 2] = src.getX(i); ts[i * 2 + 1] = src.getY(i) }
-    out.setAttribute('uv', new THREE.BufferAttribute(legUv(ts, sh), 2))
+    out.setAttribute('uv', new THREE.BufferAttribute(leg ? legUv(ts, sh) : rowFitUv(ts, rows!, sh), 2))
     return out
   }), [geos, shapeKey]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { for (const g of fitted) if (!geos.includes(g)) g.dispose() }, [fitted, geos])

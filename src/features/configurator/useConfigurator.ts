@@ -13,7 +13,8 @@ import { areaBoxCm, drawSleeve, drawSleevePreview, silhouetteBands, sleeveInfo, 
 import { anchorOf, elementDpi, elementHeightCm, SECTION_LABEL, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 import type { PieceKind } from '@/lib/patterns/geometry'
 import { buildPlan, type ProductionPiece } from '@/lib/production/plan'
-import { drawPieceCanvas, PIECE_CANVAS_KINDS, PIECE_MODELS, type PieceCanvases, type PieceGuides, type PieceSet } from './garment/pieces'
+import { drawPieceCanvas, modelBandPolys, PIECE_CANVAS_KINDS, PIECE_MODELS, type PieceCanvases, type PieceGuides, type PieceSet } from './garment/pieces'
+import { MODEL_PIECES } from './garment/pieceModels'
 
 const solidCache = new Map<string, HTMLCanvasElement>()
 /** Immagine 1×1 di un colore pieno (colori per sezione, fasce colorate). */
@@ -387,7 +388,11 @@ export function useConfigurator(
               fixed: areas.filter((a) => a.side === side && a.area_type !== 'all_over')
                 .flatMap((a) => { const bx = areaBoxCm(a, shape, pieceFor(side, elementKit)); return bx ? [{ name: a.name, box: bx }] : [] }),
             } : null
-            if (job) drawPieceCanvas(pieceCanvases[kind]!, job, imageOf, config.textStyle!, g)
+            // fasce sulle cuciture del modello 3D (il file di produzione usa quelle del cartamodello)
+            const modelPiece = MODEL_PIECES[shape]?.[kind]
+            const shown = job?.band && modelPiece && piece
+              ? { ...job, band: { ...job.band, polys: modelBandPolys(kind, modelPiece, piece, job.band.widthMm) } } : job
+            if (shown) drawPieceCanvas(pieceCanvases[kind]!, shown, imageOf, config.textStyle!, g)
           }
         }
         setVersion((v) => v + 1)

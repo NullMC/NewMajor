@@ -9,6 +9,8 @@
 import type { AssetRef, TextStyle } from '@/types/config'
 import { bounds, type PieceAnchor, type Vec } from '@/lib/patterns/geometry'
 import { horizontalHits } from '@/lib/patterns/placement'
+import { bandPolygons } from '@/lib/patterns/bands'
+import type { ModelPiece } from './pieceModels'
 import type { Box } from '@/lib/printing'
 import type { PieceJob } from '@/lib/production/plan'
 import { drawFittedText } from './panel'
@@ -34,16 +36,62 @@ export interface PieceSet { canvases: PieceCanvases; shapes: PieceShapes }
  * quello "dietro", altezza dalla vita all'orlo) alle coordinate del canvas del pezzo. Ogni riga
  * del modello copre l'intera larghezza del pezzo a quell'altezza: nessuna parte resta scoperta.
  */
-export function legUv(ts: ArrayLike<number>, shape: { outline: Vec[]; anchor: PieceAnchor }): Float32Array {
-  const b = bounds(shape.outline)
-  const ROWS = 240
+/** Intervallo [sinistra, destra] (mm) del pezzo a ogni riga, dall'alto (riga 0) al basso (riga ROWS). */
+function outlineRows(outline: Vec[], ROWS: number): [number, number][] {
+  const b = bounds(outline)
   const rows: [number, number][] = []
   for (let i = 0; i <= ROWS; i++) {
     // un soffio dentro il riquadro per avere sempre un'intersezione
     const y = b.maxY - (i / ROWS) * b.height * 0.998 - b.height * 0.001
-    const xs = horizontalHits(shape.outline, y)
+    const xs = horizontalHits(outline, y)
     rows.push(xs.length >= 2 ? [xs[0], xs[xs.length - 1]] : rows[rows.length - 1] ?? [b.minX, b.maxX])
   }
+  return rows
+}
+
+/** Interpolazione di una tabella di righe alla quota v (0 in alto, 1 in basso). */
+function rowAt(rows: [number, number][], v: number): [number, number] {
+  const R = rows.length - 1
+  const f = Math.min(1, Math.max(0, v)) * R, r0 = Math.floor(f), r1 = Math.min(R, r0 + 1), k = f - r0
+  return [rows[r0][0] + (rows[r1][0] - rows[r0][0]) * k, rows[r0][1] + (rows[r1][1] - rows[r0][1]) * k]
+}
+
+/**
+ * Pezzi del busto e maniche: le UV del modello (u, v normalizzate sul suo pezzo) vengono adattate
+ * riga per riga al pezzo del prodotto. A ogni altezza la larghezza del pezzo del modello (`srcRows`,
+ * salvata nel GLB da piece_uv.mjs) corrisponde alla larghezza del pezzo del cartamodello: spalle,
+ * giromanica e fianchi coincidono, e le fasce o le grafiche vicino ai bordi cadono al posto giusto.
+ */
+export function rowFitUv(uvs: ArrayLike<number>, srcRows: [number, number][], shape: { outline: Vec[] }): Float32Array {
+  const b = bounds(shape.outline)
+  const dst = outlineRows(shape.outline, 240)
+  // righe degeneri (un solo punto, agli estremi): si usa la riga valida più vicina
+  const src = srcRows.map((r) => [r[0], r[1]] as [number, number])
+  for (let i = 0; i < src.length; i++) {
+    if (src[i][1] - src[i][0] >= 0.02) continue
+    for (let k = 1; k < src.length; k++) {
+      const n = src[i + k] && src[i + k][1] - src[i + k][0] >= 0.02 ? src[i + k] : src[i - k] && src[i - k][1] - src[i - k][0] >= 0.02 ? src[i - k] : null
+      if (n) { src[i] = [n[0], n[1]]; break }
+    }
+  }
+  const out = new Float32Array(uvs.length)
+  for (let i = 0; i < uvs.length; i += 2) {
+    const u = uvs[i], v = uvs[i + 1]
+    // righe cercate appena dentro il pezzo (agli estremi orli curvi e punte danno righe di un punto)
+    const vr = Math.min(0.99, Math.max(0.01, v))
+    const [sl, sr] = rowAt(src, vr)
+    const [dl, dr] = rowAt(dst, vr)
+    const t = Math.min(1.05, Math.max(-0.05, (u - sl) / Math.max(1e-4, sr - sl)))
+    out[i] = (dl + t * (dr - dl) - b.minX) / b.width
+    out[i + 1] = v
+  }
+  return out
+}
+
+export function legUv(ts: ArrayLike<number>, shape: { outline: Vec[]; anchor: PieceAnchor }): Float32Array {
+  const b = bounds(shape.outline)
+  const ROWS = 240
+  const rows = outlineRows(shape.outline, ROWS)
   // il bordo "davanti" del pezzo è quello del centro davanti in vita (x, y), l'altro è il dietro (bx, by)
   const frontLeft = (shape.anchor.x ?? b.minX) <= (shape.anchor.bx ?? b.maxX)
   const out = new Float32Array(ts.length)
@@ -153,4 +201,35 @@ export function drawPieceCanvas(
     }
     ctx.restore()
   }
+}
+
+/**
+ * Fasce per l'anteprima 3D: calcolate sul pezzo del modello (le sue cuciture di spalla e giromanica
+ * possono essere diverse da quelle del cartamodello, es. spalla scesa) e riportate sul pezzo del
+ * prodotto con lo stesso adattamento riga per riga delle UV. Così sul modello la fascia segue la
+ * cucitura della spalla e la sommità della manica; nel file di produzione resta quella del
+ * cartamodello.
+ */
+export function modelBandPolys(kind: string, model: ModelPiece, shape: { outline: Vec[] }, widthMm: number): Vec[][] {
+  const [W, H] = model.mm
+  const mOutline: Vec[] = model.outline.map(([u, v]) => [u * W, (1 - v) * H])
+  const top = mOutline.reduce((a, p) => (p[1] > a[1] ? p : a))
+  const ax = kind === 'sleeve_left' || kind === 'sleeve_right' ? top[0] : W / 2
+  const polys = bandPolygons(kind, { outline: mOutline, anchor: { x: ax, y: H } }, widthMm, false)
+  const src = outlineRows(mOutline, 240)
+  const dst = outlineRows(shape.outline, 240)
+  const b = bounds(shape.outline)
+  const scale = b.width / W
+  return polys.map((poly) => poly.map(([x, y]) => {
+    const v = (H - y) / H
+    // righe cercate un po' dentro il pezzo: agli estremi un orlo curvo o una punta danno righe di un solo punto
+    const vr = Math.min(0.97, Math.max(0.03, v))
+    const [sl, sr] = rowAt(src, vr), [dl, dr] = rowAt(dst, vr)
+    // righe molto strette (testa della manica, punte): distanza dal centro con la scala del pezzo,
+    // altrimenti la posizione in proporzione alla larghezza della riga
+    const X = sr - sl >= 60
+      ? dl + ((x - sl) / (sr - sl)) * (dr - dl)
+      : (dl + dr) / 2 + (x - (sl + sr) / 2) * scale
+    return [X, b.maxY - v * b.height] as Vec
+  }))
 }
