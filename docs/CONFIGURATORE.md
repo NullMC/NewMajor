@@ -9,8 +9,11 @@ Codice: `src/features/configurator`.
 2. **Colore base** – varianti con colore principale e colore dei profili (collo, maniche, orli).
 3. **Opzioni** – valori singoli o multipli, obbligatori o facoltativi.
 4. **Loghi, sponsor e grafiche** – per ogni area: upload del file o scelta dalla libreria, scala nell’area, controllo qualità.
-5. **Nomi, numeri, taglie e quantità** – attivazione delle aree testo/numero, una riga per capo (nome, numero, taglia o taglie per componente kit, quantità), importazione da elenco incollato, anteprima del giocatore selezionato sul mockup; stile (colore, contorno, carattere).
-6. **Riepilogo** – dettaglio del prezzo, sconti quantità, indicazioni per la produzione → aggiunta al carrello.
+5. **Grafica all-over** (articoli abilitati) – grafica su tutto il capo, con grafica o colore diversi per sezione.
+6. **Aree di stampa** – nelle zone definite dall’admin: grafiche o testi aggiunti accanto o sotto, misure in cm, posizione, centratura, rotazione, tecnica e prezzo per area.
+7. **Fasce** (se attive) – sul fondo di maniche o gambe: nessuna, colore diverso o grafica.
+8. **Nomi, numeri, taglie e quantità** – attivazione delle aree testo/numero, una riga per capo (nome, numero, taglia o taglie per componente kit, quantità), importazione da elenco incollato, anteprima del giocatore selezionato sul mockup; stile (colore, contorno, carattere).
+9. **Riepilogo** – dettaglio del prezzo, sconti quantità, indicazioni per la produzione → aggiunta al carrello.
 
 Il cliente può configurare **senza account**: le grafiche restano nel browser (IndexedDB) e vengono caricate nel suo spazio privato al login, insieme al carrello.
 

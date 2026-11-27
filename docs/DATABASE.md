@@ -28,7 +28,9 @@ Un ruolo `staff` separato non è stato introdotto: non necessario per i requisit
 - **product_images** – immagini con ordine, testo alternativo, una sola principale (indice univoco parziale).
 - **customization_areas** – aree di personalizzazione: lato, tipo (`logo`, `sponsor`, `all_over`, `text`, `number`), posizione in % del pannello, **dimensione di stampa in cm** (per i DPI effettivi), sovrapprezzo, obbligatorietà, componente kit.
 - **customization_assets** – libreria grafiche dell’admin (file originali, non compressi).
-- **kit_items** – componenti di un kit (maglia, pantaloncino…), con taglie e modello 3D propri. *(Il kit è un `product` con `product_type = 'kit'`: non serve una tabella `kits` separata.)*
+- **print_techniques** – tecniche di stampa (serigrafia, DTF, ricamo, sublimazione) con prezzo minimo e massimo per area; la sublimazione solo con grafica all-over.
+- **print_zones** – area massima di stampa per prodotto/componente e zona (rettangolo in cm dal riferimento del pezzo), numero massimo di aree, grafiche/testi, tecniche ammesse.
+- **kit_items** – componenti di un kit (maglia, pantaloncino…), con taglie e modello 3D propri. Prodotti e componenti hanno anche le impostazioni delle fasce (`band_enabled`, `band_height_cm`, `band_price`). *(Il kit è un `product` con `product_type = 'kit'`: non serve una tabella `kits` separata.)*
 - **price_tiers** – sconti percentuali per quantità.
 - **related_products**, **featured_products** – correlati e prodotti in evidenza in home.
 
@@ -78,6 +80,8 @@ unitario = prezzo base
          + sovrapprezzo colore
          + somma valori opzione selezionati
          + somma aree di personalizzazione attivate
+         + aree di stampa del cliente: min + (area / area massima della zona) × (max − min) della tecnica
+         + fasce (prezzo per capo del prodotto o componente)
 quantità = somma delle righe del roster (o quantità semplice)
 totale   = unitario × quantità × (1 − sconto scaglione massimo raggiunto)
 ```
