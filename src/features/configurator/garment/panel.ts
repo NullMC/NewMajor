@@ -46,6 +46,8 @@ export interface PanelSpec {
 }
 
 export const PANEL_WIDTH = 1536
+/** Larghezza dei pannelli live del configuratore (texture 3D e vista piana): più leggeri da caricare sulla GPU. */
+export const LIVE_PANEL_WIDTH = 1024
 
 export function panelSize(shape: GarmentShape, width = PANEL_WIDTH) {
   const { minX, maxX, minY, maxY } = shape.bounds

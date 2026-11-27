@@ -7,7 +7,7 @@ import { evaluateQuality, effectiveDpi, readImageInfo } from '@/lib/imageQuality
 import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
-import { canvasToBlob, drawPanel, ensureFonts, type PanelLayer } from './garment/panel'
+import { canvasToBlob, drawPanel, ensureFonts, LIVE_PANEL_WIDTH, type PanelLayer } from './garment/panel'
 import { drawSleeve, drawSleevePreview, sleeveInfo, toSilhouette } from './garment/elements'
 import { elementDpi, elementHeightCm, placementIssue, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 
@@ -209,8 +209,8 @@ export function useConfigurator(
         // piana) e con le guide solo sul lato inquadrato, così sui fianchi del modello, dove davanti e
         // dietro si fondono, non compaiono le guide dell'altro lato
         const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, highlightId: highlightArea, edges: false }
-        drawPanel(frontCanvas, { ...common, side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), elements: silhouetteElements('front', shape, elementKit) })
-        drawPanel(backCanvas, { ...common, side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), elements: silhouetteElements('back', shape, elementKit) })
+        drawPanel(frontCanvas, { ...common, side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), elements: silhouetteElements('front', shape, elementKit) }, LIVE_PANEL_WIDTH)
+        drawPanel(backCanvas, { ...common, side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), elements: silhouetteElements('back', shape, elementKit) }, LIVE_PANEL_WIDTH)
         for (const [zone, canvas] of [['sleeve_left', sleeveLeftCanvas], ['sleeve_right', sleeveRightCanvas]] as const) {
           const piece = zonePiece(zones, zone, elementKit)
           if (piece) drawSleeve(canvas, piece, elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages, allOverImage(elementKit, zone))

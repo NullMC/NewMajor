@@ -1,7 +1,7 @@
 // Prepara un modello 3D di capo per il web: niente texture (la grafica viene proiettata dal
 // configuratore), trasformazioni dei nodi applicate, centrato e scalato ad altezza 1,
 // semplificato e compresso con meshopt. Il fronte del capo deve guardare verso +z.
-// Uso: node optimize.mjs <input.glb> <output.glb> [ratio] ["nota licenza"]
+// Uso: node optimize.mjs <input.glb> <output.glb> [ratio] ["nota licenza"]  (SIMPLIFY_ERROR=0.004 per semplificare di più)
 // Dipendenze (fuori dal progetto, in una cartella di lavoro):
 //   npm i @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions meshoptimizer gl-matrix
 import { NodeIO } from '@gltf-transform/core'
@@ -58,7 +58,7 @@ for (const node of root.listNodes()) {
 await doc.transform(
   dedup(),
   weld(),
-  simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.0008 }),
+  simplify({ simplifier: MeshoptSimplifier, ratio, error: Number(process.env.SIMPLIFY_ERROR ?? 0.0008) }),
   prune(),
   quantize(),
 )

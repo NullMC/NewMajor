@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Brush, Layers, MessageSquareText, Ruler, Shirt, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -11,6 +11,7 @@ import { Badge, EmptyState, Skeleton } from '@/components/ui/Display'
 import { Markdown } from '@/components/ui/Markdown'
 import { ButtonLink } from '@/components/ui/Button'
 import { SHAPE_LABEL } from '@/features/configurator/garment/shapes'
+import type { ModelShape } from '@/types/db'
 import { getProductBySlug, listRelated } from './api'
 import { ProductCard } from './ProductCard'
 import { AnimatedPrice, ProductStage } from './ProductStage'
@@ -22,6 +23,24 @@ export default function ProductPage() {
   const { data: product, loading } = useQuery(`product:${slug}`, () => getProductBySlug(slug))
   const { data: related } = useQuery(product ? `related:${product.id}` : null, () => listRelated(product!.id))
   const [color, setColor] = useState<string | null>(null)
+
+  // Pre-caricamento del visualizzatore 3D e dei modelli del prodotto, a pagina ferma:
+  // aprendo il configuratore il 3D è già pronto.
+  useEffect(() => {
+    if (!product?.is_configurable) return
+    const shapes = [product.model_shape, ...product.kit_items.map((k) => k.model_shape)].filter(Boolean) as ModelShape[]
+    const run = () => {
+      void import('@/features/configurator/garment/GarmentViewer').catch(() => undefined)
+      void import('@/features/configurator/garment/ModelGarment').then((m) => m.preloadGarmentModels(shapes)).catch(() => undefined)
+    }
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void }
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run)
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(run, 1200)
+    return () => window.clearTimeout(t)
+  }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const images = product?.product_images ?? []
   const imageUrl = publicUrl(images[0]?.storage_path)

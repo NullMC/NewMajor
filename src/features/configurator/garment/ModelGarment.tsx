@@ -78,6 +78,14 @@ export function loadModel(url: string) {
   return p
 }
 
+/** Pre-carica i modelli delle sagome indicate (es. dalla pagina prodotto, prima di aprire il configuratore). */
+export function preloadGarmentModels(shapes: ModelShape[]) {
+  for (const s of new Set(shapes)) {
+    const url = GARMENT_MODELS[s]?.url
+    if (url) void loadModel(url).catch(() => undefined)
+  }
+}
+
 export function useGarmentModel(shape: ModelShape) {
   const url = GARMENT_MODELS[shape]?.url
   const [state, setState] = useState<{ url?: string; geos?: THREE.BufferGeometry[]; failed?: boolean }>({})

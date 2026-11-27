@@ -91,8 +91,11 @@ function Garment({ shape, front, back, version, view, baseColor, sleeves }: {
   )
 }
 
+/** Densità di pixel: piena da fermo (max 1,5), ridotta a 1 durante la rotazione per restare fluida. */
+const DPR_IDLE = Math.min(1.5, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+
 function Controls({ resetKey }: { resetKey: string }) {
-  const { camera, gl, invalidate } = useThree()
+  const { camera, gl, invalidate, setDpr } = useThree()
   const ref = useRef<OrbitControls | null>(null)
   useEffect(() => {
     const c = new OrbitControls(camera, gl.domElement)
@@ -103,10 +106,17 @@ function Controls({ resetKey }: { resetKey: string }) {
     c.maxDistance = 6
     c.minPolarAngle = Math.PI * 0.28
     c.maxPolarAngle = Math.PI * 0.72
+    let idle = 0
     c.addEventListener('change', () => invalidate())
+    c.addEventListener('start', () => { window.clearTimeout(idle); setDpr(1) })
+    c.addEventListener('end', () => {
+      // a rotazione terminata (smorzamento compreso) torna la risoluzione piena
+      window.clearTimeout(idle)
+      idle = window.setTimeout(() => { setDpr(DPR_IDLE); invalidate() }, 600)
+    })
     ref.current = c
-    return () => c.dispose()
-  }, [camera, gl, invalidate])
+    return () => { window.clearTimeout(idle); c.dispose() }
+  }, [camera, gl, invalidate, setDpr])
   useEffect(() => {
     // Cambio vista: riporta la camera in posizione frontale
     camera.position.set(0, 0.1, 3.9)
@@ -139,7 +149,7 @@ export default function GarmentViewer({ shape, front, back, version, view, baseC
     <Canvas
       className={className}
       frameloop="demand"
-      dpr={[1, 2]}
+      dpr={DPR_IDLE}
       camera={{ position: [0, 0.1, 3.9], fov: 35 }}
       gl={{ antialias: true, preserveDrawingBuffer: false, alpha: true }}
       aria-label="Anteprima 3D del prodotto configurato"
