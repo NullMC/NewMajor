@@ -219,10 +219,14 @@ export function drawSleeve(
 }
 
 /** Dati della manica per il visualizzatore 3D: canvas, riquadro del pezzo e riferimento (mm). */
-export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement) {
+/**
+ * Manica per l'anteprima proiettata. `full`: il canvas ha un fondo (grafica all-over, colore della
+ * sezione) e deve coprire tutta la manica, non solo il lato esterno del braccio.
+ */
+export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement, full = false) {
   if (!piece) return null
   const b = bounds(piece.outline)
-  return { canvas, rect: [b.minX, b.minY, b.width, b.height] as [number, number, number, number], anchor: anchorOf(piece) as [number, number] }
+  return { canvas, rect: [b.minX, b.minY, b.width, b.height] as [number, number, number, number], anchor: anchorOf(piece) as [number, number], full }
 }
 
 /** Anteprima di una manica per l'ordine: il pezzo reale nel colore di fondo con i suoi elementi. */

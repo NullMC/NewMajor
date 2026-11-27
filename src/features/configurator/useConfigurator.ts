@@ -891,8 +891,8 @@ export function useConfigurator(
     printZones, printEnabled, techniques, techniquesFor,
     pieceSet: pieceMode ? pieceSet : null, trimColor: secondaryColor ?? baseColor,
     sleeveCanvases: {
-      left: sleeveInfo(pieceFor('sleeve_left', elementKit), sleeveLeftCanvas),
-      right: sleeveInfo(pieceFor('sleeve_right', elementKit), sleeveRightCanvas),
+      left: sleeveInfo(pieceFor('sleeve_left', elementKit), sleeveLeftCanvas, !!allOverImage(elementKit, 'sleeve_left')),
+      right: sleeveInfo(pieceFor('sleeve_right', elementKit), sleeveRightCanvas, !!allOverImage(elementKit, 'sleeve_right')),
     },
     addElement, updateElement, removeElement, centerElement, replaceElementAsset, elementQuality, elementUploading, elementHeightCm,
     bandEnabled, bandHeightCm, band, setBand, uploadBand, isBottomShape: isBottom(shape),

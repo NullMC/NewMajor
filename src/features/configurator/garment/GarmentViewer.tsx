@@ -39,12 +39,12 @@ function usePanelTexture(canvas: HTMLCanvasElement | null, version: number, flip
   return texture
 }
 
-export interface SleeveCanvas { canvas: HTMLCanvasElement; rect: [number, number, number, number]; anchor: [number, number] }
+export interface SleeveCanvas { canvas: HTMLCanvasElement; rect: [number, number, number, number]; anchor: [number, number]; full?: boolean }
 
 function useSleeve(s: SleeveCanvas | null | undefined, version: number): SleeveTexture | null {
   const texture = usePanelTexture(s?.canvas ?? null, version)
-  const rectKey = s ? `${s.rect.join(',')}|${s.anchor.join(',')}` : ''
-  return useMemo(() => (texture && s ? { texture, rect: s.rect, anchor: s.anchor } : null), [texture, rectKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const rectKey = s ? `${s.rect.join(',')}|${s.anchor.join(',')}|${s.full ? 1 : 0}` : ''
+  return useMemo(() => (texture && s ? { texture, rect: s.rect, anchor: s.anchor, full: !!s.full } : null), [texture, rectKey]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 function Garment({ shape, front, back, version, view, baseColor, sleeves, pieces, trimColor }: {

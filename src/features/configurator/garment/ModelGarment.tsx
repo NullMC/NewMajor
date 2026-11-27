@@ -51,7 +51,7 @@ export const GARMENT_MODELS: Partial<Record<ModelShape, GarmentModel>> = {
 }
 
 /** Manica per l'anteprima: canvas con i soli elementi e riquadro/riferimento del pezzo in mm. */
-export interface SleeveTexture { texture: THREE.Texture; rect: [number, number, number, number]; anchor: [number, number] }
+export interface SleeveTexture { texture: THREE.Texture; rect: [number, number, number, number]; anchor: [number, number]; full?: boolean }
 
 const EMPTY = (() => {
   const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1)
@@ -130,6 +130,8 @@ export function projectionMaterial(shape: ModelShape, front: THREE.Texture, back
     uSR: { value: new THREE.Vector4(0, 0, 1, 1) },
     uSLA: { value: new THREE.Vector2() },
     uSRA: { value: new THREE.Vector2() },
+    // 1 = la manica ha un fondo proprio (all-over, colore della sezione) e copre tutto il braccio
+    uSFull: { value: new THREE.Vector2(0, 0) },
     uShoulder: { value: new THREE.Vector3(model?.sleeve?.topY ?? 0, model?.sleeve?.z ?? 0, model?.sleeve?.minAbsX ?? 99) },
     uArm: { value: new THREE.Vector2(...(model?.sleeve?.dir ?? [0, -1])).normalize() },
     uMm: { value: model?.unitPerMm ?? 0.001 },
@@ -154,6 +156,7 @@ uniform sampler2D uSleeveL;
 uniform sampler2D uSleeveR;
 uniform vec4 uSL, uSR;
 uniform vec2 uSLA, uSRA;
+uniform vec2 uSFull;
 uniform vec3 uShoulder;
 uniform vec2 uArm;
 uniform float uMm;
@@ -165,6 +168,17 @@ vec4 sleeveSample(sampler2D tex, vec4 rect, vec2 anchor, float dxMm, float dyMm)
   vec4 c = texture2D(tex, clamp(uv, 0.0, 1.0));
   c.a *= inside;
   return c;
+}
+// pannello: dove la superficie 3D esce di poco dalla sagoma piana (orli, risvolti, pieghe) si usa
+// il colore più vicino verso l'interno invece di lasciare il colore base scoperto
+vec4 panelSample(sampler2D tex, vec2 uv) {
+  vec4 c = texture2D(tex, uv);
+  for (int i = 1; i <= 4; i++) {
+    if (c.a > 0.5) break;
+    float k = float(i) * 0.06;
+    c = texture2D(tex, clamp(mix(uv, vec2(0.5, 0.55), k), 0.0, 1.0));
+  }
+  return c;
 }`,
       )
       .replace(
@@ -173,8 +187,8 @@ vec4 sleeveSample(sampler2D tex, vec4 rect, vec2 anchor, float dxMm, float dyMm)
 vec2 s = vec2(vObjPos.x * uScale, (vObjPos.y + 0.5) * uScale + uMinY);
 float u = (s.x - uMinX) / uW;
 float v = (s.y - uMinY) / uH;
-vec4 f = texture2D(uFront, vec2(u, v));
-vec4 bk = texture2D(uBack, vec2(1.0 - u, v)); // il retro è disegnato visto da dietro
+vec4 f = panelSample(uFront, vec2(u, v));
+vec4 bk = panelSample(uBack, vec2(1.0 - u, v)); // il retro è disegnato visto da dietro
 float wf = smoothstep(-0.28, 0.28, normalize(vObjNormal).z);
 vec4 tx = mix(bk, f, wf);
 vec3 col = mix(uBase, tx.rgb, tx.a);
@@ -189,13 +203,13 @@ if (abs(vObjPos.x) > uShoulder.z) {
     vec2 o = vec2(-d.y, d.x);
     float along = dot(vObjPos.xy - vec2(uShoulder.z, uShoulder.x), d) / uMm;
     vec4 sl = sleeveSample(uSleeveL, uSL, uSLA, (uShoulder.y - vObjPos.z) / uMm, along);
-    col = mix(col, sl.rgb, sl.a * smoothstep(0.1, 0.5, dot(nrm.xy, o)));
+    col = mix(col, sl.rgb, sl.a * max(uSFull.x, smoothstep(0.1, 0.5, dot(nrm.xy, o))));
   } else {
     vec2 d = vec2(-uArm.x, uArm.y);
     vec2 o = vec2(d.y, -d.x);
     float along = dot(vObjPos.xy - vec2(-uShoulder.z, uShoulder.x), d) / uMm;
     vec4 sr = sleeveSample(uSleeveR, uSR, uSRA, (vObjPos.z - uShoulder.y) / uMm, along);
-    col = mix(col, sr.rgb, sr.a * smoothstep(0.1, 0.5, dot(nrm.xy, o)));
+    col = mix(col, sr.rgb, sr.a * max(uSFull.y, smoothstep(0.1, 0.5, dot(nrm.xy, o))));
   }
 }
 diffuseColor.rgb *= col;`,
@@ -263,6 +277,7 @@ export function ModelGarment({ shape, geos, front, back, baseColor, sleeveLeft, 
     uniforms.uSleeveR.value = sleeveRight?.texture ?? EMPTY
     if (sleeveLeft) { uniforms.uSL.value.set(...sleeveLeft.rect); uniforms.uSLA.value.set(...sleeveLeft.anchor) }
     if (sleeveRight) { uniforms.uSR.value.set(...sleeveRight.rect); uniforms.uSRA.value.set(...sleeveRight.anchor) }
+    uniforms.uSFull.value.set(sleeveLeft?.full ? 1 : 0, sleeveRight?.full ? 1 : 0)
   }, [sleeveLeft, sleeveRight, uniforms])
   useEffect(() => () => mat.dispose(), [mat])
   // altezza 1 → 1.78 unità di scena; i modelli con le braccia aperte vengono ridotti per restare nell'inquadratura
