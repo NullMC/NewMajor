@@ -1,7 +1,8 @@
 // Download per la produzione di una riga d'ordine (solo admin):
 // 1. anteprima del prodotto finito (foglio unico con tutte le viste salvate);
 // 2. file originali del cliente in un archivio ZIP, con riepilogo di posizioni e misure;
-// 3. file di produzione: PDF 1:1 con i pezzi del cartamodello disposti sul rotolo.
+// 3. file di produzione: PDF con i pezzi del cartamodello 1:1 disposti sul rotolo (sublimazione),
+//    il foglio dei transfer DTF e le schede di posizionamento per serigrafia e ricamo.
 
 import { useEffect, useState } from 'react'
 import { AlertTriangle, FileArchive, FileImage, Printer } from 'lucide-react'
@@ -11,7 +12,10 @@ import { supabase } from '@/lib/supabase'
 import { errorMessage } from '@/lib/errors'
 import { slugify } from '@/lib/slug'
 import { publicUrl, signedUrl, UPLOADS_BUCKET } from '@/lib/storage'
-import { ZONE_LABEL } from '@/lib/patterns/placement'
+import { SECTION_LABEL } from '@/lib/patterns/placement'
+import { TECHNIQUE_LABEL } from '@/lib/printing'
+import type { TechniqueCode } from '@/types/config'
+import { listTechniques } from '@/features/catalog/techniques'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Overlay'
@@ -104,13 +108,14 @@ export function ProductionDownloads({ item, orderRef, index }: { item: OrderItem
       const rows = (item.order_item_customizations ?? []).filter((c) => c.asset_path)
       for (const [i, c] of rows.entries()) {
         const m = c.asset_meta as Record<string, unknown>
-        const zone = (m.zone as keyof typeof ZONE_LABEL | undefined) ?? (c.side ?? 'front')
-        const name = `${String(i + 1).padStart(2, '0')}_${slugify(c.area_name)}_${slugify(ZONE_LABEL[zone as keyof typeof ZONE_LABEL] ?? String(zone))}.${extOf(m.name as string, m.mime as string)}`
+        const zone = (m.zone as keyof typeof SECTION_LABEL | undefined) ?? (c.side ?? 'front')
+        const zoneLabel = SECTION_LABEL[zone as keyof typeof SECTION_LABEL] ?? String(zone)
+        const name = `${String(i + 1).padStart(2, '0')}_${slugify(c.area_name)}_${slugify(zoneLabel)}.${extOf(m.name as string, m.mime as string)}`
         zip.file(name, await fetchBytes(c.asset_bucket ?? UPLOADS_BUCKET, c.asset_path!))
         const pos = m.free
-          ? ` · larghezza ${m.widthCm} cm · ${Number(m.xCm) === 0 ? 'centrato' : `${Math.abs(Number(m.xCm))} cm a ${Number(m.xCm) > 0 ? 'destra' : 'sinistra'} del centro`} · ${m.yCm} cm ${String(zone).startsWith('sleeve') ? 'dalla sommità della manica' : 'sotto il centro collo'}${Number(m.rotation) ? ` · ruotato ${m.rotation}°` : ''}`
+          ? `${m.technique ? ` · ${TECHNIQUE_LABEL[m.technique as TechniqueCode] ?? m.technique}` : ''} · ${m.heightCm ? `${m.widthCm} × ${m.heightCm} cm` : `larghezza ${m.widthCm} cm`} · ${Number(m.xCm) === 0 ? 'centrato' : `${Math.abs(Number(m.xCm))} cm a ${Number(m.xCm) > 0 ? 'destra' : 'sinistra'} del centro`} · ${m.yCm} cm ${String(zone).startsWith('sleeve') ? 'dalla sommità della manica' : 'sotto il centro collo'}${Number(m.rotation) ? ` · ruotato ${m.rotation}°` : ''}`
           : ''
-        lines.push(`${name}: ${c.area_name} (${ZONE_LABEL[zone as keyof typeof ZONE_LABEL] ?? zone})${pos} · file originale "${m.name ?? ''}"${m.width ? ` ${m.width}×${m.height} px` : ''}${m.effectiveDpi ? ` · ≈${m.effectiveDpi} dpi` : ''}`)
+        lines.push(`${name}: ${c.area_name} (${zoneLabel})${pos} · file originale "${m.name ?? ''}"${m.width ? ` ${m.width}×${m.height} px` : ''}${m.effectiveDpi ? ` · ≈${m.effectiveDpi} dpi` : ''}`)
       }
       if (!rows.length) throw new Error('Il cliente non ha caricato file per questo articolo.')
       lines.push('', 'Posizioni misurate guardando il pezzo dall’esterno, dal punto di riferimento del cartamodello.')
@@ -170,13 +175,12 @@ function ProductionDialog({ item, orderRef, base, onClose }: { item: OrderItem; 
       if (!product) throw new Error('Prodotto non trovato.')
       const { data: sets, error } = await supabase.from('pattern_sets').select('*, pattern_pieces(*)').eq('product_id', product.id)
       if (error) throw error
-      if (!sets?.length) throw new Error('Questo prodotto non ha cartamodelli: caricali nella scheda Cartamodelli del prodotto.')
       // per ogni componente: cartamodello della tipologia scelta se esiste, altrimenti quello generico
       const comps = product.product_type === 'kit' && product.kit_items.length ? product.kit_items.map((k) => k.id as string | null) : [null]
       const pieces: ProductionPiece[] = []
       const referenceSize: Record<string, string | null> = {}
       for (const comp of comps) {
-        const mine = sets.filter((x) => (x.kit_item_id ?? null) === comp)
+        const mine = (sets ?? []).filter((x) => (x.kit_item_id ?? null) === comp)
         const set = mine.find((x) => x.garment_type_id && x.garment_type_id === config.garmentTypeId) ?? mine.find((x) => !x.garment_type_id)
         if (!set) continue
         referenceSize[comp ?? 'main'] = set.reference_size
@@ -185,19 +189,26 @@ function ProductionDialog({ item, orderRef, base, onClose }: { item: OrderItem; 
       const variant = product.product_variants.find((v) => v.id === config.variantId)
       const baseColor = variant?.color_hex ?? config.baseColor ?? DEFAULT_BASE
       const [{ buildPlan }, { buildProductionPdf }] = await Promise.all([import('@/lib/production/plan'), import('@/lib/production/pdf')])
+      const techniques = await listTechniques().catch(() => [])
       const plan = buildPlan({
         product, config, pieces, referenceSize, baseColor, secondaryColor: variant?.secondary_hex ?? null,
-        textStyle: config.textStyle ?? DEFAULT_TEXT, bleedMm: settings.bleedMm,
+        textStyle: config.textStyle ?? DEFAULT_TEXT, bleedMm: settings.bleedMm, techniques,
       })
-      if (!plan.jobs.length) throw new Error(plan.warnings[0] ?? 'Nessun pezzo da stampare.')
-      const pdf = await buildProductionPdf(plan.jobs, settings, {
+      if (!plan.jobs.length && !plan.transfers.length && !plan.specs.length) {
+        throw new Error(plan.warnings[0] ?? (pieces.length ? 'Nessun pezzo da stampare.' : 'Questo prodotto non ha cartamodelli né aree di stampa: carica il cartamodello nella scheda Cartamodelli del prodotto.'))
+      }
+      const pdf = await buildProductionPdf(plan, settings, {
         orderRef, productName: item.product_name, colorName: variant?.name ?? null, baseColor, secondaryColor: variant?.secondary_hex ?? null,
         notes: config.customDescription ?? null, roster: config.roster ?? [], warnings: plan.warnings,
       }, config.textStyle ?? DEFAULT_TEXT, (a: AssetRef) => fetchBytes(a.bucket, a.path!))
       save(new Blob([pdf.bytes as BlobPart], { type: 'application/pdf' }), `${base}_produzione.pdf`)
       setReport({
         warnings: [...plan.warnings, ...(pdf.tooWide.length ? [`${pdf.tooWide.length} pezzi sono più larghi del rotolo e non sono stati disposti.`] : [])],
-        result: `${pdf.pieces} pezzi su ${pdf.pages} ${pdf.pages === 1 ? 'pagina' : 'pagine'} · circa ${(pdf.lengthMm / 1000).toFixed(2).replace('.', ',')} m di rotolo.`,
+        result: [
+          pdf.pieces ? `${pdf.pieces} pezzi su ${pdf.pages} ${pdf.pages === 1 ? 'pagina' : 'pagine'} · circa ${(pdf.lengthMm / 1000).toFixed(2).replace('.', ',')} m di rotolo` : null,
+          pdf.transfers ? `${pdf.transfers} transfer DTF · circa ${(pdf.dtfLengthMm / 1000).toFixed(2).replace('.', ',')} m` : null,
+          pdf.specSheets ? `${pdf.specSheets} ${pdf.specSheets === 1 ? 'scheda' : 'schede'} di posizionamento` : null,
+        ].filter(Boolean).join(' · ') + '.',
       })
     } catch (e) {
       toast(errorMessage(e), 'error')
@@ -208,7 +219,7 @@ function ProductionDialog({ item, orderRef, base, onClose }: { item: OrderItem; 
 
   const set = (k: keyof ProductionSettings) => (e: React.ChangeEvent<HTMLInputElement>) => s && setS({ ...s, [k]: e.target.value })
   return (
-    <Modal open onClose={onClose} size="lg" title="File di produzione" description="PDF in scala reale con i pezzi del cartamodello di ogni giocatore, nella sua taglia, disposti sul rotolo."
+    <Modal open onClose={onClose} size="lg" title="File di produzione" description="PDF in scala reale con i pezzi del cartamodello di ogni giocatore nella sua taglia, il foglio dei transfer DTF e le schede di posizionamento per serigrafia e ricamo."
       footer={<><Button variant="ghost" onClick={onClose}>Chiudi</Button><Button loading={busy} disabled={!s} icon={<Printer className="h-4 w-4" />} onClick={() => void generate()}>Genera PDF</Button></>}>
       {!s ? null : (
         <div className="space-y-5">

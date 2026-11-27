@@ -1,6 +1,6 @@
 // Test di cartamodelli, posizionamento e produzione con dati DEMO (misure note, non per produzione).
 import { parseDxf } from '../src/lib/patterns/dxf'
-import { autoAnchor, bounds } from '../src/lib/patterns/geometry'
+import { autoAnchor, bounds, legAnchors } from '../src/lib/patterns/geometry'
 import { elementCenterMm, elementCornersMm, placementIssue } from '../src/lib/patterns/placement'
 import { offsetOutline } from '../src/lib/production/offset'
 import { layoutPieces } from '../src/lib/production/layout'
@@ -151,6 +151,77 @@ near(bounds(inch.pieces[0].outline).width, 500 * 25.4, 0.5) ? ok('conversione da
     ? ok('all-over: grafica del capo su davanti e maniche, sostituzione solo sul dietro') : fail(JSON.stringify({ f: byPiece('front'), b: byPiece('back'), s: byPiece('sleeve_left') }))
   aoPlan.jobs.find((j) => j.piece === 'front')!.placements.length === fM.placements.length
     ? ok('all-over: loghi, nomi e numeri restano sopra la grafica') : fail('placements cambiati')
+}
+
+// Aree per tecnica, transfer DTF, schede, dima di riferimento, fasce, colori per sezione, gambe
+{
+  const asset = { bucket: 'customer-uploads' as const, path: 'u/g.png', name: 'g.png', mime: 'image/png', width: 1000, height: 1000, sizeBytes: 1, isVector: false, effectiveDpi: null, metadataDpi: null, quality: 'ok' as const }
+  const rect = (w: number, h: number): [number, number][] => [[0, 0], [w, 0], [w, h], [0, h]]
+  const pc = (size: string, piece: ProductionPiece['piece'], outline: [number, number][], anchor: ProductionPiece['anchor']): ProductionPiece =>
+    ({ kitItemId: null, size, piece, name: piece, quantity: 1, outline, anchor, mirror: false, grain_angle: 0 })
+  const style = { color: '#fff', outline: null, font: 'block' as const }
+  const techniques = [
+    { code: 'dtf', name: 'Stampa DTF', min_price: 1.5, max_price: 5, all_over_only: false, is_active: true, sort_order: 20 },
+    { code: 'screen', name: 'Serigrafia', min_price: 1.5, max_price: 5, all_over_only: false, is_active: true, sort_order: 10 },
+  ] as never
+  const zoneRow = { id: 'z', product_id: 'p', kit_item_id: null, zone: 'front', x_cm: -15, y_cm: 5, width_cm: 30, height_cm: 30, max_items: 3, allow_graphic: true, allow_text: true, techniques: ['dtf', 'screen', 'sublimation'], sort_order: 0 }
+  const tee = {
+    id: 'p', name: 'T', product_type: 'simple', model_shape: 'tshirt', sizes: ['M', 'L'], kit_items: [], customization_areas: [],
+    print_zones: [zoneRow], band_enabled: true, band_height_cm: 3,
+  } as never
+  const teePieces = [pc('M', 'front', rect(500, 700), { x: 250, y: 620 }), pc('M', 'sleeve_left', rect(380, 240), { x: 190, y: 240 })]
+  const cfg = {
+    version: 1, optionValueIds: [], areas: {},
+    roster: [{ id: 'a', size: 'M', quantity: 1 }, { id: 'b', size: 'L', quantity: 2 }],
+    elements: [
+      { id: 'd', kind: 'graphic', zone: 'front', asset, xCm: 0, yCm: 12, widthCm: 15, heightCm: 15, rotation: 0, technique: 'dtf' },
+      { id: 's', kind: 'text', zone: 'front', text: 'Team', font: 'block', color: '#FF0000', xCm: 0, yCm: 28, widthCm: 20, heightCm: 5, rotation: 0, technique: 'sublimation' },
+    ],
+    bands: [{ kitItemId: null, mode: 'color', color: '#00FF00' }],
+    allOver: [{ asset, colors: { sleeve_left: '#123456' } }],
+  } as never
+  const r = buildPlan({ product: tee, config: cfg, pieces: teePieces, referenceSize: { main: 'M' }, baseColor: '#FFFFFF', secondaryColor: null, textStyle: style, bleedMm: 5, techniques })
+  const front = r.jobs.filter((j) => j.piece === 'front')
+  front.length === 3 && front.every((j) => j.placements.length === 1 && j.placements[0].kind === 'text' && j.placements[0].text === 'TEAM' && j.placements[0].textStyle?.color === '#FF0000')
+    ? ok('sublimazione sul pezzo (testo con il suo colore), DTF non stampato sul pezzo') : fail(JSON.stringify(front.map((j) => j.placements)))
+  r.transfers.length === 1 && r.transfers[0].copies === 3 && near(r.transfers[0].w, 150) && near(r.transfers[0].h, 150)
+    ? ok('transfer DTF 15 × 15 cm, una copia per capo (3)') : fail(JSON.stringify(r.transfers))
+  const spec = r.specs.find((s) => s.zone === 'front')
+  // 15×15 = 225 cm² su 900 cm² → 1,50 + 0,25 × 3,50 = 2,375 → 2,38
+  spec && spec.items.length === 2 && spec.items[0].price === 2.38 && spec.items[0].technique === 'dtf' && spec.garments === 3 && !spec.virtual
+    ? ok('scheda del davanti: 2 aree, prezzo DTF in proporzione all’area (2,38 €)') : fail(JSON.stringify(spec && { items: spec.items.map((i) => [i.technique, i.price]), g: spec.garments }))
+  const lJobs = r.jobs.filter((j) => j.size === 'L')
+  lJobs.length === 4 && lJobs.every((j) => j.patternSize === 'M') && r.warnings.some((w) => w.includes('taglia L senza dima, usata la dima M'))
+    ? ok('taglia senza pezzi: usata la dima M, segnalato una volta') : fail(JSON.stringify({ n: lJobs.length, w: r.warnings }))
+  const sl = r.jobs.find((j) => j.piece === 'sleeve_left')!, fr = r.jobs.find((j) => j.piece === 'front')!
+  sl.band?.color === '#00FF00' && near(sl.band.heightMm, 30) && fr.band === null ? ok('fascia colorata di 3 cm sulle maniche, non sul davanti') : fail(JSON.stringify({ s: sl.band, f: fr.band }))
+  sl.fill === '#123456' && sl.allOver === null && fr.allOver?.path === 'u/g.png' ? ok('colore della sezione sulla manica, grafica all-over sul davanti') : fail(JSON.stringify({ fill: sl.fill, a: sl.allOver, f: fr.allOver }))
+
+  // senza cartamodello: schede e transfer DTF comunque, avviso solo se servono pezzi da sublimare
+  const noPat = buildPlan({ product: tee, config: { ...(cfg as object), allOver: [], elements: [(cfg as { elements: unknown[] }).elements[0]] } as never, pieces: [], referenceSize: {}, baseColor: '#FFFFFF', secondaryColor: null, textStyle: style, bleedMm: 5, techniques })
+  noPat.jobs.length === 0 && noPat.transfers.length === 1 && noPat.specs.length === 1 && noPat.specs[0].virtual && noPat.warnings.length === 0
+    ? ok('senza cartamodello: transfer DTF e scheda sulla sagoma, nessun avviso') : fail(JSON.stringify({ j: noPat.jobs.length, t: noPat.transfers.length, s: noPat.specs.map((s) => s.virtual), w: noPat.warnings }))
+
+  // pantaloncino: gambe con davanti e dietro uniti, centro davanti (basso) e centro dietro (alto) in vita
+  const leg: [number, number][] = [[0, 0], [600, 0], [600, 560], [300, 520], [0, 500]] // davanti a sinistra (vita più bassa)
+  const anchors = legAnchors(leg)
+  near(anchors.front[0], 0) && near(anchors.front[1], 500) && near(anchors.back[0], 600) && near(anchors.back[1], 560)
+    ? ok('gamba: centro davanti nell’angolo in vita più basso, centro dietro in quello più alto') : fail(JSON.stringify(anchors))
+  const legL = pc('M', 'leg_left', leg, { x: 0, y: 500, bx: 600, by: 560 })
+  const legR = pc('M', 'leg_right', leg.map(([x, y]) => [600 - x, y] as [number, number]), { x: 600, y: 500, bx: 0, by: 560 })
+  const shorts = { id: 'p', name: 'S', product_type: 'simple', model_shape: 'shorts', sizes: ['M'], kit_items: [], customization_areas: [], print_zones: [] } as never
+  const sc = {
+    version: 1, optionValueIds: [], areas: {}, roster: [{ id: 'a', size: 'M', quantity: 1 }],
+    elements: [
+      { id: 'f', kind: 'graphic', zone: 'front', asset, xCm: 8, yCm: 6, widthCm: 6, rotation: 0, technique: 'sublimation' },
+      { id: 'b', kind: 'graphic', zone: 'back', asset, xCm: -5, yCm: 4, widthCm: 6, rotation: 0, technique: 'sublimation' },
+    ],
+  } as never
+  const sp = buildPlan({ product: shorts, config: sc, pieces: [legL, legR], referenceSize: { main: 'M' }, baseColor: '#FFFFFF', secondaryColor: null, textStyle: style, bleedMm: 5 })
+  const jl = sp.jobs.find((j) => j.piece === 'leg_left')!, jr = sp.jobs.find((j) => j.piece === 'leg_right')!
+  const fL = jl.placements[0].center, bL = jl.placements[1].center, fR = jr.placements[0].center
+  jl.placements.length === 2 && jr.placements.length === 2 && near(fL[0], 80) && near(fL[1], 440) && near(bL[0], 550) && near(bL[1], 520) && near(fR[0], 680) && near(fR[1], 440)
+    ? ok('gambe: davanti misurato dal centro davanti, dietro dal centro dietro, su entrambe le gambe') : fail(JSON.stringify({ l: jl.placements.map((p) => p.center), r: jr.placements.map((p) => p.center) }))
 }
 
 console.log(failures ? `\n${failures} TEST FALLITI` : '\nTutti i test superati')
