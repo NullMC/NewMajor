@@ -25,7 +25,9 @@ const MODELS = {
   hoodie: { file: 'hoodie.glb', mm: 900, neckY: 68, backNeckY: 73 },
   track_jacket: { file: 'track_jacket.glb', mm: 700, neckY: 86, backNeckY: 91 },
   track_pants: { file: 'track_pants.glb', mm: 1050, bottom: true },
-  jacket: { file: 'puffer.glb', mm: 760, neckY: 89, backNeckY: 95 },
+  // cappuccio: scollatura alla base del cappuccio (piumino) o dove i bordi del cappuccio incontrano la zip
+  jacket: { file: 'jacket.glb', mm: 780, neckY: 84, backNeckY: 90 },
+  puffer: { file: 'puffer.glb', mm: 950, neckY: 67, backNeckY: 73 },
   shorts: { file: 'shorts.glb', mm: 500, bottom: true },
 }
 

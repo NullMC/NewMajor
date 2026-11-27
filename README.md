@@ -209,8 +209,9 @@ Nessuna libreria di stato globale, form o data-fetching: sono coperti da context
 
 ## 8. Semplificazioni e punti da completare
 
-- **Modelli 3D**: maglia manica corta e lunga, polo, felpa con cappuccio, giacca e pantalone tuta, giubbotto e pantaloncino usano modelli 3D reali (`public/models/`, fonti e licenze in `public/models/CREDITS.md` e nella pagina pubblica `/crediti`, obbligatoria per la licenza CC BY). Le grafiche sono proiettate da fronte e retro senza mappatura UV; le maniche seguono l’asse del braccio di ogni modello. Solo la canotta usa ancora una sagoma procedurale. Per aggiungere un modello:
+- **Modelli 3D**: maglia manica corta e lunga, polo, felpa con cappuccio, giacca e pantalone tuta, giubbotto con cappuccio, piumino con cappuccio e pantaloncino usano modelli 3D reali (`public/models/`, fonti e licenze in `public/models/CREDITS.md` e nella pagina pubblica `/crediti`, obbligatoria per la licenza CC BY). Le grafiche sono proiettate da fronte e retro senza mappatura UV; le maniche seguono l’asse del braccio di ogni modello. Solo la canotta usa ancora una sagoma procedurale. Per aggiungere un modello:
   1. `node scripts/models/optimize.mjs originale.glb public/models/nome.glb [ratio] "titolo, autore, licenza"` (toglie texture, applica le trasformazioni, centra a altezza 1; il fronte deve guardare verso +z);
+     se il capo originale è ruotato o inclinato, prima `yaw_fix.mjs` (rotazione attorno alla verticale) e `tilt_fix.mjs` (inclinazione del busto, `EXTRA_ROLL` per ritocchi a vista); per i capi con guscio spesso (es. piumini da CLO), dopo l’ottimizzazione `zside_fix.mjs` evita che la superficie interna mostri la grafica del lato opposto;
   2. registrarlo in `MODELS` di `scripts/models/outlines.mjs` e rigenerare `src/features/configurator/garment/outlines.ts` (sagoma frontale e riferimenti delle maniche);
   3. aggiungerlo a `GARMENT_MODELS` (`ModelGarment.tsx`), al tipo `ModelShape` e, se serve un nuovo valore, all’enum `model_shape` con una migration; aggiornare i crediti.
   Gli script richiedono `@gltf-transform/*`, `meshoptimizer` e `gl-matrix` in una cartella di lavoro esterna (vedi l’intestazione dei file).

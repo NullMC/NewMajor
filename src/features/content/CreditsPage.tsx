@@ -12,7 +12,8 @@ const MODELS = [
   { use: 'Pantalone tuta', title: 'Dillard, Darren Joggers', author: 'darrendillard1', url: 'https://sketchfab.com/3d-models/dillard-darren-joggers-1f6f7318f9364456b8d58c1eaf71762b', license: CC_BY },
   { use: 'Polo', title: 'T-shirt Polo Lengan Pendek', author: 'Ikal.Ichwan', url: 'https://sketchfab.com/3d-models/t-shirt-polo-lengan-pendek-74c33d16b31346f1a46a55c3ec8e8a78', license: CC_BY },
   { use: 'Maglia manica lunga', title: 'Dickies Long Sleeve Shirt', author: 'Kodie Russell', url: 'https://sketchfab.com/3d-models/dickies-long-sleeve-shirt-f6f27327fbaf423081ae9da8e5dc109e', license: CC_BY },
-  { use: 'Giubbotto', title: 'Puffer Jacket', author: 'sivayuce', url: 'https://sketchfab.com/3d-models/puffer-jacket-ca50a464389b4ea8aa4c748bd43ec480', license: CC_BY },
+  { use: 'Piumino con cappuccio', title: 'men s black puffy jacket', author: 'funlab117', url: 'https://sketchfab.com/3d-models/men-s-black-puffy-jacket-587515ac17ad49db9541ff7c0c06affb', license: CC_BY },
+  { use: 'Giubbotto con cappuccio', title: 'Hooded Jacket', author: 'ArtDevice', url: 'https://sketchfab.com/3d-models/hooded-jacket-562280813fa74612a89369d4b791e011', license: CC_BY },
   { use: 'Felpa con cappuccio', title: 'Hoodie', author: 'Virtual Pandora', url: 'https://sketchfab.com/3d-models/hoodie-97611a53e3b846f69e0655b210f72b2f', license: CC_BY },
 ]
 
