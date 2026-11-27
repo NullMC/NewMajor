@@ -47,7 +47,23 @@ for (const [name, side] of [['leg_left', 1], ['leg_right', -1]]) {
   const box = Array.from({ length: BANDS }, () => [Infinity, -Infinity, Infinity, -Infinity])
   const band = (y) => Math.min(BANDS - 1, Math.max(0, Math.floor(((yTop - y) / H) * BANDS)))
   for (const t of mine) for (const v of t) { const b = box[band(v.p[1])]; b[0] = Math.min(b[0], v.p[0]); b[1] = Math.max(b[1], v.p[0]); b[2] = Math.min(b[2], v.p[2]); b[3] = Math.max(b[3], v.p[2]) }
-  const centre = (y) => { const b = box[band(y)]; return Number.isFinite(b[0]) ? [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2] : [side * 0.1, 0] }
+  // centro della gamba per fascia, smussato sulle fasce vicine e interpolato in altezza: senza salti
+  // tra una fascia e l'altra il giro attorno alla gamba (e quindi la fascia laterale) resta regolare
+  const raw = box.map((b) => (Number.isFinite(b[0]) ? [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2] : null))
+  for (let i = 0; i < BANDS; i++) if (!raw[i]) raw[i] = raw[i - 1] ?? raw.find(Boolean) ?? [side * 0.1, 0]
+  const smooth = (arr, k = 3) => arr.map((_, i) => {
+    let n = 0
+    const acc = arr[0].map(() => 0)
+    for (let j = Math.max(0, i - k); j <= Math.min(arr.length - 1, i + k); j++) { n++; arr[j].forEach((v, d) => { acc[d] += v }) }
+    return acc.map((v) => v / n)
+  })
+  const centres = smooth(raw)
+  const lerpBand = (arr, y) => {
+    const f = Math.min(BANDS - 1, Math.max(0, ((yTop - y) / H) * BANDS - 0.5))
+    const i0 = Math.floor(f), i1 = Math.min(BANDS - 1, i0 + 1), k = f - i0
+    return arr[i0].map((v, d) => v + (arr[i1][d] - v) * k)
+  }
+  const centre = (y) => lerpBand(centres, y)
   const tOf = ({ p }) => {
     const [cx, cz] = centre(p[1])
     const phi = Math.atan2(p[2] - cz, (p[0] - cx) * side) // 0 esterno, +π/2 davanti, ±π interno
@@ -64,10 +80,11 @@ for (const [name, side] of [['leg_left', 1], ['leg_right', -1]]) {
     return [s[Math.floor(s.length * 0.01)], s[Math.ceil(s.length * 0.99) - 1]]
   })
   for (let i = 0; i < BANDS; i++) if (!range[i]) range[i] = range[i - 1] ?? range.find(Boolean) ?? [0, 1]
+  const ranges = smooth(range)
   const stretch = (v) => {
     const f = Math.min(BANDS - 1, Math.max(0, ((yTop - v.p[1]) / H) * BANDS - 0.5))
     const i0 = Math.floor(f), i1 = Math.min(BANDS - 1, i0 + 1), k = f - i0
-    const lo = range[i0][0] + (range[i1][0] - range[i0][0]) * k, hi = range[i0][1] + (range[i1][1] - range[i0][1]) * k
+    const lo = ranges[i0][0] + (ranges[i1][0] - ranges[i0][0]) * k, hi = ranges[i0][1] + (ranges[i1][1] - ranges[i0][1]) * k
     return Math.min(1, Math.max(0, (tOf(v) - lo) / Math.max(1e-3, hi - lo)))
   }
   const pos = [], nor = [], uv = []
