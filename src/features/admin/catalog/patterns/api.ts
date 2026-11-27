@@ -1,7 +1,7 @@
 // Accesso ai cartamodelli (solo admin, garantito da RLS) e ai file sorgente nel bucket privato.
 
 import { supabase } from '@/lib/supabase'
-import type { PieceKind, Vec } from '@/lib/patterns/geometry'
+import type { PieceAnchor, PieceKind, Vec } from '@/lib/patterns/geometry'
 import type { SourceUnit } from '@/lib/patterns/dxf'
 
 export const PATTERNS_BUCKET = 'patterns'
@@ -27,7 +27,7 @@ export interface PatternPiece {
   name: string
   quantity: number
   outline: Vec[]
-  anchor: { x?: number; y?: number }
+  anchor: PieceAnchor
   mirror: boolean
   grain_angle: number
   sort_order: number

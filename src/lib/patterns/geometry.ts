@@ -1,13 +1,21 @@
 // Geometria dei pezzi di cartamodello: poligoni in millimetri, y verso l'alto.
 
 export type Vec = [number, number]
-export type PieceKind = 'front' | 'back' | 'sleeve_left' | 'sleeve_right' | 'collar' | 'cuff' | 'other'
+export type PieceKind = 'front' | 'back' | 'sleeve_left' | 'sleeve_right' | 'leg_left' | 'leg_right' | 'collar' | 'cuff' | 'other'
+
+/**
+ * Punto di riferimento del pezzo (mm). Per le gambe del pantaloncino (davanti e dietro uniti sulla
+ * cucitura laterale) x, y è il centro davanti in vita e bx, by il centro dietro in vita.
+ */
+export interface PieceAnchor { x?: number; y?: number; bx?: number; by?: number }
 
 export const PIECE_LABEL: Record<PieceKind, string> = {
   front: 'Davanti',
   back: 'Dietro',
   sleeve_left: 'Manica sinistra',
   sleeve_right: 'Manica destra',
+  leg_left: 'Gamba sinistra',
+  leg_right: 'Gamba destra',
   collar: 'Collo',
   cuff: 'Polsino',
   other: 'Altro',
@@ -71,10 +79,13 @@ export function simplify(pts: Vec[], tol: number): Vec[] {
     const [a, b] = stack.pop()!
     const [ax, ay] = pts[a], [bx, by] = pts[b]
     const dx = bx - ax, dy = by - ay
-    const len = Math.hypot(dx, dy) || 1
+    const len = Math.hypot(dx, dy)
     let best = -1, bestD = tol
     for (let i = a + 1; i < b; i++) {
-      const d = Math.abs(dy * pts[i][0] - dx * pts[i][1] + bx * ay - by * ax) / len
+      // estremi coincidenti (contorno chiuso che torna al punto di partenza): distanza dal punto
+      const d = len > 1e-9
+        ? Math.abs(dy * pts[i][0] - dx * pts[i][1] + bx * ay - by * ax) / len
+        : Math.hypot(pts[i][0] - ax, pts[i][1] - ay)
       if (d > bestD) { bestD = d; best = i }
     }
     if (best > 0) { keep[best] = 1; stack.push([a, best], [best, b]) }
@@ -122,6 +133,7 @@ function verticalHits(pts: Vec[], cx: number): number[] {
  * Punto di riferimento proposto in automatico:
  * - davanti/dietro: centro del collo, cioè il bordo superiore del pezzo sull'asse centrale;
  * - maniche: il punto più alto della testa della manica;
+ * - gambe: l'angolo in vita più basso (centro davanti, vedi legAnchors);
  * - altri pezzi: centro del bordo superiore.
  */
 export function autoAnchor(pts: Vec[], kind: PieceKind): Vec {
@@ -131,15 +143,47 @@ export function autoAnchor(pts: Vec[], kind: PieceKind): Vec {
     for (const p of pts) if (p[1] > top[1]) top = p
     return [round(top[0]), round(top[1])]
   }
+  if (kind === 'leg_left' || kind === 'leg_right') return legAnchors(pts).front
   const cx = b.minX + b.width / 2
   const hits = verticalHits(pts, cx)
   return [round(cx), round(hits.length ? Math.max(...hits) : b.maxY)]
+}
+
+/**
+ * Riferimenti di una gamba del pantaloncino: i due angoli del bordo in vita (il punto più alto e più
+ * esterno di ciascuna metà del pezzo). Il centro dietro sale più del davanti (cavallo alto), quindi l'angolo
+ * più basso è il centro davanti.
+ */
+export function legAnchors(pts: Vec[]): { front: Vec; back: Vec } {
+  const b = bounds(pts)
+  const cx = b.minX + b.width / 2
+  const topOf = (side: -1 | 1) => {
+    let best: Vec | null = null
+    // il più alto, preferendo i punti verso l'esterno: l'angolo in vita, non il centro del bordo
+    const score = (p: Vec) => p[1] + 0.5 * Math.abs(p[0] - cx)
+    for (const p of pts) if ((p[0] - cx) * side >= 0 && (!best || score(p) > score(best))) best = p
+    return best ?? [cx, b.maxY]
+  }
+  const l = topOf(-1), r = topOf(1)
+  const [front, back] = l[1] <= r[1] ? [l, r] : [r, l]
+  return { front: [round(front[0]), round(front[1])], back: [round(back[0]), round(back[1])] }
+}
+
+/** Riferimento proposto per il tipo di pezzo (con il centro dietro per le gambe). */
+export function defaultAnchor(pts: Vec[], kind: PieceKind): PieceAnchor {
+  if (kind === 'leg_left' || kind === 'leg_right') {
+    const { front, back } = legAnchors(pts)
+    return { x: front[0], y: front[1], bx: back[0], by: back[1] }
+  }
+  const [x, y] = autoAnchor(pts, kind)
+  return { x, y }
 }
 
 /** Tipo di pezzo dedotto dal nome (italiano o inglese). */
 export function guessKind(name: string): PieceKind {
   const n = name.toLowerCase()
   if (/(sleeve|manica|maniche)/.test(n)) return /(right|destr|\bdx\b|\br\b)/.test(n) ? 'sleeve_right' : 'sleeve_left'
+  if (/(leg|gamba|pantalonc|short)/.test(n)) return /(right|destr|\bdx\b|\br\b)/.test(n) ? 'leg_right' : 'leg_left'
   if (/(cuff|polsin)/.test(n)) return 'cuff'
   if (/(collar|collo|collett|neck|rib|scollo)/.test(n)) return 'collar'
   if (/(back|dietro|retro|posterior|schiena)/.test(n)) return 'back'
