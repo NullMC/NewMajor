@@ -42,7 +42,8 @@ export interface PanelSpec {
   /** Grafica all-over del cliente: copre l'intero pannello, sotto loghi, nomi e numeri. */
   allOver?: CanvasImageSource | null
   /** Fascia sul fondo (pantaloncini e pantaloni): immagine o colore pieno, altezza in unità della sagoma. */
-  hemBand?: { image: CanvasImageSource; height: number } | null
+  /** Fasce longitudinali (spalle e maniche, fianchi dei pantaloni): immagine o colore pieno dentro i poligoni, in unità della sagoma. */
+  bands?: { image: CanvasImageSource; polys: Pt[][] } | null
   /** Metà sinistra e destra con grafica/colore propri (gambe del pantaloncino). */
   allOverHalves?: { left: CanvasImageSource | null; right: CanvasImageSource | null } | null
   /** Aree massime di stampa (guide), in unità della sagoma: centro e dimensioni. */
@@ -177,10 +178,18 @@ export function drawPanel(canvas: HTMLCanvasElement, spec: PanelSpec, width = PA
   if (spec.allOver) drawImageFit(ctx, spec.allOver, 0, 0, w, h, 'cover')
   if (spec.allOverHalves?.left) drawImageFit(ctx, spec.allOverHalves.left, 0, 0, w / 2, h, 'cover')
   if (spec.allOverHalves?.right) drawImageFit(ctx, spec.allOverHalves.right, w / 2, 0, w / 2, h, 'cover')
-  // fascia sul fondo (gambe), ritagliata dalla sagoma
-  if (spec.hemBand && spec.hemBand.height > 0) {
-    const bandH = (spec.hemBand.height / (shape.bounds.maxY - shape.bounds.minY)) * h
-    drawImageFit(ctx, spec.hemBand.image, 0, h - bandH, w, bandH, 'cover')
+  // fasce longitudinali, ritagliate dalla sagoma
+  for (const poly of spec.bands?.polys ?? []) {
+    const pts = poly.map((p) => toCanvas(p, shape.bounds, w, h))
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
+    ctx.save()
+    ctx.beginPath()
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+    ctx.closePath()
+    ctx.clip()
+    const x0 = Math.min(...xs), y0 = Math.min(...ys)
+    drawImageFit(ctx, spec.bands!.image, x0, y0, Math.max(...xs) - x0, Math.max(...ys) - y0, 'cover')
+    ctx.restore()
   }
   for (const l of sideLayers) {
     if (l.area.area_type === 'all_over' && l.image) drawImageFit(ctx, l.image, ...rect(l.area), 'cover')

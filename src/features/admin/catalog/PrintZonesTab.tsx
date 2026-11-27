@@ -215,7 +215,7 @@ function BandSettings({ product, kitItemId, onSaved }: { product: ProductDetail;
   const [error, setError] = useState<string | null>(null)
   const save = async () => {
     const h = n(height), p = n(price)
-    if (!(h > 0 && h <= 30)) return setError('Altezza della fascia tra 0 e 30 cm.')
+    if (!(h > 0 && h <= 30)) return setError('Larghezza della fascia tra 0 e 30 cm.')
     if (!(p >= 0)) return setError('Il prezzo deve essere maggiore o uguale a 0.')
     setSaving(true)
     setError(null)
@@ -235,10 +235,10 @@ function BandSettings({ product, kitItemId, onSaved }: { product: ProductDetail;
   }
   return (
     <Card>
-      <CardHeader title="Fasce" description="Fascia sul fondo delle maniche (capi superiori) o delle gambe (pantaloncini e pantaloni): il cliente sceglie un colore diverso o una grafica stampata." />
+      <CardHeader title="Fasce" description="Fasce longitudinali: sui capi superiori partono dal colletto (cucitura tra davanti e dietro), seguono la spalla e scendono lungo la sommità della manica fino al polsino; su pantaloncini e pantaloni corrono lungo il lato esterno della gamba, dalla vita all'orlo. Il cliente sceglie un colore diverso o una grafica stampata." />
       <div className="grid gap-4 p-5 sm:grid-cols-3">
         <div className="flex items-center gap-3"><Switch checked={enabled} onChange={setEnabled} label="Consenti le fasce" /><span className="text-sm font-medium">Consenti le fasce</span></div>
-        <Field label="Altezza (cm)"><Input inputMode="decimal" value={height} onChange={(e) => setHeight(e.target.value)} /></Field>
+        <Field label="Larghezza (cm)"><Input inputMode="decimal" value={height} onChange={(e) => setHeight(e.target.value)} /></Field>
         <Field label="Prezzo (€ per capo)"><Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
         <div className="sm:col-span-3"><FormError message={error} /></div>
         <div className="flex justify-end sm:col-span-3"><Button loading={saving} onClick={() => void save()}>Salva</Button></div>

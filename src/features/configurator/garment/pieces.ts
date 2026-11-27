@@ -93,15 +93,21 @@ export function drawPieceCanvas(
     if (img) cover(img, 0, 0, w, h)
   }
   if (job.band) {
-    // fascia sul fondo del pezzo, come nel file di produzione
-    const bh = job.band.heightMm * k, y0 = h - bh
-    ctx.save()
-    ctx.beginPath()
-    ctx.rect(0, y0, w, bh)
-    ctx.clip()
-    if (job.band.color) { ctx.fillStyle = job.band.color; ctx.fillRect(0, y0, w, bh) }
-    else if (job.band.asset) { const img = image(job.band.asset); if (img) cover(img, 0, y0, w, bh) }
-    ctx.restore()
+    // fasce longitudinali come nel file di produzione (spalla e manica, lato della gamba)
+    for (const poly of job.band.polys) {
+      ctx.save()
+      ctx.beginPath()
+      poly.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))))
+      ctx.closePath()
+      ctx.clip()
+      if (job.band.color) { ctx.fillStyle = job.band.color; ctx.fillRect(0, 0, w, h) }
+      else if (job.band.asset) {
+        const img = image(job.band.asset)
+        const pb = bounds(poly)
+        if (img) cover(img, X(pb.minX), Y(pb.maxY), pb.width * k, pb.height * k)
+      }
+      ctx.restore()
+    }
   }
   for (const p of job.placements) {
     const pw = p.w * k, ph = p.h * k

@@ -17,7 +17,8 @@
 //   della taglia di riferimento e poi applicata in cm su ogni taglia;
 // - grafiche all-over: coprono l'intero pezzo; per sezione il cliente può scegliere un'altra
 //   grafica o un colore pieno;
-// - fasce: striscia sul fondo delle maniche (capi superiori) o delle gambe (pantaloni);
+// - fasce: bande longitudinali dal colletto lungo spalla e sommità della manica (capi superiori) o
+//   lungo il lato esterno della gamba dalla vita all'orlo (pantaloni), vedi lib/patterns/bands.ts;
 // - taglie senza dima: si usa la dima della taglia di riferimento, segnalandolo.
 
 import type { AssetRef, BandConfig, Configuration, PlacedElement, PrintZone, SectionKey, TechniqueCode, TextStyle } from '@/types/config'
@@ -25,6 +26,7 @@ import type { CustomizationArea, ModelShape, PrintTechnique, PrintZoneRow, Produ
 import { anchorOf, elementCenterMm, elementCornersMm, elementHeightCm, SECTION_LABEL } from '@/lib/patterns/placement'
 import { bounds, cleanOutline, type PieceAnchor, type PieceKind, type Vec } from '@/lib/patterns/geometry'
 import { elementPrice, findZone } from '@/lib/printing'
+import { bandPolygons } from '@/lib/patterns/bands'
 import { silhouetteFrame, virtualPiece } from '@/features/configurator/garment/elements'
 import { offsetOutline } from './offset'
 
@@ -57,7 +59,8 @@ export interface Placement {
   label: string
 }
 
-export interface BandFill { heightMm: number; color: string | null; asset: AssetRef | null }
+/** Fascia del pezzo: colore o grafica dentro i poligoni (mm, coordinate del pezzo), ritagliati sul pezzo. */
+export interface BandFill { widthMm: number; color: string | null; asset: AssetRef | null; polys: Vec[][] }
 
 export interface PieceJob {
   id: string
@@ -151,7 +154,6 @@ export interface PlanResult { jobs: PieceJob[]; transfers: TransferItem[]; specs
 const keyOf = (k: string | null) => k ?? 'main'
 const isBottom = (s: ModelShape) => s === 'shorts' || s === 'track_pants'
 const isLeg = (k: PieceKind) => k === 'leg_left' || k === 'leg_right'
-const isSleeve = (k: PieceKind) => k === 'sleeve_left' || k === 'sleeve_right'
 /** Le aree in sublimazione (e i loghi/sponsor senza tecnica) si stampano sul pezzo. */
 export const printedOnPiece = (e: Pick<PlacedElement, 'technique'>) => !e.technique || e.technique === 'sublimation'
 
@@ -235,7 +237,7 @@ export function buildPlan(input: PlanInput): PlanResult {
     const allOverCfg = (config.allOver ?? []).find((x) => (x.kitItemId ?? null) === comp.id) ?? null
     const bandCfg: BandConfig | null = comp.src.band_enabled ? (config.bands ?? []).find((b) => (b.kitItemId ?? null) === comp.id) ?? null : null
     const band: BandFill | null = bandCfg && (bandCfg.mode === 'color' ? bandCfg.color : bandCfg.asset)
-      ? { heightMm: Number(comp.src.band_height_cm ?? 4) * 10, color: bandCfg.mode === 'color' ? bandCfg.color ?? null : null, asset: bandCfg.mode === 'graphic' ? bandCfg.asset ?? null : null }
+      ? { widthMm: Number(comp.src.band_height_cm ?? 4) * 10, color: bandCfg.mode === 'color' ? bandCfg.color ?? null : null, asset: bandCfg.mode === 'graphic' ? bandCfg.asset ?? null : null, polys: [] }
       : null
 
     // posizione delle aree dell'admin in cm, calcolata una volta sulla taglia di riferimento
@@ -305,7 +307,8 @@ export function buildPlan(input: PlanInput): PlanResult {
           const color = allOverCfg.colors?.[section]
           if (color) { fill = color; allOver = null } else allOver = allOverCfg.overrides?.[section] ?? allOverCfg.asset ?? allOver
         }
-        const pieceBand = band && (isBottom(comp.shape) ? isLeg(p.piece) : isSleeve(p.piece)) ? band : null
+        const polys = band ? bandPolygons(p.piece, p, band.widthMm, isBottom(comp.shape)) : []
+        const pieceBand: BandFill | null = band && polys.length ? { ...band, polys } : null
 
         for (let c = 0; c < copies; c++) {
           // coppie specchiate (es. fianchi): si specchiano contorno e posizioni, non le grafiche
@@ -319,7 +322,7 @@ export function buildPlan(input: PlanInput): PlanResult {
             playerName: name, playerNumber: number, rosterIndex: ri,
             cut: mirrored ? mx(cut) : cut,
             bleed: mirrored ? mx(bleed) : bleed,
-            fill, allOver, band: pieceBand,
+            fill, allOver, band: pieceBand && mirrored ? { ...pieceBand, polys: pieceBand.polys.map(mx) } : pieceBand,
             placements: mirrored ? placements.map((pl) => ({ ...pl, center: [axis - pl.center[0], pl.center[1]] as Vec, rotation: -pl.rotation })) : placements,
           })
         }

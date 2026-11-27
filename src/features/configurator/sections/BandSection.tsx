@@ -1,4 +1,5 @@
-// Fasce: sul fondo delle maniche (capi superiori) o delle gambe (pantaloncini e pantaloni).
+// Fasce longitudinali: dal colletto lungo la spalla e la sommità della manica (capi superiori) o lungo
+// il lato esterno della gamba dalla vita all'orlo (pantaloncini e pantaloni).
 // Il cliente sceglie nessuna fascia, un colore diverso o una grafica stampata.
 
 import { useState } from 'react'
@@ -37,7 +38,10 @@ export function BandSection({ api }: { api: ConfiguratorApi }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-ink-600">
-        Una fascia alta {String(api.bandHeightCm).replace('.', ',')} cm sul fondo {api.isBottomShape ? 'delle gambe' : 'delle maniche'}, in un colore diverso o con una grafica stampata.
+        {api.isBottomShape
+          ? <>Una fascia larga {String(api.bandHeightCm).replace('.', ',')} cm lungo il lato esterno di ogni gamba, dalla vita all’orlo,</>
+          : <>Una fascia larga {String(api.bandHeightCm).replace('.', ',')} cm che parte dal colletto, segue la spalla e scende lungo la manica fino al polsino,</>}
+        {' '}in un colore diverso o con una grafica stampata.
         {price > 0 && <> Costo: <strong>+{formatPrice(price)}</strong> a capo.</>}
       </p>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Fascia">

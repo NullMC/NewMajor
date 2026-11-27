@@ -9,7 +9,7 @@ import { PUBLIC_BUCKET } from '@/lib/storage'
 import { centerIn, distribute, elementIssues, elementLabel, findZone, fitSize, heightOf, nextSlot, quickSpot, usableBox, zoneBox, type Box, type ElementIssue, type QuickSpot } from '@/lib/printing'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
 import { canvasToBlob, drawPanel, ensureFonts, isDark, LIVE_PANEL_WIDTH, type PanelLayer } from './garment/panel'
-import { areaBoxCm, drawSleeve, drawSleevePreview, silhouetteUnitsPerMm, sleeveInfo, toSilhouette, virtualPiece, withTextImages } from './garment/elements'
+import { areaBoxCm, drawSleeve, drawSleevePreview, silhouetteBands, sleeveInfo, toSilhouette, virtualPiece, withTextImages } from './garment/elements'
 import { anchorOf, elementDpi, elementHeightCm, SECTION_LABEL, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 import type { PieceKind } from '@/lib/patterns/geometry'
 import { buildPlan, type ProductionPiece } from '@/lib/production/plan'
@@ -351,17 +351,17 @@ export function useConfigurator(
         // pannelli usati anche come texture 3D: senza ombreggiatura del contorno (la aggiunge la vista
         // piana) e con le guide solo sul lato inquadrato, così sui fianchi del modello, dove davanti e
         // dietro si fondono, non compaiono le guide dell'altro lato
-        const hemBand = isBottom(shape) && bandImage(elementKit)
-          ? { image: bandImage(elementKit)!, height: bandHeightCm * 10 * silhouetteUnitsPerMm(shape) } : null
-        const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, highlightId: highlightArea, edges: false, hemBand }
+        const bandImg = bandImage(elementKit)
+        const bandsFor = (side: 'front' | 'back') => bandImg ? { image: bandImg, polys: silhouetteBands(shape, side, bandHeightCm * 10, isBottom(shape)) } : null
+        const common = { shape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, highlightId: highlightArea, edges: false }
         const legs = (side: 'front' | 'back') => isBottom(shape) ? legHalves(elementKit, side) : null
-        drawPanel(frontCanvas, { ...common, side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), allOverHalves: legs('front'), elements: silhouetteElements('front', shape, elementKit), zoneRects: guides ? zoneRectsFor('front') : [] }, LIVE_PANEL_WIDTH)
-        drawPanel(backCanvas, { ...common, side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), allOverHalves: legs('back'), elements: silhouetteElements('back', shape, elementKit), zoneRects: guides ? zoneRectsFor('back') : [] }, LIVE_PANEL_WIDTH)
+        drawPanel(frontCanvas, { ...common, bands: bandsFor('front'), side: 'front', guides: guides && view === 'front', allOver: allOverImage(elementKit, 'front'), allOverHalves: legs('front'), elements: silhouetteElements('front', shape, elementKit), zoneRects: guides ? zoneRectsFor('front') : [] }, LIVE_PANEL_WIDTH)
+        drawPanel(backCanvas, { ...common, bands: bandsFor('back'), side: 'back', guides: guides && view === 'back', allOver: allOverImage(elementKit, 'back'), allOverHalves: legs('back'), elements: silhouetteElements('back', shape, elementKit), zoneRects: guides ? zoneRectsFor('back') : [] }, LIVE_PANEL_WIDTH)
         for (const [zone, canvas] of [['sleeve_left', sleeveLeftCanvas], ['sleeve_right', sleeveRightCanvas]] as const) {
-          // maniche: pezzo del cartamodello o pezzo indicativo; fascia sul fondo manica (capi superiori)
-          const sleeveBand = !isBottom(shape) ? bandImage(elementKit) : null
+          // maniche: pezzo del cartamodello o pezzo indicativo; fascia lungo la sommità (capi superiori)
+          const sleeveBand = !isBottom(shape) ? bandImg : null
           drawSleeve(canvas, pieceFor(zone, elementKit), elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === elementKit), elementImages,
-            allOverImage(elementKit, zone), sleeveBand ? { image: sleeveBand, heightMm: bandHeightCm * 10 } : null)
+            allOverImage(elementKit, zone), sleeveBand ? { image: sleeveBand, widthMm: bandHeightCm * 10 } : null)
         }
         if (pieceMode) {
           // ricostruzione dai pezzi: piano di produzione del capo in anteprima (riga del roster scelta)
@@ -854,16 +854,15 @@ export function useConfigurator(
       : product.customization_areas.filter((a) => a.is_active))
     const mainShape = (product.kit_items[0]?.model_shape ?? product.model_shape) as ModelShape
     const mainBottom = isBottom(mainShape)
-    const hem = mainBottom ? bandImage(product.product_type === 'kit' ? firstKitItem : null) : null
-    const common = {
-      shape: mainShape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides: false,
-      hemBand: hem ? { image: hem, height: Number((product.product_type === 'kit' ? product.kit_items[0] : product)?.band_height_cm ?? 4) * 10 * silhouetteUnitsPerMm(mainShape) } : null,
-    }
+    const mainBandImg = bandImage(product.product_type === 'kit' ? firstKitItem : null)
+    const mainBandMm = Number((product.product_type === 'kit' ? product.kit_items[0] : product)?.band_height_cm ?? 4) * 10
+    const mainBands = (side: 'front' | 'back') => mainBandImg ? { image: mainBandImg, polys: silhouetteBands(mainShape, side, mainBandMm, mainBottom) } : null
+    const common = { shape: mainShape, baseColor, secondaryColor, layers, textStyle: config.textStyle!, guides: false }
     const f = document.createElement('canvas')
     const b = document.createElement('canvas')
     const mainKit = product.product_type === 'kit' ? firstKitItem : null
-    drawPanel(f, { ...common, side: 'front', allOver: allOverImage(mainKit, 'front'), allOverHalves: mainBottom ? legHalves(mainKit, 'front') : null, elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
-    drawPanel(b, { ...common, side: 'back', allOver: allOverImage(mainKit, 'back'), allOverHalves: mainBottom ? legHalves(mainKit, 'back') : null, elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
+    drawPanel(f, { ...common, bands: mainBands('front'), side: 'front', allOver: allOverImage(mainKit, 'front'), allOverHalves: mainBottom ? legHalves(mainKit, 'front') : null, elements: silhouetteElements('front', mainShape, mainKit) }, 1024)
+    drawPanel(b, { ...common, bands: mainBands('back'), side: 'back', allOver: allOverImage(mainKit, 'back'), allOverHalves: mainBottom ? legHalves(mainKit, 'back') : null, elements: silhouetteElements('back', mainShape, mainKit) }, 1024)
     const out: Partial<Record<'front' | 'back' | 'sleeveLeft' | 'sleeveRight', Blob>> = {}
     const [front, back] = await Promise.all([canvasToBlob(f), canvasToBlob(b)])
     if (front) out.front = front
@@ -875,7 +874,7 @@ export function useConfigurator(
       const els = elements.filter((e) => e.zone === zone && (e.kitItemId ?? null) === mainKit)
       const fill = allOverImage(mainKit, zone)
       if (!els.length && !fill && !mainBand) continue
-      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor, fill, mainBand ? { image: mainBand, heightMm: bandHeightCm * 10 } : null))
+      const blob = await canvasToBlob(drawSleevePreview(piece, els, elementImages, baseColor, fill, mainBand ? { image: mainBand, widthMm: mainBandMm } : null))
       if (blob) out[key] = blob
     }
     return out

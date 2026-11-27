@@ -147,7 +147,7 @@ function Configurator({ product, editLine, initialVariantId }: { product: Produc
             </Step>
           )}
           {api.bandEnabled && (
-            <Step n={++n} title={api.isBottomShape ? 'Fascia sul fondo' : 'Fasce sulle maniche'} issues={issuesBy('bands')}>
+            <Step n={++n} title={api.isBottomShape ? 'Fasce laterali' : 'Fasce su spalle e maniche'} issues={issuesBy('bands')}>
               <BandSection api={api} />
             </Step>
           )}

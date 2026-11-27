@@ -210,16 +210,17 @@ export async function buildProductionPdf(
       page.pushOperators(setFillingRgbColor(r, g, bl), ...pathOps(job.bleed), fill())
       if (job.allOver) drawCover(page, await embedAsset(job.allOver, Math.max(b.width, b.height)), b.minX, b.minY, b.width, b.height)
       if (job.band) {
-        // fascia: dal fondo del pezzo (abbondanza compresa) fino all'altezza indicata sopra il taglio
-        const cutMin = bounds(job.cut).minY
-        const y0 = b.minY, h = cutMin - b.minY + job.band.heightMm
-        if (job.band.color) {
-          const [br, bg, bb] = hexRgb(job.band.color)
-          page.pushOperators(setFillingRgbColor(br, bg, bb), moveTo(b.minX, y0), lineTo(b.maxX, y0), lineTo(b.maxX, y0 + h), lineTo(b.minX, y0 + h), closePath(), fill())
-        } else if (job.band.asset) {
-          page.pushOperators(pushGraphicsState(), moveTo(b.minX, y0), lineTo(b.maxX, y0), lineTo(b.maxX, y0 + h), lineTo(b.minX, y0 + h), closePath(), clip(), endPath())
-          drawCover(page, await embedAsset(job.band.asset, b.width), b.minX, y0, b.width, h)
-          page.pushOperators(popGraphicsState())
+        // fasce longitudinali (spalla e manica, lato della gamba), già ritagliate sul pezzo dal clip
+        for (const poly of job.band.polys) {
+          if (job.band.color) {
+            const [br, bg, bb] = hexRgb(job.band.color)
+            page.pushOperators(setFillingRgbColor(br, bg, bb), ...pathOps(poly), fill())
+          } else if (job.band.asset) {
+            const pb = bounds(poly)
+            page.pushOperators(pushGraphicsState(), ...pathOps(poly), clip(), endPath())
+            drawCover(page, await embedAsset(job.band.asset, Math.max(pb.width, pb.height)), pb.minX, pb.minY, pb.width, pb.height)
+            page.pushOperators(popGraphicsState())
+          }
         }
       }
       for (const p of job.placements) {

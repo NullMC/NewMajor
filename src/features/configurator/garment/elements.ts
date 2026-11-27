@@ -9,6 +9,7 @@ import type { PlacedElement, PrintZone } from '@/types/config'
 import { anchorOf, elementCenterMm, elementHeightCm, type ZonePiece } from '@/lib/patterns/placement'
 import { bounds, type Vec } from '@/lib/patterns/geometry'
 import { getShape } from './shapes'
+import { outerEdgeStripes, shoulderStripes, sleeveStripe } from '@/lib/patterns/bands'
 import { MODEL_OUTLINES } from './outlines'
 import { drawFittedText } from './panel'
 
@@ -175,7 +176,7 @@ function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource, w: num
 export function drawSleeve(
   canvas: HTMLCanvasElement, piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>,
   fill?: CanvasImageSource | null,
-  band?: { image: CanvasImageSource; heightMm: number } | null,
+  band?: { image: CanvasImageSource; widthMm: number } | null,
 ) {
   const b = bounds(piece.outline)
   const w = Math.max(1, Math.round(b.width * SLEEVE_PX_PER_MM)), h = Math.max(1, Math.round(b.height * SLEEVE_PX_PER_MM))
@@ -195,12 +196,21 @@ export function drawSleeve(
     ctx.closePath()
     ctx.clip()
     if (fill) drawCover(ctx, fill, w, h)
-    // fascia sul fondo della manica (polsino), alta band.heightMm
+    // fascia lungo la sommità della manica, dalla testa al polsino (prosegue sulla spalla fino al colletto)
     if (band) {
-      const bh = Math.min(h, band.heightMm * SLEEVE_PX_PER_MM)
+      const poly = sleeveStripe(piece, band.widthMm)
+      const pb = bounds(poly)
       ctx.save()
-      ctx.translate(0, h - bh)
-      drawCover(ctx, band.image, w, bh)
+      ctx.beginPath()
+      poly.forEach(([x, y], i) => {
+        const px = (x - b.minX) * SLEEVE_PX_PER_MM, py = (b.maxY - y) * SLEEVE_PX_PER_MM
+        if (i) ctx.lineTo(px, py)
+        else ctx.moveTo(px, py)
+      })
+      ctx.closePath()
+      ctx.clip()
+      ctx.translate((pb.minX - b.minX) * SLEEVE_PX_PER_MM, (b.maxY - pb.maxY) * SLEEVE_PX_PER_MM)
+      drawCover(ctx, band.image, pb.width * SLEEVE_PX_PER_MM, pb.height * SLEEVE_PX_PER_MM)
       ctx.restore()
     }
     ctx.restore()
@@ -233,7 +243,7 @@ export function sleeveInfo(piece: ZonePiece | null, canvas: HTMLCanvasElement, f
 export function drawSleevePreview(
   piece: ZonePiece, elements: PlacedElement[], images: Record<string, CanvasImageSource>, baseColor: string,
   fill?: CanvasImageSource | null,
-  band?: { image: CanvasImageSource; heightMm: number } | null,
+  band?: { image: CanvasImageSource; widthMm: number } | null,
 ) {
   const elCanvas = document.createElement('canvas')
   drawSleeve(elCanvas, piece, elements, images, fill, band)
@@ -261,4 +271,15 @@ export function drawSleevePreview(
   ctx.strokeStyle = 'rgba(0,0,0,0.18)'
   ctx.stroke()
   return c
+}
+
+/**
+ * Fasce sulla sagoma piana (anteprima proiettata e anteprime salvate), in unità della sagoma:
+ * capi superiori lungo spalla e sommità della manica dal colletto, pantaloni lungo i fianchi.
+ */
+export function silhouetteBands(shape: ModelShape, side: 'front' | 'back', widthMm: number, bottom: boolean): [number, number][][] {
+  const s = getShape(shape)
+  const outline = (side === 'front' ? s.front : s.back) as [number, number][]
+  const w = widthMm * silhouetteUnitsPerMm(shape)
+  return bottom ? outerEdgeStripes(outline, w / 2) : shoulderStripes({ outline, anchor: { x: 0, y: s.bounds.maxY } }, w)
 }

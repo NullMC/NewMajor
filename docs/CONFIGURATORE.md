@@ -11,7 +11,7 @@ Codice: `src/features/configurator`.
 4. **Loghi, sponsor e grafiche** – per ogni area: upload del file o scelta dalla libreria, scala nell’area, controllo qualità.
 5. **Grafica all-over** (articoli abilitati) – grafica su tutto il capo, con grafica o colore diversi per sezione.
 6. **Aree di stampa** – nelle zone definite dall’admin: grafiche o testi aggiunti accanto o sotto, misure in cm, posizione, centratura, rotazione, tecnica e prezzo per area.
-7. **Fasce** (se attive) – sul fondo di maniche o gambe: nessuna, colore diverso o grafica.
+7. **Fasce** (se attive) – longitudinali, dal colletto lungo spalla e manica o lungo il lato esterno della gamba: nessuna, colore diverso o grafica.
 8. **Nomi, numeri, taglie e quantità** – attivazione delle aree testo/numero, una riga per capo (nome, numero, taglia o taglie per componente kit, quantità), importazione da elenco incollato, anteprima del giocatore selezionato sul mockup; stile (colore, contorno, carattere).
 9. **Riepilogo** – dettaglio del prezzo, sconti quantità, indicazioni per la produzione → aggiunta al carrello.
 

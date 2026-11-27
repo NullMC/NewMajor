@@ -7,6 +7,7 @@ import { layoutPieces } from '../src/lib/production/layout'
 import { buildPlan, type ProductionPiece } from '../src/lib/production/plan'
 import { boxesOverlap, distribute, elementBox, elementIssues, insideBox, nextSlot, quickSpot, usableBox, type Box } from '../src/lib/printing'
 import { largestTorsoBox } from '../src/lib/patterns/placement'
+import { bandPolygons } from '../src/lib/patterns/bands'
 import type { PlacedElement } from '../src/types/config'
 
 let failures = 0
@@ -197,7 +198,18 @@ near(bounds(inch.pieces[0].outline).width, 500 * 25.4, 0.5) ? ok('conversione da
   lJobs.length === 4 && lJobs.every((j) => j.patternSize === 'M') && r.warnings.some((w) => w.includes('taglia L senza dima, usata la dima M'))
     ? ok('taglia senza pezzi: usata la dima M, segnalato una volta') : fail(JSON.stringify({ n: lJobs.length, w: r.warnings }))
   const sl = r.jobs.find((j) => j.piece === 'sleeve_left')!, fr = r.jobs.find((j) => j.piece === 'front')!
-  sl.band?.color === '#00FF00' && near(sl.band.heightMm, 30) && fr.band === null ? ok('fascia colorata di 3 cm sulle maniche, non sul davanti') : fail(JSON.stringify({ s: sl.band, f: fr.band }))
+  const stripe = sl.band?.polys[0] ?? []
+  sl.band?.color === '#00FF00' && near(Math.min(...stripe.map((p) => p[0])), 175) && near(Math.max(...stripe.map((p) => p[0])), 205) && Math.max(...stripe.map((p) => p[1])) >= 240 && Math.min(...stripe.map((p) => p[1])) <= 0
+    ? ok('fascia di 3 cm al centro della manica, dalla testa al polsino') : fail(JSON.stringify(sl.band))
+  // davanti con scollo e spalle: due mezze fasce lungo le cuciture delle spalle, dal colletto al giromanica
+  const shirtFront: [number, number][] = [[0, 0], [500, 0], [500, 450], [440, 520], [430, 680], [320, 700], [250, 610], [180, 700], [70, 680], [60, 520], [0, 450]]
+  const sh = bandPolygons('front', { outline: shirtFront, anchor: { x: 250, y: 610 } }, 40, false)
+  const leftInner = sh.find((q) => q.every(([x]) => x < 250))
+  // il lato interno della mezza fascia è 2 cm sotto la cucitura (180,700)→(70,680)
+  const lineY = (x: number) => 700 + ((x - 180) * (680 - 700)) / (70 - 180)
+  sh.length === 2 && !!leftInner && leftInner.some(([x, y]) => near(y, lineY(x) - 20 * Math.cos(Math.atan(20 / 110)), 1))
+    ? ok('spalle: due mezze fasce di 2 cm lungo la cucitura, dal colletto alla manica') : fail(JSON.stringify(sh))
+  fr.band === null ? ok('pezzo senza spalle riconoscibili (rettangolo): nessuna fascia') : fail(JSON.stringify(fr.band))
   sl.fill === '#123456' && sl.allOver === null && fr.allOver?.path === 'u/g.png' ? ok('colore della sezione sulla manica, grafica all-over sul davanti') : fail(JSON.stringify({ fill: sl.fill, a: sl.allOver, f: fr.allOver }))
 
   // senza cartamodello: schede e transfer DTF comunque, avviso solo se servono pezzi da sublimare
@@ -225,6 +237,13 @@ near(bounds(inch.pieces[0].outline).width, 500 * 25.4, 0.5) ? ok('conversione da
   const fL = jl.placements[0].center, bL = jl.placements[1].center, fR = jr.placements[0].center
   jl.placements.length === 2 && jr.placements.length === 2 && near(fL[0], 80) && near(fL[1], 440) && near(bL[0], 550) && near(bL[1], 520) && near(fR[0], 680) && near(fR[1], 440)
     ? ok('gambe: davanti misurato dal centro davanti, dietro dal centro dietro, su entrambe le gambe') : fail(JSON.stringify({ l: jl.placements.map((p) => p.center), r: jr.placements.map((p) => p.center) }))
+  // fascia laterale: a metà della gamba a ogni altezza (lato esterno), dalla vita all'orlo
+  const side = bandPolygons('leg_left', legL, 40, true)[0] ?? []
+  const atY = (y: number) => side.filter((p) => near(p[1], y, 6)).map((p) => p[0])
+  const mid100 = (() => { const xs = atY(100); return xs.length >= 2 ? (Math.min(...xs) + Math.max(...xs)) / 2 : NaN })()
+  side.length > 0 && near(mid100, 300, 3) && Math.max(...side.map((p) => p[1])) > 560 && Math.min(...side.map((p) => p[1])) < 0
+    ? ok(`pantaloncino: fascia di 4 cm sul lato esterno della gamba, centrata a metà pezzo (${mid100.toFixed(0)} mm)`) : fail(JSON.stringify({ mid100, n: side.length }))
+  bandPolygons('sleeve_left', legL, 40, true).length === 0 ? ok('capi inferiori: nessuna fascia sulle maniche') : fail('fascia sbagliata')
 }
 
 // Aree fisse dell'admin come ostacoli per le aree di stampa del cliente
