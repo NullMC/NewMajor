@@ -1,22 +1,24 @@
-// Aree di stampa del cliente: nelle zone previste dal prodotto (davanti, dietro, maniche) il
-// cliente aggiunge grafiche o testi, uno accanto o sotto l'altro finché c'è spazio nell'area
-// massima; per ogni area sceglie tecnica, misure in cm, posizione, centratura e rotazione.
-// Il prezzo di ogni area dipende dalla tecnica e dalla superficie occupata.
+// Aree di stampa del cliente: nelle zone previste dal prodotto (tutto il davanti, il dietro, le
+// maniche) il cliente aggiunge grafiche o testi. La disposizione può essere libera oppure dividere
+// lo spazio in parti uguali (affiancate, una sotto l'altra, a griglia): ogni grafica occupa la sua
+// parte con le sue proporzioni. Per ogni area: tecnica, misure in cm, posizione (anche rapida: lato
+// cuore, centro petto, lato opposto), centratura e rotazione. Il prezzo dipende dalla tecnica e
+// dalla superficie occupata.
 
 import { useState } from 'react'
 import {
-  AlertTriangle, AlignCenterHorizontal, AlignCenterVertical, ArrowDownToLine, ArrowRightToLine, Image as ImageIcon,
-  Library, Link2, Link2Off, Move, Replace, RotateCcw, RotateCw, Trash2, Type,
+  AlertTriangle, AlignCenterHorizontal, AlignCenterVertical, Columns3, Grid2x2, Hand, Heart, Image as ImageIcon,
+  Library, Link2, Link2Off, Move, Replace, RotateCcw, RotateCw, Rows3, Trash2, Type,
 } from 'lucide-react'
 import type { CustomizationAsset } from '@/types/db'
-import type { PlacedElement, PrintZone, TechniqueCode } from '@/types/config'
+import type { PlacedElement, PrintZone, TechniqueCode, ZoneLayout } from '@/types/config'
 import { cn } from '@/lib/cn'
 import { formatPrice } from '@/lib/format'
 import { errorMessage } from '@/lib/errors'
 import { ACCEPTED_GRAPHIC_TYPES } from '@/lib/imageQuality'
 import { publicUrl } from '@/lib/storage'
 import { elementDpi, ZONE_LABEL } from '@/lib/patterns/placement'
-import { elementIssues, elementLabel, elementPrice, findZone, heightOf, TECHNIQUE_LABEL } from '@/lib/printing'
+import { elementIssues, elementLabel, elementPrice, findZone, heightOf, TECHNIQUE_LABEL, type QuickSpot } from '@/lib/printing'
 import { Button } from '@/components/ui/Button'
 import { Checkbox, Input, Select } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Overlay'
@@ -26,6 +28,19 @@ import { QualityBadge, Thumb } from './GraphicsSection'
 
 const num = (v: string) => Number(v.replace(',', '.'))
 const fmt = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',')
+
+const LAYOUTS: { value: ZoneLayout; label: string; icon: typeof Hand; hint: string }[] = [
+  { value: 'free', label: 'Libera', icon: Hand, hint: 'Posizioni e misure scelte da te.' },
+  { value: 'columns', label: 'Affiancate', icon: Columns3, hint: 'Lo spazio è diviso in parti uguali, una accanto all’altra.' },
+  { value: 'rows', label: 'In colonna', icon: Rows3, hint: 'Lo spazio è diviso in parti uguali, una sotto l’altra.' },
+  { value: 'grid', label: 'Griglia', icon: Grid2x2, hint: 'Lo spazio è diviso in parti uguali a griglia (4 grafiche = 4 quarti).' },
+]
+
+const SPOTS: { value: QuickSpot; label: string }[] = [
+  { value: 'heart', label: 'Lato cuore' },
+  { value: 'chest', label: 'Centro petto' },
+  { value: 'opposite', label: 'Lato opposto' },
+]
 
 const ISSUE: Record<string, string> = {
   outside: 'Esce dall’area di stampa: spostala o riducila.',
@@ -132,6 +147,12 @@ function AreaCard({ api, el, index }: { api: ConfiguratorApi; el: PlacedElement;
         </div>
       </div>
 
+      {el.zone === 'front' && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-600"><Heart className="h-3.5 w-3.5" aria-hidden /> Posizione rapida</span>
+          {SPOTS.map((s) => <Button key={s.value} size="sm" variant="ghost" onClick={() => api.placeElement(el.id, s.value)}>{s.label}</Button>)}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" icon={<AlignCenterVertical className="h-4 w-4" />} onClick={() => api.centerElement(el.id, 'x')}>Centra in orizzontale</Button>
         <Button size="sm" variant="secondary" icon={<AlignCenterHorizontal className="h-4 w-4" />} onClick={() => api.centerElement(el.id, 'y')}>Centra in verticale</Button>
@@ -164,7 +185,6 @@ function AreaCard({ api, el, index }: { api: ConfiguratorApi; el: PlacedElement;
 export function PrintAreasSection({ api, library }: { api: ConfiguratorApi; library: CustomizationAsset[] }) {
   const zones = api.printZones
   const [zoneKey, setZoneKey] = useState<PrintZone>(zones[0]?.zone ?? 'front')
-  const [axis, setAxis] = useState<'x' | 'y'>('x')
   const [libOpen, setLibOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const zone = zones.find((z) => z.zone === zoneKey) ?? zones[0]
@@ -178,7 +198,7 @@ export function PrintAreasSection({ api, library }: { api: ConfiguratorApi; libr
   const add = async (kind: 'graphic' | 'text', source?: Parameters<ConfiguratorApi['addElement']>[3]) => {
     setError(null)
     try {
-      const r = await api.addElement(kind, zone.zone, axis, source)
+      const r = await api.addElement(kind, zone.zone, 'x', source)
       if (r.error) setError(r.error)
       else if (r.report?.blocking) setError(r.report.messages.find((m) => m.level === 'error')?.text ?? 'File non valido.')
     } catch (e) {
@@ -187,6 +207,8 @@ export function PrintAreasSection({ api, library }: { api: ConfiguratorApi; libr
   }
 
   const seg = (on: boolean) => cn('inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors', on ? 'bg-ink-900 text-white' : 'text-ink-600 hover:text-ink-900')
+  const layout = api.layoutOf(zone.zone, api.elementKit)
+  const usable = api.usableFor(zone.zone, api.elementKit)
 
   return (
     <div className="space-y-4">
@@ -200,15 +222,24 @@ export function PrintAreasSection({ api, library }: { api: ConfiguratorApi; libr
           ))}
         </div>
         <p className="mt-3 text-sm text-ink-600">
-          Area di stampa {fmt(Number(zone.width_cm))} × {fmt(Number(zone.height_cm))} cm · fino a {zone.max_items} {zone.max_items === 1 ? 'area' : 'aree'}
+          Area di stampa {fmt(Number(zone.width_cm))} × {fmt(Number(zone.height_cm))} cm
+          {usable && (usable.x2 - usable.x1 < Number(zone.width_cm) - 0.05 || usable.y2 - usable.y1 < Number(zone.height_cm) - 0.05) && <> (libero {fmt(usable.x2 - usable.x1)} × {fmt(usable.y2 - usable.y1)} cm accanto a nome, numero o loghi scelti)</>}
+          {' · '}fino a {zone.max_items} {zone.max_items === 1 ? 'area' : 'aree'}
           {' · '}{[zone.allow_graphic && 'grafiche', zone.allow_text && 'testi'].filter(Boolean).join(' e ')}
           {techs.length > 0 && <> · {techs.map((t) => `${TECHNIQUE_LABEL[t.code]}${Number(t.max_price) > 0 ? ` ${formatPrice(t.min_price)}–${formatPrice(t.max_price)}` : ''}`).join(', ')}</>}
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <div className="flex rounded-xl bg-white p-0.5 ring-1 ring-ink-200" role="group" aria-label="Dove aggiungere la nuova area">
-            <button type="button" className={seg(axis === 'x')} aria-pressed={axis === 'x'} onClick={() => setAxis('x')}><ArrowRightToLine className="h-4 w-4" /> Accanto</button>
-            <button type="button" className={seg(axis === 'y')} aria-pressed={axis === 'y'} onClick={() => setAxis('y')}><ArrowDownToLine className="h-4 w-4" /> Sotto</button>
+        <div className="mt-3">
+          <p className="text-xs font-medium text-ink-600">Disposizione</p>
+          <div className="mt-1.5 inline-flex flex-wrap rounded-xl bg-white p-0.5 ring-1 ring-ink-200" role="group" aria-label="Disposizione delle aree">
+            {LAYOUTS.map((l) => (
+              <button key={l.value} type="button" className={seg(layout === l.value)} aria-pressed={layout === l.value} title={l.hint} onClick={() => api.setLayout(zone.zone, l.value)}>
+                <l.icon className="h-4 w-4" aria-hidden /> {l.label}
+              </button>
+            ))}
           </div>
+          <p className="mt-1.5 text-xs text-ink-500">{LAYOUTS.find((l) => l.value === layout)?.hint}{layout !== 'free' ? ' Ogni grafica mantiene le sue proporzioni; se sposti o ridimensioni un’area la disposizione torna libera.' : ''}</p>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           {zone.allow_graphic && (
             <>
               <label className={cn('inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-ink-900 px-4 text-sm font-semibold text-white transition hover:bg-ink-800', (full || api.elementUploading) && 'pointer-events-none opacity-50')}>

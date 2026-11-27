@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AssetRef, AreaConfig, BandConfig, Configuration, PlacedElement, PrintZone, RosterEntry, SectionKey, TextStyle } from '@/types/config'
+import type { AssetRef, AreaConfig, BandConfig, Configuration, PlacedElement, PrintZone, RosterEntry, SectionKey, TextStyle, ZoneLayout } from '@/types/config'
 import { emptyConfiguration } from '@/types/config'
 import type { CustomizationArea, CustomizationAsset, ModelShape, PrintTechnique, PrintZoneRow, ProductDetail, QualitySettings } from '@/types/db'
 import { computePrice, configQuantity } from '@/lib/pricing'
 import { evaluateQuality, effectiveDpi, readImageInfo, type QualityReport } from '@/lib/imageQuality'
 import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
-import { centerIn, elementIssues, elementLabel, findZone, fitSize, heightOf, nextSlot, zoneBox, type Box, type ElementIssue } from '@/lib/printing'
+import { centerIn, distribute, elementIssues, elementLabel, findZone, fitSize, heightOf, nextSlot, quickSpot, usableBox, zoneBox, type Box, type ElementIssue, type QuickSpot } from '@/lib/printing'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
 import { canvasToBlob, drawPanel, ensureFonts, isDark, LIVE_PANEL_WIDTH, type PanelLayer } from './garment/panel'
 import { areaBoxCm, drawSleeve, drawSleevePreview, silhouetteUnitsPerMm, sleeveInfo, toSilhouette, virtualPiece, withTextImages } from './garment/elements'
@@ -38,6 +38,8 @@ const ISSUE_TEXT: Record<ElementIssue, string> = {
 }
 
 export const DEFAULT_BASE = '#F4F4F2'
+
+const round1 = (v: number) => Math.round(v * 10) / 10
 
 export function usesRoster(product: ProductDetail) {
   return (
@@ -199,6 +201,41 @@ export function useConfigurator(
   /** Zone di stampa (area massima) del componente visualizzato. */
   const printZones = useMemo(() => (product.print_zones ?? []).filter((z) => (z.kit_item_id ?? null) === elementKit), [product.print_zones, elementKit])
   const printEnabled = printZones.length > 0
+  /**
+   * Aree fisse dell'admin (loghi, sponsor, nomi, numeri) attivate dal cliente sul lato indicato, in
+   * cm dal riferimento: le aree di stampa non possono sovrapporsi.
+   */
+  const blockedFor = useCallback((zone: PrintZone, kit: string | null): Box[] => {
+    if (zone !== 'front' && zone !== 'back') return []
+    const piece = pieceFor(zone, kit)
+    const shp = shapeOf(kit)
+    return product.customization_areas
+      .filter((a) => a.is_active && a.area_type !== 'all_over' && a.side === zone && config.areas[a.id]?.enabled
+        && (product.product_type !== 'kit' || (a.kit_item_id ?? firstKitItem) === kit))
+      .map((a) => areaBoxCm(a, shp, piece))
+      .filter((b): b is Box => !!b)
+  }, [product, config.areas, pieceFor, shapeOf, firstKitItem])
+  /** Spazio utilizzabile di una zona: l'area massima meno le fasce occupate dalle aree fisse in uso. */
+  const usableFor = useCallback((zone: PrintZone, kit: string | null): Box | null => {
+    const z = findZone(product.print_zones ?? [], zone, kit)
+    return z ? usableBox(zoneBox(z), blockedFor(zone, kit)) : null
+  }, [product.print_zones, blockedFor])
+  const layoutKey = (zone: PrintZone, kit: string | null) => `${kit ?? 'main'}:${zone}`
+  const layoutOf = useCallback((zone: PrintZone, kit: string | null): ZoneLayout => config.printLayouts?.[layoutKey(zone, kit)] ?? 'free', [config.printLayouts])
+  /** Ridistribuisce in parti uguali le aree della zona secondo la disposizione (nulla se libera). */
+  const relayout = useCallback((els: PlacedElement[], zone: PrintZone, kit: string | null, layout: ZoneLayout): PlacedElement[] => {
+    const box = usableFor(zone, kit)
+    if (layout === 'free' || !box) return els
+    const mine = els.filter((e) => e.technique && e.zone === zone && (e.kitItemId ?? null) === kit)
+    const pos = distribute(box, mine, layout)
+    return els.map((e) => {
+      const p = pos.get(e.id)
+      if (!p) return e
+      const next = { ...e, ...p }
+      if (next.asset && (next.widthCm !== e.widthCm || next.heightCm !== e.heightCm)) next.asset = { ...next.asset, acknowledgedLowQuality: false }
+      return next
+    })
+  }, [usableFor])
   const allOverAllowedFor = useCallback((kit: string | null) =>
     !!product.all_over_enabled && (!kit || product.kit_items.find((k) => k.id === kit)?.all_over_enabled !== false), [product])
   /** Tecniche ammesse in una zona (la sublimazione solo dove è consentito l'all-over). */
@@ -230,10 +267,12 @@ export function useConfigurator(
 
   /** Rettangoli delle aree massime di stampa del lato indicato, in unità della sagoma (guide). */
   const zoneRectsFor = useCallback((side: 'front' | 'back') => printZones.filter((z) => z.zone === side).flatMap((z) => {
-    const w = Number(z.width_cm), h = Number(z.height_cm)
-    const pseudo: PlacedElement = { id: 'zone', kind: 'graphic', zone: side, kitItemId: elementKit, xCm: Number(z.x_cm) + w / 2, yCm: Number(z.y_cm) + h / 2, widthCm: w, heightCm: h, rotation: 0 }
+    const u = usableBox(zoneBox(z), blockedFor(side, elementKit))
+    const w = u.x2 - u.x1, h = u.y2 - u.y1
+    if (w <= 0 || h <= 0) return []
+    const pseudo: PlacedElement = { id: 'zone', kind: 'graphic', zone: side, kitItemId: elementKit, xCm: u.x1 + w / 2, yCm: u.y1 + h / 2, widthCm: w, heightCm: h, rotation: 0 }
     return toSilhouette(shape, side, [pseudo], pieceFor(side, elementKit), { zone: solidImage('#000000') }).map((r) => ({ cx: r.cx, cy: r.cy, w: r.w, h: r.h }))
-  }), [printZones, elementKit, shape, pieceFor])
+  }), [printZones, elementKit, shape, pieceFor, blockedFor])
 
   // Grafica all-over ---------------------------------------------------------------
   // nei kit l'admin sceglie i componenti su cui è consentita (es. solo la maglia)
@@ -401,7 +440,12 @@ export function useConfigurator(
    * altezza cambiano insieme; cambiando dimensione la conferma sulla qualità va ripetuta.
    */
   const updateElement = useCallback((id: string, p: Partial<PlacedElement>) => {
-    setConfig((c) => ({ ...c, elements: (c.elements ?? []).map((e) => {
+    setConfig((c) => {
+      const cur = (c.elements ?? []).find((e) => e.id === id)
+      const manual = cur && ['xCm', 'yCm', 'widthCm', 'heightCm', 'rotation'].some((k) => k in p)
+      const key = cur ? `${cur.kitItemId ?? 'main'}:${cur.zone}` : ''
+      const printLayouts = manual && c.printLayouts?.[key] && c.printLayouts[key] !== 'free' ? { ...c.printLayouts, [key]: 'free' as const } : c.printLayouts
+      return { ...c, printLayouts, elements: (c.elements ?? []).map((e) => {
       if (e.id !== id) return e
       const next = { ...e, ...p }
       const h0 = heightOf(e)
@@ -418,35 +462,44 @@ export function useConfigurator(
         next.asset = { ...next.asset, acknowledgedLowQuality: false }
       }
       return next
-    }) }))
+    }) }
+    })
   }, [])
 
   const removeElement = useCallback((id: string) => {
-    setConfig((c) => ({ ...c, elements: (c.elements ?? []).filter((e) => e.id !== id) }))
+    setConfig((c) => {
+      const gone = (c.elements ?? []).find((e) => e.id === id)
+      const rest = (c.elements ?? []).filter((e) => e.id !== id)
+      if (!gone) return c
+      const kit = gone.kitItemId ?? null
+      return { ...c, elements: relayout(rest, gone.zone, kit, c.printLayouts?.[`${kit ?? 'main'}:${gone.zone}`] ?? 'free') }
+    })
     setSelectedElement((s) => (s === id ? null : s))
-  }, [])
+  }, [relayout])
+
+  /** Cambia la disposizione della zona del componente visualizzato e ridistribuisce le aree. */
+  const setLayout = useCallback((zone: PrintZone, layout: ZoneLayout) => {
+    setConfig((c) => ({
+      ...c,
+      printLayouts: { ...(c.printLayouts ?? {}), [layoutKey(zone, elementKit)]: layout },
+      elements: relayout(c.elements ?? [], zone, elementKit, layout),
+    }))
+  }, [elementKit, relayout])
+
+  /** Posizione rapida sul davanti (lato cuore, centro petto, lato opposto). */
+  const placeElement = useCallback((id: string, spot: QuickSpot) => {
+    const e = (config.elements ?? []).find((x) => x.id === id)
+    const box = e ? usableFor(e.zone, e.kitItemId ?? null) : null
+    if (e && box) updateElement(id, quickSpot(box, e, spot))
+  }, [config.elements, usableFor, updateElement])
 
   /** Centra un'area nell'area massima della sua zona, in orizzontale o in verticale. */
   const centerElement = useCallback((id: string, axis: 'x' | 'y') => {
     const e = (config.elements ?? []).find((x) => x.id === id)
-    const z = e ? findZone(product.print_zones ?? [], e.zone, e.kitItemId) : null
-    if (e && z) updateElement(id, centerIn(zoneBox(z), axis))
-  }, [config.elements, product.print_zones, updateElement])
+    const box = e ? usableFor(e.zone, e.kitItemId ?? null) : null
+    if (e && box) updateElement(id, centerIn(box, axis))
+  }, [config.elements, usableFor, updateElement])
 
-  /**
-   * Aree fisse dell'admin (loghi, sponsor, nomi, numeri) attivate dal cliente sul lato indicato, in
-   * cm dal riferimento: le aree di stampa non possono sovrapporsi.
-   */
-  const blockedFor = useCallback((zone: PrintZone, kit: string | null): Box[] => {
-    if (zone !== 'front' && zone !== 'back') return []
-    const piece = pieceFor(zone, kit)
-    const shp = shapeOf(kit)
-    return product.customization_areas
-      .filter((a) => a.is_active && a.area_type !== 'all_over' && a.side === zone && config.areas[a.id]?.enabled
-        && (product.product_type !== 'kit' || (a.kit_item_id ?? firstKitItem) === kit))
-      .map((a) => areaBoxCm(a, shp, piece))
-      .filter((b): b is Box => !!b)
-  }, [product, config.areas, pieceFor, shapeOf, firstKitItem])
 
   /**
    * Aggiunge un'area di stampa (grafica caricata o dalla libreria, oppure testo) nella zona
@@ -498,7 +551,9 @@ export function useConfigurator(
     // dimensione iniziale: 10 cm di larghezza (fino a 20 per i testi), ridotta per stare nell'area massima
     const w0 = kind === 'text' ? Math.min(20, zb.x2 - zb.x1) : 10
     const size = fitSize(w0, w0 * ratio, zb)
-    const slot = nextSlot(zb, existing, size.w, size.h, axis, blockedFor(zone, elementKit))
+    const layout = layoutOf(zone, elementKit)
+    const usable = usableBox(zb, blockedFor(zone, elementKit))
+    const slot = layout !== 'free' ? { xCm: round1((usable.x1 + usable.x2) / 2), yCm: round1((usable.y1 + usable.y2) / 2) } : nextSlot(usable, existing, size.w, size.h, axis, blockedFor(zone, elementKit))
     if (!slot) return { error: 'Non c’è più spazio nell’area di stampa: riduci o sposta le aree presenti (loghi, sponsor, nomi e numeri scelti occupano parte dell’area).' }
     const el: PlacedElement = {
       id: uid(), kind, zone, kitItemId: elementKit, xCm: slot.xCm, yCm: slot.yCm, widthCm: size.w, heightCm: size.h, rotation: 0,
@@ -506,11 +561,11 @@ export function useConfigurator(
       ...(kind === 'graphic' ? { asset } : { text: 'Testo', font: 'block' as const, color: isDark(baseColor) ? '#FFFFFF' : '#111111' }),
     }
     if (el.asset) el.asset = { ...el.asset, quality: elementQuality(el), effectiveDpi: elementDpi(el) }
-    setConfig((c) => ({ ...c, elements: [...(c.elements ?? []), el] }))
+    setConfig((c) => ({ ...c, elements: relayout([...(c.elements ?? []), el], zone, elementKit, layout) }))
     setSelectedElement(el.id)
     if (zone === 'front' || zone === 'back') setView(zone)
     return { element: el }
-  }, [product.print_zones, config.elements, elementKit, techniquesFor, opts.quality, opts.userId, baseColor, elementQuality, blockedFor])
+  }, [product.print_zones, config.elements, elementKit, techniquesFor, opts.quality, opts.userId, baseColor, elementQuality, blockedFor, layoutOf, relayout])
 
   /** Sostituisce la grafica di un'area mantenendo posizione e larghezza (altezza dalle nuove proporzioni). */
   const replaceElementAsset = useCallback(async (id: string, file: File): Promise<{ error?: string; report?: QualityReport }> => {
@@ -527,12 +582,16 @@ export function useConfigurator(
         ...stored, name: file.name.slice(0, 120), mime: info.mime, width: info.width, height: info.height, sizeBytes: info.sizeBytes,
         isVector: info.isVector, effectiveDpi: report.effectiveDpi, metadataDpi: report.metadataDpi, quality: report.quality, acknowledgedLowQuality: false,
       }
-      setConfig((c) => ({ ...c, elements: (c.elements ?? []).map((x) => (x.id === id ? { ...x, asset, heightCm: Math.round(x.widthCm * ratio * 10) / 10 } : x)) }))
+      setConfig((c) => {
+        const els = (c.elements ?? []).map((x) => (x.id === id ? { ...x, asset, heightCm: Math.round(x.widthCm * ratio * 10) / 10 } : x))
+        const kit = e.kitItemId ?? null
+        return { ...c, elements: relayout(els, e.zone, kit, c.printLayouts?.[`${kit ?? 'main'}:${e.zone}`] ?? 'free') }
+      })
       return {}
     } finally {
       setElementUploading(false)
     }
-  }, [config.elements, opts.quality, opts.userId])
+  }, [config.elements, opts.quality, opts.userId, relayout])
 
   // Fasce: azioni -------------------------------------------------------------------
   const setBand = useCallback((next: Omit<BandConfig, 'kitItemId'> | null) => {
@@ -776,7 +835,7 @@ export function useConfigurator(
     kitItem, activeKitItem, setActiveKitItem, shape, areas, view, setView, previewRow, setPreviewRow,
     highlightArea, setHighlightArea, uploading, frontCanvas, backCanvas, version, guides, setGuides,
     baseColor, secondaryColor, renderPreviews,
-    zones, elements, elementKit, selectedElement, setSelectedElement, pieceFor, blockedFor,
+    zones, elements, elementKit, selectedElement, setSelectedElement, pieceFor, blockedFor, usableFor, layoutOf, setLayout, placeElement,
     printZones, printEnabled, techniques, techniquesFor,
     sleeveCanvases: {
       left: sleeveInfo(pieceFor('sleeve_left', elementKit), sleeveLeftCanvas),

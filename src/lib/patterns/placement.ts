@@ -7,7 +7,7 @@
 
 import type { PlacedElement, PrintZone, SectionKey } from '@/types/config'
 import { bounds, pointInPolygon, type PieceAnchor, type Vec } from './geometry'
-import { heightOf } from '@/lib/printing'
+import { heightOf, type Box } from '@/lib/printing'
 
 export interface ZonePiece {
   kitItemId: string | null
@@ -99,4 +99,53 @@ export function elementDpi(el: Pick<PlacedElement, 'widthCm' | 'asset'>): number
 /** Pezzo della zona per il componente indicato (o per il capo principale). */
 export function zonePiece(zones: ZonePiece[], zone: SectionKey, kitItemId: string | null): ZonePiece | null {
   return zones.find((z) => z.zone === zone && (z.kitItemId ?? null) === (kitItemId ?? null)) ?? null
+}
+
+/** Ascisse in cui la retta orizzontale y attraversa il contorno, ordinate. */
+function horizontalHits(pts: Vec[], y: number): number[] {
+  const xs: number[] = []
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [x1, y1] = pts[j], [x2, y2] = pts[i]
+    if ((y1 > y) !== (y2 > y)) xs.push(x1 + ((y - y1) / (y2 - y1)) * (x2 - x1))
+  }
+  return xs.sort((a, b) => a - b)
+}
+
+/**
+ * Il rettangolo, centrato sull'asse del pezzo, che copre il busto dal petto all'orlo (sotto la scollatura,
+ * tra i giromanica, sopra l'orlo) a `marginCm` dal taglio: l'area di stampa "tutto il pezzo".
+ * In cm dal riferimento, x a destra e y in basso, arrotondato al mezzo centimetro.
+ */
+export function largestTorsoBox(piece: Pick<ZonePiece, 'outline' | 'anchor'>, marginCm = 2): Box | null {
+  const [ax, ay] = anchorOf(piece)
+  const b = bounds(piece.outline)
+  const m = marginCm * 10, step = 5
+  const rows: { y: number; hw: number }[] = []
+  // solo sotto il riferimento (centro collo): esclude il cappuccio delle sagome
+  for (let y = Math.min(b.maxY, ay) - step / 2; y > b.minY; y -= step) {
+    const xs = horizontalHits(piece.outline, y)
+    let hw = -1
+    for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i] <= ax && ax <= xs[i + 1]) hw = Math.min(ax - xs[i], xs[i + 1] - ax)
+    rows.push({ y, hw })
+  }
+  // larghezza del busto all'orlo: limita le sagome con le braccia staccate dal corpo
+  const hem = rows.filter((r) => r.y < b.minY + b.height * 0.12 && r.hw > 0)
+  const cap = hem.length ? Math.max(...hem.map((r) => r.hw)) : Infinity
+  // dall'alto verso l'orlo: si parte dalla prima riga sotto lo scollo in cui il busto è largo almeno
+  // il 75% della sua larghezza (sul dietro salta la pendenza delle spalle) e si arriva all'orlo; il
+  // petto resta sempre compreso, la larghezza è la minima del tratto (giromanica)
+  const width = (r: { hw: number }) => Math.min(r.hw, cap)
+  const valid = rows.filter((r) => r.hw > m)
+  if (!valid.length) return null
+  const full = Math.max(...valid.map(width))
+  const i0 = rows.findIndex((r) => r.hw > m && width(r) >= full * 0.75)
+  // in basso si ferma dove il busto si restringe sotto la stessa soglia (orli arrotondati delle sagome)
+  let j = i0
+  while (j + 1 < rows.length && rows[j + 1].hw > m && width(rows[j + 1]) >= full * 0.75) j++
+  const hw = Math.min(...rows.slice(i0, j + 1).map(width))
+  const best = { top: rows[i0].y + step / 2 - m, bottom: rows[j].y - step / 2 + m, hw: hw - m }
+  if (best.top <= best.bottom || best.hw <= 0) return null
+  const half = (v: number) => Math.floor(v * 2) / 2
+  const halfW = half(best.hw / 10)
+  return { x1: -halfW, x2: halfW, y1: Math.ceil(((ay - best.top) / 10) * 2) / 2, y2: half((ay - best.bottom) / 10) }
 }

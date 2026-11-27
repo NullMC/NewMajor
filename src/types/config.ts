@@ -55,6 +55,12 @@ export interface TextStyle {
 /** Tecniche di stampa (tabella print_techniques). La sublimazione è solo per i capi con all-over. */
 export type TechniqueCode = 'screen' | 'dtf' | 'embroidery' | 'sublimation'
 
+/**
+ * Disposizione delle aree in una zona: libera (posizioni del cliente) oppure divisione in parti
+ * uguali dello spazio disponibile (affiancate, una sotto l'altra, a griglia).
+ */
+export type ZoneLayout = 'free' | 'columns' | 'rows' | 'grid'
+
 export interface CustomArea {
   name: string
   type: 'logo' | 'sponsor' | 'text' | 'number' | 'all_over'
@@ -139,6 +145,8 @@ export interface Configuration {
   areas: Record<string, AreaConfig>
   /** Aree di stampa del cliente (grafiche e testi) nelle zone del prodotto. */
   elements?: PlacedElement[]
+  /** Disposizione per zona: chiave "<componente o main>:<zona>". */
+  printLayouts?: Record<string, ZoneLayout>
   /** Fasce su maniche o pantaloncino (una per capo o componente del kit). */
   bands?: BandConfig[]
   /** Grafica all-over (una per capo o per componente del kit), se il prodotto la consente. */

@@ -1,8 +1,9 @@
 // Aree di stampa del prodotto (configuratore personale dell'admin): per ogni componente e zona
 // (davanti, dietro, maniche) si definisce l'area massima di stampa in cm, posizionata sul pezzo
-// del cartamodello o, in mancanza, sulla sagoma; il numero massimo di aree che il cliente può
-// inserire, le categorie (grafica, testo) e le tecniche ammesse. Qui si attivano anche le fasce
-// e la grafica all-over.
+// del cartamodello o, in mancanza, sulla sagoma ("Tutto il pezzo" la estende all'intero busto);
+// il numero massimo di aree che il cliente può inserire, le categorie (grafica, testo) e le
+// tecniche ammesse. Le aree fisse (nome, numero, loghi) attivate dal cliente riducono lo spazio
+// disponibile. Qui si attivano anche le fasce e la grafica all-over.
 
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { Save, Trash2 } from 'lucide-react'
@@ -12,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
 import { bounds, outlinePath, round } from '@/lib/patterns/geometry'
-import { anchorOf, ZONE_LABEL, zonePiece, type ZonePiece } from '@/lib/patterns/placement'
+import { anchorOf, largestTorsoBox, ZONE_LABEL, zonePiece, type ZonePiece } from '@/lib/patterns/placement'
 import { boxesOverlap, TECHNIQUE_LABEL, zoneBox, type Box } from '@/lib/printing'
 import { useQuery } from '@/hooks/useQuery'
 import { Button } from '@/components/ui/Button'
@@ -115,7 +116,6 @@ function ZoneEditor({ product, kitItemId, zone, row, piece, fixed, onSaved }: {
     if (!(Number(d.width_cm) > 0 && Number(d.height_cm) > 0)) return setError('Larghezza e altezza devono essere maggiori di zero.')
     if (!d.allow_graphic && !d.allow_text) return setError('Consenti almeno grafiche o testi.')
     if (!d.techniques.length) return setError('Scegli almeno una tecnica.')
-    if (clashes.length) return setError(`L’area di stampa si sovrappone a: ${clashes.map((f) => f.name).join(', ')}. Spostala o riducila.`)
     setSaving(true)
     setError(null)
     try {
@@ -146,9 +146,13 @@ function ZoneEditor({ product, kitItemId, zone, row, piece, fixed, onSaved }: {
         <p className="mt-2 text-xs text-ink-500">
           {piece.virtual ? 'Nessun cartamodello per questo componente: posizione indicativa sulla sagoma (misure reali in cm). ' : `Pezzo del cartamodello, taglia ${piece.size}. `}
           Il punto oro è il riferimento (centro collo o sommità della manica). Trascina il riquadro per spostarlo, l’angolo per ridimensionarlo.
-          {fixed.length > 0 && ' I riquadri grigi sono le aree fisse (scheda Aree personalizzazione): l’area di stampa non può sovrapporsi.'}
+          {fixed.length > 0 && ' I riquadri grigi sono le aree fisse (scheda Aree personalizzazione).'}
         </p>
-        {clashes.length > 0 && <p className="mt-2 rounded-xl bg-warning-50 p-3 text-sm text-warning-700">Si sovrappone a {clashes.map((f) => f.name).join(', ')}.</p>}
+        {clashes.length > 0 && (
+          <p className="mt-2 rounded-xl bg-ink-50 p-3 text-sm text-ink-600">
+            Dentro l’area ci sono {clashes.map((f) => f.name).join(', ')}: quando il cliente le attiva, quello spazio resta riservato e le sue aree si dispongono nello spazio libero rimanente.
+          </p>
+        )}
       </div>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
@@ -157,7 +161,16 @@ function ZoneEditor({ product, kitItemId, zone, row, piece, fixed, onSaved }: {
           <Field label="Larghezza (cm)"><Input inputMode="decimal" value={d.width_cm} onChange={(e) => set({ width_cm: n(e.target.value) })} /></Field>
           <Field label="Altezza (cm)"><Input inputMode="decimal" value={d.height_cm} onChange={(e) => set({ height_cm: n(e.target.value) })} /></Field>
           <Field label="Aree al massimo"><Input inputMode="numeric" value={d.max_items} onChange={(e) => set({ max_items: Math.max(1, Math.min(20, Math.round(n(e.target.value)) || 1)) })} /></Field>
-          <div className="flex items-end pb-1"><Button size="sm" variant="secondary" onClick={() => set({ x_cm: round(-Number(d.width_cm) / 2, 1) })}>Centra in orizzontale</Button></div>
+          <div className="flex flex-wrap items-end gap-2 pb-1">
+            {(zone === 'front' || zone === 'back') && (
+              <Button size="sm" variant="secondary" onClick={() => {
+                const box = largestTorsoBox(piece)
+                if (box) set({ x_cm: box.x1, y_cm: box.y1, width_cm: round(box.x2 - box.x1, 1), height_cm: round(box.y2 - box.y1, 1) })
+                else setError('Impossibile ricavare il busto da questo pezzo: imposta le misure a mano.')
+              }}>Tutto il pezzo</Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => set({ x_cm: round(-Number(d.width_cm) / 2, 1) })}>Centra in orizzontale</Button>
+          </div>
         </div>
         <fieldset>
           <legend className="text-sm font-medium text-ink-800">Contenuti ammessi</legend>

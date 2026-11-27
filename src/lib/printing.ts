@@ -5,7 +5,7 @@
 //
 // Coordinate in cm dal punto di riferimento del pezzo, x verso destra e y verso il basso.
 
-import type { PlacedElement, PrintZone, TechniqueCode } from '@/types/config'
+import type { PlacedElement, PrintZone, TechniqueCode, ZoneLayout } from '@/types/config'
 import type { PrintTechnique, PrintZoneRow } from '@/types/db'
 
 const TOL = 0.05
@@ -138,4 +138,65 @@ export function elementLabel(el: Pick<PlacedElement, 'kind' | 'text'>, index: nu
   if (el.kind === 'sponsor') return `Sponsor ${index + 1}`
   if (el.kind === 'logo') return `Logo ${index + 1}`
   return `Grafica ${index + 1}`
+}
+
+/**
+ * Spazio utilizzabile della zona: la fascia verticale più alta libera dalle aree fisse in uso
+ * (nome, numero, loghi dell'admin). Senza aree fisse è l'intera area massima.
+ */
+export function usableBox(z: Box, blocked: Box[]): Box {
+  const cuts = blocked.filter((b) => boxesOverlap(b, z)).map((b) => [Math.max(z.y1, b.y1), Math.min(z.y2, b.y2)] as const).sort((a, b) => a[0] - b[0])
+  if (!cuts.length) return z
+  let best: [number, number] = [z.y1, z.y1], y = z.y1
+  for (const [a, b] of cuts) {
+    if (a - y > best[1] - best[0]) best = [y, a]
+    y = Math.max(y, b)
+  }
+  if (z.y2 - y > best[1] - best[0]) best = [y, z.y2]
+  // piccolo margine dalle aree fisse
+  const top = best[0] > z.y1 ? best[0] + GAP : best[0], bottom = best[1] < z.y2 ? best[1] - GAP : best[1]
+  return { x1: z.x1, x2: z.x2, y1: round1(top), y2: round1(Math.max(top, bottom)) }
+}
+
+/**
+ * Divide lo spazio in parti uguali tra le aree (nell'ordine dato): affiancate, una sotto l'altra o
+ * a griglia. Ogni area occupa la sua parte mantenendo le proporzioni della grafica (o del testo),
+ * centrata; la rotazione torna a 0. Restituisce le nuove misure per id.
+ */
+export function distribute(z: Box, els: PlacedElement[], layout: Exclude<ZoneLayout, 'free'>, gap = 1): Map<string, Pick<PlacedElement, 'xCm' | 'yCm' | 'widthCm' | 'heightCm' | 'rotation'>> {
+  const out = new Map<string, Pick<PlacedElement, 'xCm' | 'yCm' | 'widthCm' | 'heightCm' | 'rotation'>>()
+  const n = els.length
+  if (!n) return out
+  const cols = layout === 'columns' ? n : layout === 'rows' ? 1 : Math.ceil(Math.sqrt(n))
+  const rows = Math.ceil(n / cols)
+  const W = z.x2 - z.x1, H = z.y2 - z.y1
+  const cw = (W - gap * (cols - 1)) / cols, ch = (H - gap * (rows - 1)) / rows
+  const floor1 = (v: number) => Math.floor(v * 10) / 10
+  els.forEach((el, i) => {
+    const r = Math.floor(i / cols), c = i % cols
+    // l'ultima riga incompleta della griglia viene centrata
+    const inRow = r === rows - 1 ? n - r * cols : cols
+    const offset = ((cols - inRow) * (cw + gap)) / 2
+    const ratio = heightOf(el) / el.widthCm || 1
+    const w = Math.max(0.5, floor1(Math.min(cw - 0.2, (ch - 0.2) / ratio)))
+    const h = Math.max(0.5, floor1(w * ratio))
+    out.set(el.id, {
+      xCm: round1(z.x1 + offset + c * (cw + gap) + cw / 2),
+      yCm: round1(z.y1 + r * (ch + gap) + ch / 2),
+      widthCm: w, heightCm: h, rotation: 0,
+    })
+  })
+  return out
+}
+
+/** Posizioni rapide sul davanti: lato cuore (sinistra di chi indossa), centro petto, lato opposto. */
+export type QuickSpot = 'heart' | 'chest' | 'opposite'
+export function quickSpot(z: Box, el: Pick<PlacedElement, 'widthCm' | 'heightCm' | 'asset'>, spot: QuickSpot): Pick<PlacedElement, 'xCm' | 'yCm' | 'rotation'> {
+  const W = z.x2 - z.x1, H = z.y2 - z.y1, w = el.widthCm, h = heightOf(el)
+  const cx = (z.x1 + z.x2) / 2
+  // il lato cuore è a destra di chi guarda il capo
+  const side = Math.min(W * 0.27, W / 2 - w / 2)
+  const x = spot === 'heart' ? cx + side : spot === 'opposite' ? cx - side : cx
+  const y = z.y1 + Math.max(h / 2 + 1, Math.min(H * 0.18, H - h / 2))
+  return { xCm: round1(x), yCm: round1(Math.min(y, z.y2 - h / 2)), rotation: 0 }
 }

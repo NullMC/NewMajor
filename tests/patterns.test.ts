@@ -5,7 +5,9 @@ import { elementCenterMm, elementCornersMm, placementIssue } from '../src/lib/pa
 import { offsetOutline } from '../src/lib/production/offset'
 import { layoutPieces } from '../src/lib/production/layout'
 import { buildPlan, type ProductionPiece } from '../src/lib/production/plan'
-import { elementIssues, nextSlot } from '../src/lib/printing'
+import { boxesOverlap, distribute, elementBox, elementIssues, insideBox, nextSlot, quickSpot, usableBox, type Box } from '../src/lib/printing'
+import { largestTorsoBox } from '../src/lib/patterns/placement'
+import type { PlacedElement } from '../src/types/config'
 
 let failures = 0
 const ok = (m: string) => console.log('  ✓', m)
@@ -236,6 +238,33 @@ near(bounds(inch.pieces[0].outline).width, 500 * 25.4, 0.5) ? ok('conversione da
   elementIssues({ ...(el as object), yCm: 10 } as never, [el], [zone], tech, false, [sponsor]).length === 0 ? ok('area lontana dalle aree fisse: nessun problema') : fail('falso positivo')
   const slot = nextSlot({ x1: -15, y1: 5, x2: 15, y2: 35 }, [], 20, 5, 'y', [{ x1: -20, x2: 20, y1: 4, y2: 15 }])
   slot && slot.yCm - 2.5 >= 15 ? ok(`posizionamento automatico sotto l’area fissa (centro a ${slot.yCm} cm)`) : fail(JSON.stringify(slot))
+}
+
+// Intero busto, divisione in parti uguali, spazio utilizzabile e posizioni rapide
+{
+  const torso: Box = { x1: -18, y1: 2, x2: 18, y2: 62 }
+  const sp = (id: string, w: number, h: number) => ({ id, kind: 'graphic', zone: 'front', xCm: 0, yCm: 10, widthCm: w, heightCm: h, rotation: 15, technique: 'dtf' }) as never as PlacedElement
+  const four = [sp('a', 10, 5), sp('b', 10, 5), sp('c', 10, 10), sp('d', 4, 8)]
+  const g = distribute(torso, four, 'grid')
+  const cells = [...g.values()]
+  const inside = cells.every((c, i) => insideBox(elementBox({ ...four[i], ...c }), torso))
+  const noOverlap = cells.every((c, i) => cells.every((d, j) => j <= i || !boxesOverlap(elementBox({ ...four[i], ...c }), elementBox({ ...four[j], ...d }))))
+  const quarters = new Set(cells.map((c) => `${c.xCm > 0}|${c.yCm > 32}`)).size === 4
+  inside && noOverlap && quarters && cells.every((c) => c.rotation === 0)
+    ? ok('4 grafiche a griglia: una per quarto, dentro l’area, senza sovrapposizioni') : fail(JSON.stringify(cells))
+  const a = g.get('a')!, d = g.get('d')!
+  near(a.heightCm! / a.widthCm, 0.5, 0.02) && near(d.heightCm! / d.widthCm, 2, 0.05) && near(a.widthCm, 17.5, 0.2)
+    ? ok(`ogni grafica mantiene le proporzioni e riempie la sua parte (${a.widthCm}×${a.heightCm} cm)`) : fail(JSON.stringify({ a, d }))
+  const rows = [...distribute(torso, [sp('a', 30, 10), sp('b', 30, 10)], 'rows').values()]
+  rows[0].yCm < rows[1].yCm && near(rows[0].xCm, 0) && near(rows[0].widthCm, 36, 0.3) ? ok('due sponsor in colonna: uno sotto l’altro, a tutta larghezza') : fail(JSON.stringify(rows))
+  const u = usableBox(torso, [{ x1: -16, x2: 16, y1: 10, y2: 35 }])
+  near(u.y1, 35.5) && near(u.y2, 62) ? ok('spazio utilizzabile: la parte più grande libera dal numero sul dietro') : fail(JSON.stringify(u))
+  const heart = quickSpot(torso, sp('h', 8, 8), 'heart'), opp = quickSpot(torso, sp('h', 8, 8), 'opposite')
+  heart.xCm > 5 && opp.xCm < -5 && near(heart.xCm, -opp.xCm) && near(heart.yCm, opp.yCm) ? ok(`logo lato cuore a ${heart.xCm} cm, lato opposto a ${opp.xCm} cm, alla stessa altezza`) : fail(JSON.stringify({ heart, opp }))
+  // davanti con scollo e giromanica: il rettangolo resta sotto lo scollo e dentro il busto
+  const front: [number, number][] = [[0, 0], [500, 0], [500, 450], [440, 520], [430, 680], [320, 700], [250, 610], [180, 700], [70, 680], [60, 520], [0, 450]]
+  const t = largestTorsoBox({ outline: front, anchor: { x: 250, y: 610 } })
+  t && t.y1 >= 2 && t.x2 <= 17 && t.y2 <= 59 && near(t.x1, -t.x2) ? ok(`tutto il pezzo: ${t.x2 - t.x1}×${t.y2 - t.y1} cm sotto lo scollo e tra i giromanica`) : fail(JSON.stringify(t))
 }
 
 console.log(failures ? `\n${failures} TEST FALLITI` : '\nTutti i test superati')

@@ -10,7 +10,7 @@ import type { PlacedElement, PrintZone } from '@/types/config'
 import { cn } from '@/lib/cn'
 import { bounds, outlinePath, round } from '@/lib/patterns/geometry'
 import { anchorOf, elementCenterMm, elementHeightCm, placementIssue, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
-import { elementIssues, findZone, zoneBox } from '@/lib/printing'
+import { elementIssues, findZone } from '@/lib/printing'
 import { textImage } from './garment/elements'
 import { assetDisplayUrl } from '@/features/cart/assets'
 import type { ConfiguratorApi } from './useConfigurator'
@@ -136,7 +136,9 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
           <line x1={sax} y1={-pad} x2={sax} y2={b.height + pad} className={snapX ? 'stroke-gold-500' : 'stroke-ink-900/25'} strokeWidth={snapX ? 2 : 1} strokeDasharray="6 5" vectorEffect="non-scaling-stroke" />
           <circle cx={sax} cy={say} r={handle * 0.45} className="fill-gold-500" />
           {zoneRow && (() => {
-            const zb = zoneBox(zoneRow)
+            // spazio utilizzabile: l'area massima meno nome, numero o loghi fissi in uso
+            const zb = api.usableFor(zone, api.elementKit)
+            if (!zb) return null
             const [zx, zy] = toSvg(ax + zb.x1 * 10, ay - zb.y1 * 10)
             return <rect x={zx} y={zy} width={(zb.x2 - zb.x1) * 10} height={(zb.y2 - zb.y1) * 10} fill="rgba(194,160,99,.08)" className="stroke-gold-500" strokeWidth={1.5} strokeDasharray="8 6" vectorEffect="non-scaling-stroke" />
           })()}
