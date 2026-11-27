@@ -13,19 +13,22 @@ import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
 import { bounds, outlinePath, round } from '@/lib/patterns/geometry'
 import { anchorOf, ZONE_LABEL, zonePiece, type ZonePiece } from '@/lib/patterns/placement'
-import { TECHNIQUE_LABEL } from '@/lib/printing'
+import { boxesOverlap, TECHNIQUE_LABEL, zoneBox, type Box } from '@/lib/printing'
 import { useQuery } from '@/hooks/useQuery'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Display'
 import { Checkbox, Field, FormError, Input, Switch } from '@/components/ui/Form'
 import { useUi } from '@/components/ui/Toast'
 import { getPrintZones } from '@/features/catalog/api'
-import { virtualPiece } from '@/features/configurator/garment/elements'
+import { areaBoxCm, virtualPiece } from '@/features/configurator/garment/elements'
 import { AllOverSettings } from './patterns/FreeElementsSettings'
 
 const ZONES: PrintZone[] = ['front', 'back', 'sleeve_left', 'sleeve_right']
 const TECHS: TechniqueCode[] = ['screen', 'dtf', 'embroidery', 'sublimation']
 const n = (s: string) => Number(s.replace(',', '.'))
+
+/** Area fissa dell'admin (logo, sponsor, nome, numero) sullo stesso lato, in cm dal riferimento. */
+type FixedBox = { name: string; box: Box }
 
 type Draft = Pick<PrintZoneRow, 'x_cm' | 'y_cm' | 'width_cm' | 'height_cm' | 'max_items' | 'allow_graphic' | 'allow_text' | 'techniques'>
 
@@ -37,7 +40,7 @@ const DEFAULTS: Record<PrintZone, Draft> = {
 }
 
 /** Pezzo con il rettangolo dell'area massima, trascinabile (spostamento) e ridimensionabile (angolo). */
-function ZoneCanvas({ piece, draft, onChange }: { piece: ZonePiece; draft: Draft; onChange: (d: Partial<Draft>) => void }) {
+function ZoneCanvas({ piece, draft, fixed, onChange }: { piece: ZonePiece; draft: Draft; fixed: FixedBox[]; onChange: (d: Partial<Draft>) => void }) {
   const svg = useRef<SVGSVGElement>(null)
   const drag = useRef<{ mode: 'move' | 'resize'; x: number; y: number; d: Draft } | null>(null)
   const b = bounds(piece.outline)
@@ -81,14 +84,24 @@ function ZoneCanvas({ piece, draft, onChange }: { piece: ZonePiece; draft: Draft
       <path d={outlinePath(piece.outline, b)} className="fill-white stroke-ink-900/50" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       <line x1={sax} y1={-pad} x2={sax} y2={b.height + pad} className="stroke-ink-900/20" strokeDasharray="6 5" vectorEffect="non-scaling-stroke" />
       <circle cx={sax} cy={say} r={handle * 0.45} className="fill-gold-500" />
+      {fixed.map((f) => {
+        const [fx, fy] = toSvg(ax + f.box.x1 * 10, ay - f.box.y1 * 10)
+        const fw = (f.box.x2 - f.box.x1) * 10, fh = (f.box.y2 - f.box.y1) * 10
+        return (
+          <g key={f.name} className="pointer-events-none">
+            <rect x={fx} y={fy} width={fw} height={fh} className="fill-ink-900/5 stroke-ink-500" strokeWidth={1.5} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
+            <text x={fx + fw / 2} y={fy + fh / 2} textAnchor="middle" dominantBaseline="middle" fontSize={Math.max(b.width, b.height) * 0.028} className="fill-ink-500">{f.name}</text>
+          </g>
+        )
+      })}
       <rect x={zx} y={zy} width={zw} height={zh} className="cursor-move fill-gold-500/15 stroke-gold-600" strokeWidth={2} strokeDasharray="8 6" vectorEffect="non-scaling-stroke" onPointerDown={(e) => down(e, 'move')} />
       <rect x={zx + zw - handle / 2} y={zy + zh - handle / 2} width={handle} height={handle} className="cursor-nwse-resize fill-white stroke-ink-900" strokeWidth={1.5} vectorEffect="non-scaling-stroke" onPointerDown={(e) => down(e, 'resize')} />
     </svg>
   )
 }
 
-function ZoneEditor({ product, kitItemId, zone, row, piece, onSaved }: {
-  product: ProductDetail; kitItemId: string | null; zone: PrintZone; row: PrintZoneRow | null; piece: ZonePiece; onSaved: () => void
+function ZoneEditor({ product, kitItemId, zone, row, piece, fixed, onSaved }: {
+  product: ProductDetail; kitItemId: string | null; zone: PrintZone; row: PrintZoneRow | null; piece: ZonePiece; fixed: FixedBox[]; onSaved: () => void
 }) {
   const { toast, confirm } = useUi()
   const [d, setD] = useState<Draft>(() => row ? { ...row, techniques: [...row.techniques] } : { ...DEFAULTS[zone] })
@@ -96,11 +109,13 @@ function ZoneEditor({ product, kitItemId, zone, row, piece, onSaved }: {
   const [error, setError] = useState<string | null>(null)
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }))
   const allOverOk = !!product.all_over_enabled
+  const clashes = fixed.filter((f) => Number(d.width_cm) > 0 && Number(d.height_cm) > 0 && boxesOverlap(zoneBox(d), f.box))
 
   const save = async () => {
     if (!(Number(d.width_cm) > 0 && Number(d.height_cm) > 0)) return setError('Larghezza e altezza devono essere maggiori di zero.')
     if (!d.allow_graphic && !d.allow_text) return setError('Consenti almeno grafiche o testi.')
     if (!d.techniques.length) return setError('Scegli almeno una tecnica.')
+    if (clashes.length) return setError(`L’area di stampa si sovrappone a: ${clashes.map((f) => f.name).join(', ')}. Spostala o riducila.`)
     setSaving(true)
     setError(null)
     try {
@@ -127,11 +142,13 @@ function ZoneEditor({ product, kitItemId, zone, row, piece, onSaved }: {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div>
-        <ZoneCanvas piece={piece} draft={d} onChange={set} />
+        <ZoneCanvas piece={piece} draft={d} fixed={fixed} onChange={set} />
         <p className="mt-2 text-xs text-ink-500">
           {piece.virtual ? 'Nessun cartamodello per questo componente: posizione indicativa sulla sagoma (misure reali in cm). ' : `Pezzo del cartamodello, taglia ${piece.size}. `}
           Il punto oro è il riferimento (centro collo o sommità della manica). Trascina il riquadro per spostarlo, l’angolo per ridimensionarlo.
+          {fixed.length > 0 && ' I riquadri grigi sono le aree fisse (scheda Aree personalizzazione): l’area di stampa non può sovrapporsi.'}
         </p>
+        {clashes.length > 0 && <p className="mt-2 rounded-xl bg-warning-50 p-3 text-sm text-warning-700">Si sovrappone a {clashes.map((f) => f.name).join(', ')}.</p>}
       </div>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
@@ -229,6 +246,12 @@ export function PrintZonesTab({ product, onChanged }: { product: ProductDetail; 
   const { data: pieces } = useQuery(`print-zones:${product.id}`, () => getPrintZones(product.id))
   const row = (product.print_zones ?? []).find((z) => z.zone === zone && (z.kit_item_id ?? null) === target.kitItemId) ?? null
   const piece = zonePiece(pieces ?? [], zone, target.kitItemId) ?? virtualPiece(target.shape, zone, target.kitItemId)
+  // aree fisse dello stesso lato e componente (solo davanti e dietro)
+  const firstKit = product.kit_items[0]?.id ?? null
+  const fixed: FixedBox[] = zone !== 'front' && zone !== 'back' ? [] : product.customization_areas
+    .filter((a) => a.is_active && a.area_type !== 'all_over' && a.side === zone
+      && (product.product_type !== 'kit' || (a.kit_item_id ?? firstKit) === target.kitItemId))
+    .flatMap((a) => { const box = areaBoxCm(a, target.shape, piece); return box ? [{ name: a.name, box }] : [] })
   const active = (z: PrintZone) => (product.print_zones ?? []).some((r) => r.zone === z && (r.kit_item_id ?? null) === target.kitItemId)
 
   return (
@@ -263,7 +286,7 @@ export function PrintZonesTab({ product, onChanged }: { product: ProductDetail; 
               </button>
             ))}
           </div>
-          <ZoneEditor key={`${target.kitItemId}-${zone}-${row?.id ?? 'new'}`} product={product} kitItemId={target.kitItemId} zone={zone} row={row} piece={piece} onSaved={onChanged} />
+          <ZoneEditor key={`${target.kitItemId}-${zone}-${row?.id ?? 'new'}`} product={product} kitItemId={target.kitItemId} zone={zone} row={row} piece={piece} fixed={fixed} onSaved={onChanged} />
         </div>
       </Card>
 

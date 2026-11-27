@@ -3,7 +3,8 @@
 // riferimento del pezzo coincide con il centro collo della sagoma e la scala deriva dalla
 // larghezza all'orlo. Il file di produzione usa invece le misure esatte del pezzo.
 
-import type { ModelShape } from '@/types/db'
+import type { CustomizationArea, ModelShape } from '@/types/db'
+import type { Box } from '@/lib/printing'
 import type { PlacedElement, PrintZone } from '@/types/config'
 import { anchorOf, elementCenterMm, elementHeightCm, type ZonePiece } from '@/lib/patterns/placement'
 import { bounds, type Vec } from '@/lib/patterns/geometry'
@@ -61,6 +62,20 @@ export function silhouetteFrame(shape: ModelShape, side: 'front' | 'back', piece
   const pieceHem = widthAt(piece.outline, pieceY)
   const neck = (side === 'back' ? s.backNeckY : s.neckY) ?? neckY(outline)
   return { k: silHem > 0 && pieceHem > 0 ? silHem / pieceHem : 0, neck, bounds: sb }
+}
+
+/**
+ * Riquadro in cm (dal riferimento del pezzo, x a destra, y in basso) di un'area fissa dell'admin,
+ * definita in percentuale del pannello della sagoma. Stessa corrispondenza usata per la produzione.
+ */
+export function areaBoxCm(area: Pick<CustomizationArea, 'x' | 'y' | 'width' | 'height' | 'side'>, shape: ModelShape, piece: ZonePiece | Pick<ZonePiece, 'outline' | 'anchor'>): Box | null {
+  const { k, neck, bounds: b } = silhouetteFrame(shape, area.side, piece)
+  if (!k) return null
+  const W = b.maxX - b.minX, H = b.maxY - b.minY
+  const x1 = b.minX + (Number(area.x) / 100) * W, x2 = x1 + (Number(area.width) / 100) * W
+  const top = b.maxY - (Number(area.y) / 100) * H, bottom = top - (Number(area.height) / 100) * H
+  const cm = (v: number) => Math.round((v / k / 10) * 10) / 10
+  return { x1: cm(x1), x2: cm(x2), y1: cm(neck - top), y2: cm(neck - bottom) }
 }
 
 /**

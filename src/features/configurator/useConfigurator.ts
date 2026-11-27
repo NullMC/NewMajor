@@ -6,10 +6,10 @@ import { computePrice, configQuantity } from '@/lib/pricing'
 import { evaluateQuality, effectiveDpi, readImageInfo, type QualityReport } from '@/lib/imageQuality'
 import { uid } from '@/lib/slug'
 import { PUBLIC_BUCKET } from '@/lib/storage'
-import { centerIn, elementIssues, elementLabel, findZone, fitSize, heightOf, nextSlot, zoneBox, type ElementIssue } from '@/lib/printing'
+import { centerIn, elementIssues, elementLabel, findZone, fitSize, heightOf, nextSlot, zoneBox, type Box, type ElementIssue } from '@/lib/printing'
 import { assetDisplayUrl, storeGraphic } from '@/features/cart/assets'
 import { canvasToBlob, drawPanel, ensureFonts, isDark, LIVE_PANEL_WIDTH, type PanelLayer } from './garment/panel'
-import { drawSleeve, drawSleevePreview, silhouetteUnitsPerMm, sleeveInfo, toSilhouette, virtualPiece, withTextImages } from './garment/elements'
+import { areaBoxCm, drawSleeve, drawSleevePreview, silhouetteUnitsPerMm, sleeveInfo, toSilhouette, virtualPiece, withTextImages } from './garment/elements'
 import { elementDpi, elementHeightCm, SECTION_LABEL, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 
 const solidCache = new Map<string, HTMLCanvasElement>()
@@ -30,6 +30,7 @@ const ISSUE_TEXT: Record<ElementIssue, string> = {
   no_zone: 'la zona non prevede aree di stampa',
   outside: 'esce dall’area di stampa: spostala o riducila',
   overlap: 'si sovrappone a un’altra area',
+  overlap_fixed: 'si sovrappone a un logo, sponsor, nome o numero già scelto: spostala',
   technique: 'tecnica non disponibile in questa zona',
   category: 'questo tipo di contenuto non è ammesso in questa zona',
   too_many: 'troppe aree in questa zona',
@@ -433,6 +434,21 @@ export function useConfigurator(
   }, [config.elements, product.print_zones, updateElement])
 
   /**
+   * Aree fisse dell'admin (loghi, sponsor, nomi, numeri) attivate dal cliente sul lato indicato, in
+   * cm dal riferimento: le aree di stampa non possono sovrapporsi.
+   */
+  const blockedFor = useCallback((zone: PrintZone, kit: string | null): Box[] => {
+    if (zone !== 'front' && zone !== 'back') return []
+    const piece = pieceFor(zone, kit)
+    const shp = shapeOf(kit)
+    return product.customization_areas
+      .filter((a) => a.is_active && a.area_type !== 'all_over' && a.side === zone && config.areas[a.id]?.enabled
+        && (product.product_type !== 'kit' || (a.kit_item_id ?? firstKitItem) === kit))
+      .map((a) => areaBoxCm(a, shp, piece))
+      .filter((b): b is Box => !!b)
+  }, [product, config.areas, pieceFor, shapeOf, firstKitItem])
+
+  /**
    * Aggiunge un'area di stampa (grafica caricata o dalla libreria, oppure testo) nella zona
    * indicata, accanto (asse orizzontale) o sotto (asse verticale) all'ultima, finché c'è spazio
    * nell'area massima. La dimensione si adatta alle proporzioni della grafica.
@@ -482,8 +498,8 @@ export function useConfigurator(
     // dimensione iniziale: 10 cm di larghezza (fino a 20 per i testi), ridotta per stare nell'area massima
     const w0 = kind === 'text' ? Math.min(20, zb.x2 - zb.x1) : 10
     const size = fitSize(w0, w0 * ratio, zb)
-    const slot = nextSlot(zb, existing, size.w, size.h, axis)
-    if (!slot) return { error: 'Non c’è più spazio nell’area di stampa: riduci o sposta le aree presenti.' }
+    const slot = nextSlot(zb, existing, size.w, size.h, axis, blockedFor(zone, elementKit))
+    if (!slot) return { error: 'Non c’è più spazio nell’area di stampa: riduci o sposta le aree presenti (loghi, sponsor, nomi e numeri scelti occupano parte dell’area).' }
     const el: PlacedElement = {
       id: uid(), kind, zone, kitItemId: elementKit, xCm: slot.xCm, yCm: slot.yCm, widthCm: size.w, heightCm: size.h, rotation: 0,
       technique: tech.code, lockRatio: kind === 'graphic',
@@ -494,7 +510,7 @@ export function useConfigurator(
     setSelectedElement(el.id)
     if (zone === 'front' || zone === 'back') setView(zone)
     return { element: el }
-  }, [product.print_zones, config.elements, elementKit, techniquesFor, opts.quality, opts.userId, baseColor, elementQuality])
+  }, [product.print_zones, config.elements, elementKit, techniquesFor, opts.quality, opts.userId, baseColor, elementQuality, blockedFor])
 
   /** Sostituisce la grafica di un'area mantenendo posizione e larghezza (altezza dalle nuove proporzioni). */
   const replaceElementAsset = useCallback(async (id: string, file: File): Promise<{ error?: string; report?: QualityReport }> => {
@@ -691,7 +707,7 @@ export function useConfigurator(
     for (const [i, e] of els.entries()) {
       const comp = product.kit_items.find((k) => k.id === e.kitItemId)?.label
       const label = `${elementLabel(e, i)} (${ZONE_LABEL[e.zone].toLowerCase()}${comp ? `, ${comp}` : ''})`
-      for (const issue of elementIssues(e, els, product.print_zones ?? [], opts.techniques ?? [], allOverAllowedFor(e.kitItemId ?? null))) {
+      for (const issue of elementIssues(e, els, product.print_zones ?? [], opts.techniques ?? [], allOverAllowedFor(e.kitItemId ?? null), blockedFor(e.zone, e.kitItemId ?? null))) {
         out.push({ section: 'elements', message: `${label}: ${ISSUE_TEXT[issue]}.` })
       }
       const q = elementQuality(e)
@@ -760,7 +776,7 @@ export function useConfigurator(
     kitItem, activeKitItem, setActiveKitItem, shape, areas, view, setView, previewRow, setPreviewRow,
     highlightArea, setHighlightArea, uploading, frontCanvas, backCanvas, version, guides, setGuides,
     baseColor, secondaryColor, renderPreviews,
-    zones, elements, elementKit, selectedElement, setSelectedElement, pieceFor,
+    zones, elements, elementKit, selectedElement, setSelectedElement, pieceFor, blockedFor,
     printZones, printEnabled, techniques, techniquesFor,
     sleeveCanvases: {
       left: sleeveInfo(pieceFor('sleeve_left', elementKit), sleeveLeftCanvas),

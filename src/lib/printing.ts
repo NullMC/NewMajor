@@ -61,11 +61,14 @@ export function elementPrice(el: Pick<PlacedElement, 'widthCm' | 'heightCm' | 'a
   return round2(Number(t.min_price) + k * (Number(t.max_price) - Number(t.min_price)))
 }
 
-export type ElementIssue = 'no_zone' | 'outside' | 'overlap' | 'technique' | 'category' | 'too_many' | 'empty_text'
+export type ElementIssue = 'no_zone' | 'outside' | 'overlap' | 'overlap_fixed' | 'technique' | 'category' | 'too_many' | 'empty_text'
 
-/** Problemi di un'area rispetto alla sua zona e alle altre aree della stessa zona. */
+/**
+ * Problemi di un'area rispetto alla sua zona, alle altre aree della stessa zona e alle aree fisse
+ * dell'admin in uso sullo stesso lato (`blocked`, in cm come le aree).
+ */
 export function elementIssues(
-  el: PlacedElement, all: PlacedElement[], zones: PrintZoneRow[], techniques: PrintTechnique[], allOverAllowed: boolean,
+  el: PlacedElement, all: PlacedElement[], zones: PrintZoneRow[], techniques: PrintTechnique[], allOverAllowed: boolean, blocked: Box[] = [],
 ): ElementIssue[] {
   if (!el.technique) return []
   const out: ElementIssue[] = []
@@ -79,6 +82,7 @@ export function elementIssues(
   if (!insideBox(box, zoneBox(z))) out.push('outside')
   const same = all.filter((o) => o.technique && o.zone === el.zone && (o.kitItemId ?? null) === (el.kitItemId ?? null))
   if (same.some((o) => o.id !== el.id && boxesOverlap(box, elementBox(o)))) out.push('overlap')
+  if (blocked.some((b) => boxesOverlap(box, b))) out.push('overlap_fixed')
   if (same.length > z.max_items) out.push('too_many')
   return out
 }
@@ -97,24 +101,24 @@ export function centerIn(z: Box, axis: 'x' | 'y'): Pick<PlacedElement, 'xCm'> | 
 /**
  * Posizione per una nuova area di w × h cm: accanto (asse orizzontale) o sotto (asse verticale)
  * all'ultima area della zona, oppure in alto a sinistra se la zona è vuota. Cerca il primo
- * spazio libero dentro l'area massima; null se non c'è più posto.
+ * spazio libero dentro l'area massima, evitando le aree fisse (`blocked`); null se non c'è più posto.
  */
-export function nextSlot(z: Box, existing: PlacedElement[], w: number, h: number, axis: 'x' | 'y'): { xCm: number; yCm: number } | null {
+export function nextSlot(z: Box, existing: PlacedElement[], w: number, h: number, axis: 'x' | 'y', blocked: Box[] = []): { xCm: number; yCm: number } | null {
   const boxes = existing.map(elementBox)
   const free = (x: number, y: number) => {
     const b = { x1: x - w / 2, y1: y - h / 2, x2: x + w / 2, y2: y + h / 2 }
-    return insideBox(b, z) && !boxes.some((o) => boxesOverlap(b, o))
-  }
-  if (!boxes.length) {
-    const x = round1((z.x1 + z.x2) / 2), y = round1(z.y1 + h / 2)
-    return free(x, y) ? { xCm: x, yCm: y } : null
+    return insideBox(b, z) && !boxes.some((o) => boxesOverlap(b, o)) && !blocked.some((o) => boxesOverlap(b, o))
   }
   const last = boxes[boxes.length - 1]
+  if (!last) {
+    const x = round1((z.x1 + z.x2) / 2), y = round1(z.y1 + h / 2)
+    if (free(x, y)) return { xCm: x, yCm: y }
+  }
   // prima prova accanto/sotto l'ultima, poi scorre righe (o colonne) dell'area massima
-  const first = axis === 'x'
+  const first = !last ? null : axis === 'x'
     ? { xCm: round1(last.x2 + GAP + w / 2), yCm: round1((last.y1 + last.y2) / 2) }
     : { xCm: round1((last.x1 + last.x2) / 2), yCm: round1(last.y2 + GAP + h / 2) }
-  if (free(first.xCm, first.yCm)) return first
+  if (first && free(first.xCm, first.yCm)) return first
   const step = 0.5
   if (axis === 'x') {
     for (let y = z.y1 + h / 2; y <= z.y2 - h / 2 + TOL; y += step) {

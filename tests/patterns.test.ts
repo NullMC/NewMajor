@@ -5,6 +5,7 @@ import { elementCenterMm, elementCornersMm, placementIssue } from '../src/lib/pa
 import { offsetOutline } from '../src/lib/production/offset'
 import { layoutPieces } from '../src/lib/production/layout'
 import { buildPlan, type ProductionPiece } from '../src/lib/production/plan'
+import { elementIssues, nextSlot } from '../src/lib/printing'
 
 let failures = 0
 const ok = (m: string) => console.log('  ✓', m)
@@ -222,6 +223,19 @@ near(bounds(inch.pieces[0].outline).width, 500 * 25.4, 0.5) ? ok('conversione da
   const fL = jl.placements[0].center, bL = jl.placements[1].center, fR = jr.placements[0].center
   jl.placements.length === 2 && jr.placements.length === 2 && near(fL[0], 80) && near(fL[1], 440) && near(bL[0], 550) && near(bL[1], 520) && near(fR[0], 680) && near(fR[1], 440)
     ? ok('gambe: davanti misurato dal centro davanti, dietro dal centro dietro, su entrambe le gambe') : fail(JSON.stringify({ l: jl.placements.map((p) => p.center), r: jr.placements.map((p) => p.center) }))
+}
+
+// Aree fisse dell'admin come ostacoli per le aree di stampa del cliente
+{
+  const zone = { id: 'z', product_id: 'p', kit_item_id: null, zone: 'front', x_cm: -15, y_cm: 5, width_cm: 30, height_cm: 30, max_items: 3, allow_graphic: true, allow_text: true, techniques: ['dtf'], sort_order: 0 } as never
+  const tech = [{ code: 'dtf', name: 'DTF', min_price: 1.5, max_price: 5, all_over_only: false, is_active: true, sort_order: 0 }] as never
+  const sponsor = { x1: -20, x2: 20, y1: 25, y2: 37 }
+  const el = { id: 'a', kind: 'text', zone: 'front', text: 'X', xCm: 0, yCm: 28, widthCm: 20, heightCm: 5, rotation: 0, technique: 'dtf' } as never
+  const issues = elementIssues(el, [el], [zone], tech, false, [sponsor])
+  issues.includes('overlap_fixed') ? ok('area sopra lo sponsor fisso: segnalata') : fail(JSON.stringify(issues))
+  elementIssues({ ...(el as object), yCm: 10 } as never, [el], [zone], tech, false, [sponsor]).length === 0 ? ok('area lontana dalle aree fisse: nessun problema') : fail('falso positivo')
+  const slot = nextSlot({ x1: -15, y1: 5, x2: 15, y2: 35 }, [], 20, 5, 'y', [{ x1: -20, x2: 20, y1: 4, y2: 15 }])
+  slot && slot.yCm - 2.5 >= 15 ? ok(`posizionamento automatico sotto l’area fissa (centro a ${slot.yCm} cm)`) : fail(JSON.stringify(slot))
 }
 
 console.log(failures ? `\n${failures} TEST FALLITI` : '\nTutti i test superati')

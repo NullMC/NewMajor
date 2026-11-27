@@ -30,6 +30,7 @@ const fmt = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',')
 const ISSUE: Record<string, string> = {
   outside: 'Esce dall’area di stampa: spostala o riducila.',
   overlap: 'Si sovrappone a un’altra area.',
+  overlap_fixed: 'Si sovrappone a un logo, sponsor, nome o numero già scelto: spostala.',
   technique: 'Tecnica non disponibile in questa zona.',
   category: 'Questo contenuto non è ammesso in questa zona.',
   too_many: 'Troppe aree in questa zona.',
@@ -52,7 +53,7 @@ function AreaCard({ api, el, index }: { api: ConfiguratorApi; el: PlacedElement;
   const techs = zone ? api.techniquesFor(zone) : []
   const tech = api.techniques.find((t) => t.code === el.technique)
   const price = zone && tech ? elementPrice(el, zone, tech) : 0
-  const issues = elementIssues(el, api.elements, api.product.print_zones ?? [], api.techniques, techs.some((t) => t.all_over_only))
+  const issues = elementIssues(el, api.elements, api.product.print_zones ?? [], api.techniques, techs.some((t) => t.all_over_only), api.blockedFor(el.zone, el.kitItemId ?? null))
   const q = api.elementQuality(el)
   const dpi = elementDpi(el)
   const selected = api.selectedElement === el.id

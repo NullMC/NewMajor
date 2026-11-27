@@ -107,8 +107,8 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
 
   const handle = Math.max(b.width, b.height) * 0.022
   // fuori dall'area massima o sovrapposta (bloccante); vicino alla cucitura solo sui pezzi reali
-  const selIssues = sel ? elementIssues(sel, api.elements, api.product.print_zones ?? [], api.techniques, true) : []
-  const issue = selIssues.includes('outside') || selIssues.includes('overlap') ? 'outside' : sel && !piece.virtual ? placementIssue(sel, piece) : null
+  const selIssues = sel ? elementIssues(sel, api.elements, api.product.print_zones ?? [], api.techniques, true, api.blockedFor(sel.zone, sel.kitItemId ?? null)) : []
+  const issue = selIssues.includes('outside') || selIssues.includes('overlap') || selIssues.includes('overlap_fixed') ? 'outside' : sel && !piece.virtual ? placementIssue(sel, piece) : null
 
   return (
     <div className="flex h-full flex-col">
@@ -180,7 +180,7 @@ export function PlacementEditor({ api, zone, piece, baseColor }: { api: Configur
             </span>
             {issue && (
               <span className={cn('font-semibold', issue === 'outside' ? 'text-danger-600' : 'text-warning-700')}>
-                {issue === 'outside' ? (selIssues.includes('overlap') ? 'Si sovrappone a un’altra area' : 'Fuori dall’area di stampa') : 'Vicino alla cucitura'}
+                {issue === 'outside' ? (selIssues.includes('overlap_fixed') ? 'Sopra un logo, sponsor, nome o numero' : selIssues.includes('overlap') ? 'Si sovrappone a un’altra area' : 'Fuori dall’area di stampa') : 'Vicino alla cucitura'}
               </span>
             )}
           </>
