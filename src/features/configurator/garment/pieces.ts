@@ -2,23 +2,61 @@
 // disegnato su un canvas esattamente come nel file di produzione (fondo o colore della sezione,
 // grafica all-over, fascia, nomi, numeri e aree di stampa in mm) e applicato alla mesh del modello
 // 3D che corrisponde allo stesso pezzo (UV normalizzate sul riquadro del pezzo, vedi
-// scripts/models/piece_uv.mjs). Così l'anteprima mostra le grafiche dove verranno stampate e cucite.
+// scripts/models/piece_uv.mjs; per le gambe di pantaloncini e pantaloni scripts/models/leg_uv.mjs,
+// adattate riga per riga al contorno del pezzo con legUv). Così l'anteprima mostra le grafiche
+// dove verranno stampate e cucite.
 
 import type { AssetRef, TextStyle } from '@/types/config'
-import { bounds, type Vec } from '@/lib/patterns/geometry'
+import { bounds, type PieceAnchor, type Vec } from '@/lib/patterns/geometry'
+import { horizontalHits } from '@/lib/patterns/placement'
 import type { Box } from '@/lib/printing'
 import type { PieceJob } from '@/lib/production/plan'
 import { drawFittedText } from './panel'
 
-export type PieceCanvasKind = 'front' | 'back' | 'sleeve_left' | 'sleeve_right'
-export const PIECE_CANVAS_KINDS: PieceCanvasKind[] = ['front', 'back', 'sleeve_left', 'sleeve_right']
+export type PieceCanvasKind = 'front' | 'back' | 'sleeve_left' | 'sleeve_right' | 'leg_left' | 'leg_right'
+export const PIECE_CANVAS_KINDS: PieceCanvasKind[] = ['front', 'back', 'sleeve_left', 'sleeve_right', 'leg_left', 'leg_right']
 
 /**
  * Sagome con un modello 3D preparato per la ricostruzione dai pezzi (mesh nominate per pezzo e UV
  * normalizzate): con il cartamodello del prodotto l'anteprima usa i pezzi invece della proiezione.
  */
-export const PIECE_MODELS: Partial<Record<string, true>> = { tshirt: true }
+export const PIECE_MODELS: Partial<Record<string, PieceCanvasKind[]>> = {
+  tshirt: ['front', 'back'], // pezzi indispensabili; le maniche se presenti
+  shorts: ['leg_left', 'leg_right'],
+}
 export type PieceCanvases = Partial<Record<PieceCanvasKind, HTMLCanvasElement>>
+/** Contorno e riferimenti dei pezzi disegnati (per adattare le UV delle gambe). */
+export type PieceShapes = Partial<Record<PieceCanvasKind, { outline: Vec[]; anchor: PieceAnchor }>>
+export interface PieceSet { canvases: PieceCanvases; shapes: PieceShapes }
+
+/**
+ * UV delle gambe: da (t, s) del modello (giro attorno alla gamba dal bordo "davanti" del pezzo a
+ * quello "dietro", altezza dalla vita all'orlo) alle coordinate del canvas del pezzo. Ogni riga
+ * del modello copre l'intera larghezza del pezzo a quell'altezza: nessuna parte resta scoperta.
+ */
+export function legUv(ts: ArrayLike<number>, shape: { outline: Vec[]; anchor: PieceAnchor }): Float32Array {
+  const b = bounds(shape.outline)
+  const ROWS = 240
+  const rows: [number, number][] = []
+  for (let i = 0; i <= ROWS; i++) {
+    // un soffio dentro il riquadro per avere sempre un'intersezione
+    const y = b.maxY - (i / ROWS) * b.height * 0.998 - b.height * 0.001
+    const xs = horizontalHits(shape.outline, y)
+    rows.push(xs.length >= 2 ? [xs[0], xs[xs.length - 1]] : rows[rows.length - 1] ?? [b.minX, b.maxX])
+  }
+  // il bordo "davanti" del pezzo è quello del centro davanti in vita (x, y), l'altro è il dietro (bx, by)
+  const frontLeft = (shape.anchor.x ?? b.minX) <= (shape.anchor.bx ?? b.maxX)
+  const out = new Float32Array(ts.length)
+  for (let i = 0; i < ts.length; i += 2) {
+    const t = Math.min(1, Math.max(0, ts[i])), s = Math.min(1, Math.max(0, ts[i + 1]))
+    const f = s * ROWS, r0 = Math.floor(f), r1 = Math.min(ROWS, r0 + 1), k = f - r0
+    const xl = rows[r0][0] + (rows[r1][0] - rows[r0][0]) * k, xr = rows[r0][1] + (rows[r1][1] - rows[r0][1]) * k
+    const x = frontLeft ? xl + t * (xr - xl) : xr - t * (xr - xl)
+    out[i] = (x - b.minX) / b.width
+    out[i + 1] = s
+  }
+  return out
+}
 
 /** Guide sul pezzo (cm dal riferimento): area di stampa utilizzabile e aree fisse. */
 export interface PieceGuides { anchor: Vec; zone?: Box | null; fixed?: { name: string; box: Box }[] }

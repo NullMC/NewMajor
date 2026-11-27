@@ -13,7 +13,7 @@ import type { ModelShape } from '@/types/db'
 import { getShape } from './shapes'
 import { buildPanelGeometry } from './geometry'
 import { hasPieceMeshes, ModelGarment, PieceGarment, useGarmentModel, type SleeveTexture } from './ModelGarment'
-import type { PieceCanvases } from './pieces'
+import type { PieceSet } from './pieces'
 
 function usePanelTexture(canvas: HTMLCanvasElement | null, version: number, flipY = true) {
   const { gl, invalidate } = useThree()
@@ -50,15 +50,22 @@ function useSleeve(s: SleeveCanvas | null | undefined, version: number): SleeveT
 function Garment({ shape, front, back, version, view, baseColor, sleeves, pieces, trimColor }: {
   shape: ModelShape; front: HTMLCanvasElement | null; back: HTMLCanvasElement | null; version: number; view: 'front' | 'back'; baseColor: string
   sleeves?: { left?: SleeveCanvas | null; right?: SleeveCanvas | null }
-  pieces?: PieceCanvases | null; trimColor?: string
+  pieces?: PieceSet | null; trimColor?: string
 }) {
   const model = useGarmentModel(shape)
   // pezzi del cartamodello (ricostruzione): una texture per pezzo
-  const pFront = usePanelTexture(pieces?.front ?? null, version, false)
-  const pBack = usePanelTexture(pieces?.back ?? null, version, false)
-  const pSleeveL = usePanelTexture(pieces?.sleeve_left ?? null, version, false)
-  const pSleeveR = usePanelTexture(pieces?.sleeve_right ?? null, version, false)
-  const pieceTextures = useMemo(() => (pFront && pBack ? { front: pFront, back: pBack, sleeve_left: pSleeveL ?? undefined, sleeve_right: pSleeveR ?? undefined } : null), [pFront, pBack, pSleeveL, pSleeveR])
+  const c = pieces?.canvases
+  const pFront = usePanelTexture(c?.front ?? null, version, false)
+  const pBack = usePanelTexture(c?.back ?? null, version, false)
+  const pSleeveL = usePanelTexture(c?.sleeve_left ?? null, version, false)
+  const pSleeveR = usePanelTexture(c?.sleeve_right ?? null, version, false)
+  const pLegL = usePanelTexture(c?.leg_left ?? null, version, false)
+  const pLegR = usePanelTexture(c?.leg_right ?? null, version, false)
+  const pieceTextures = useMemo(() => {
+    const t = { front: pFront, back: pBack, sleeve_left: pSleeveL, sleeve_right: pSleeveR, leg_left: pLegL, leg_right: pLegR }
+    const out = Object.fromEntries(Object.entries(t).filter(([, v]) => v)) as Record<string, THREE.Texture>
+    return Object.keys(out).length ? out : null
+  }, [pFront, pBack, pSleeveL, pSleeveR, pLegL, pLegR])
   const sleeveLeft = useSleeve(sleeves?.left, version)
   const sleeveRight = useSleeve(sleeves?.right, version)
   const s = getShape(shape)
@@ -84,8 +91,8 @@ function Garment({ shape, front, back, version, view, baseColor, sleeves, pieces
 
   return (
     <group ref={group} position={[0, -0.08, 0]}>
-      {model.status === 'ready' && pieceTextures && hasPieceMeshes(model.geos) ? (
-        <PieceGarment geos={model.geos} textures={pieceTextures} baseColor={baseColor} trimColor={trimColor ?? baseColor} />
+      {model.status === 'ready' && pieces && pieceTextures && hasPieceMeshes(model.geos, Object.keys(pieceTextures)) ? (
+        <PieceGarment geos={model.geos} textures={pieceTextures} shapes={pieces.shapes} baseColor={baseColor} trimColor={trimColor ?? baseColor} />
       ) : model.status === 'ready' && frontTex && backTex ? (
         <ModelGarment shape={shape} geos={model.geos} front={frontTex} back={backTex} baseColor={baseColor} sleeveLeft={sleeveLeft} sleeveRight={sleeveRight} />
       ) : (
@@ -154,7 +161,7 @@ export interface GarmentViewerProps {
   resetToken?: number
   className?: string
   /** Pezzi del cartamodello già disegnati (ricostruzione del capo dai pezzi) e colore delle finiture. */
-  pieces?: PieceCanvases | null
+  pieces?: PieceSet | null
   trimColor?: string
 }
 

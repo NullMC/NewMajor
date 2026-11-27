@@ -102,7 +102,7 @@ export function zonePiece(zones: ZonePiece[], zone: SectionKey, kitItemId: strin
 }
 
 /** Ascisse in cui la retta orizzontale y attraversa il contorno, ordinate. */
-function horizontalHits(pts: Vec[], y: number): number[] {
+export function horizontalHits(pts: Vec[], y: number): number[] {
   const xs: number[] = []
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     const [x1, y1] = pts[j], [x2, y2] = pts[i]

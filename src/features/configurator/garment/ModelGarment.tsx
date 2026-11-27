@@ -17,6 +17,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import type { ModelShape } from '@/types/db'
 import { getShape } from './shapes'
 import { MODEL_OUTLINES } from './outlines'
+import { legUv, type PieceShapes } from './pieces'
 
 export interface GarmentModel {
   url: string
@@ -204,9 +205,24 @@ diffuseColor.rgb *= col;`,
 }
 
 /** Capo ricostruito dai pezzi: ogni mesh con la texture del suo pezzo, le finiture nel colore dei profili. */
-export function PieceGarment({ geos, textures, baseColor, trimColor }: {
-  geos: THREE.BufferGeometry[]; textures: Partial<Record<string, THREE.Texture>>; baseColor: string; trimColor: string
+export function PieceGarment({ geos, textures, shapes, baseColor, trimColor }: {
+  geos: THREE.BufferGeometry[]; textures: Partial<Record<string, THREE.Texture>>; shapes: PieceShapes; baseColor: string; trimColor: string
 }) {
+  // gambe: UV adattate al contorno del pezzo del prodotto (le altre mesh hanno già le UV del pezzo)
+  const shapeKey = JSON.stringify(Object.keys(shapes).map((k) => [k, shapes[k as keyof PieceShapes]?.outline.length, shapes[k as keyof PieceShapes]?.anchor]))
+  const fitted = useMemo(() => geos.map((g) => {
+    const piece = g.userData.piece as string
+    const sh = (piece === 'leg_left' || piece === 'leg_right') ? shapes[piece] : undefined
+    if (!sh || !g.attributes.uv) return g
+    const out = g.clone()
+    // UV quantizzate (interi normalizzati): lette con getX/getY, che le riportano a 0..1
+    const src = g.attributes.uv
+    const ts = new Float32Array(src.count * 2)
+    for (let i = 0; i < src.count; i++) { ts[i * 2] = src.getX(i); ts[i * 2 + 1] = src.getY(i) }
+    out.setAttribute('uv', new THREE.BufferAttribute(legUv(ts, sh), 2))
+    return out
+  }), [geos, shapeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { for (const g of fitted) if (!geos.includes(g)) g.dispose() }, [fitted, geos])
   const mats = useMemo(() => {
     const out = new Map<string, THREE.MeshStandardMaterial>()
     for (const [k, t] of Object.entries(textures)) if (t) out.set(k, new THREE.MeshStandardMaterial({ map: t, roughness: 0.86, metalness: 0, side: THREE.DoubleSide }))
@@ -224,7 +240,7 @@ export function PieceGarment({ geos, textures, baseColor, trimColor }: {
   }, [geos])
   return (
     <group scale={scale} position={[0, 0.02, 0]}>
-      {geos.map((g, i) => {
+      {fitted.map((g, i) => {
         const piece = g.userData.piece as string
         return <mesh key={i} geometry={g} material={mats.get(piece) ?? (piece === 'trim' ? trim : plain)} castShadow receiveShadow />
       })}
@@ -233,8 +249,8 @@ export function PieceGarment({ geos, textures, baseColor, trimColor }: {
 }
 
 /** Il modello ha le mesh dei pezzi (front, back...) con le UV per la ricostruzione? */
-export const hasPieceMeshes = (geos: THREE.BufferGeometry[]) =>
-  geos.some((g) => g.userData.piece === 'front' && g.attributes.uv) && geos.some((g) => g.userData.piece === 'back' && g.attributes.uv)
+export const hasPieceMeshes = (geos: THREE.BufferGeometry[], kinds: string[]) =>
+  geos.some((g) => g.attributes.uv && kinds.includes(g.userData.piece as string))
 
 export function ModelGarment({ shape, geos, front, back, baseColor, sleeveLeft, sleeveRight }: {
   shape: ModelShape; geos: THREE.BufferGeometry[]; front: THREE.Texture; back: THREE.Texture; baseColor: string

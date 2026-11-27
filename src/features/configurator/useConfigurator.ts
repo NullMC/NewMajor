@@ -13,7 +13,7 @@ import { areaBoxCm, drawSleeve, drawSleevePreview, silhouetteUnitsPerMm, sleeveI
 import { anchorOf, elementDpi, elementHeightCm, SECTION_LABEL, zonePiece, ZONE_LABEL, type ZonePiece } from '@/lib/patterns/placement'
 import type { PieceKind } from '@/lib/patterns/geometry'
 import { buildPlan, type ProductionPiece } from '@/lib/production/plan'
-import { drawPieceCanvas, PIECE_CANVAS_KINDS, PIECE_MODELS, type PieceCanvases, type PieceGuides } from './garment/pieces'
+import { drawPieceCanvas, PIECE_CANVAS_KINDS, PIECE_MODELS, type PieceCanvases, type PieceGuides, type PieceSet } from './garment/pieces'
 
 const solidCache = new Map<string, HTMLCanvasElement>()
 /** Immagine 1×1 di un colore pieno (colori per sezione, fasce colorate). */
@@ -308,7 +308,11 @@ export function useConfigurator(
   // Ricostruzione dai pezzi ----------------------------------------------------------
   /** Pezzi reali (taglia di riferimento) del componente visualizzato. */
   const realPieces = useMemo(() => (opts.zones ?? []).filter((z) => (z.kitItemId ?? null) === elementKit && !z.virtual), [opts.zones, elementKit])
-  const pieceMode = !!PIECE_MODELS[shape] && realPieces.some((z) => z.zone === 'front') && realPieces.some((z) => z.zone === 'back')
+  const pieceMode = !!PIECE_MODELS[shape]?.every((k) => realPieces.some((z) => z.zone === k))
+  const pieceSet = useMemo<PieceSet>(() => ({
+    canvases: pieceCanvases,
+    shapes: Object.fromEntries(realPieces.map((z) => [z.zone, { outline: z.outline, anchor: z.anchor }])),
+  }), [pieceCanvases, realPieces])
   /** Immagine caricata per una grafica (aree, aree di stampa, all-over, fasce), dal suo file. */
   const imageOf = useMemo(() => {
     const byFile = new Map<string, HTMLImageElement>()
@@ -373,12 +377,15 @@ export function useConfigurator(
           for (const kind of PIECE_CANVAS_KINDS) {
             const job = plan.jobs.find((j) => (j.kitItemId ?? null) === elementKit && j.piece === kind)
             const piece = realPieces.find((z) => z.zone === kind)
-            const side = kind === 'front' || kind === 'back' ? kind : null
+            // guide del lato inquadrato: sul davanti/dietro della maglia, su entrambe le gambe (misurate
+            // dal centro davanti o dietro in vita)
+            const leg = kind === 'leg_left' || kind === 'leg_right'
+            const side = leg ? view : kind === 'front' || kind === 'back' ? kind : null
             const g: PieceGuides | null = guides && side && side === view && piece ? {
-              anchor: anchorOf(piece),
+              anchor: anchorOf(piece, leg ? view : 'front'),
               zone: usableFor(side, elementKit),
               fixed: areas.filter((a) => a.side === side && a.area_type !== 'all_over')
-                .flatMap((a) => { const bx = areaBoxCm(a, shape, piece); return bx ? [{ name: a.name, box: bx }] : [] }),
+                .flatMap((a) => { const bx = areaBoxCm(a, shape, pieceFor(side, elementKit)); return bx ? [{ name: a.name, box: bx }] : [] }),
             } : null
             if (job) drawPieceCanvas(pieceCanvases[kind]!, job, imageOf, config.textStyle!, g)
           }
@@ -387,7 +394,7 @@ export function useConfigurator(
       })
     }, 16)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [areas, buildLayers, shape, baseColor, secondaryColor, config, guides, view, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, pieceFor, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage, bandImage, bandHeightCm, zoneRectsFor, legHalves, pieceMode, realPieces, product, row, pieceCanvases, imageOf, usableFor])
+  }, [areas, buildLayers, shape, baseColor, secondaryColor, config, guides, view, highlightArea, frontCanvas, backCanvas, silhouetteElements, elementKit, pieceFor, elements, elementImages, sleeveLeftCanvas, sleeveRightCanvas, allOverImage, bandImage, bandHeightCm, zoneRectsFor, legHalves, pieceMode, realPieces, product, row, pieceCanvases, imageOf, usableFor, pieceFor])
 
   // Azioni --------------------------------------------------------------------------
   const patch = useCallback((p: Partial<Configuration>) => setConfig((c) => ({ ...c, ...p })), [])
@@ -882,7 +889,7 @@ export function useConfigurator(
     baseColor, secondaryColor, renderPreviews,
     zones, elements, elementKit, selectedElement, setSelectedElement, pieceFor, blockedFor, usableFor, layoutOf, setLayout, placeElement,
     printZones, printEnabled, techniques, techniquesFor,
-    pieceCanvases: pieceMode ? pieceCanvases : null, trimColor: secondaryColor ?? baseColor,
+    pieceSet: pieceMode ? pieceSet : null, trimColor: secondaryColor ?? baseColor,
     sleeveCanvases: {
       left: sleeveInfo(pieceFor('sleeve_left', elementKit), sleeveLeftCanvas),
       right: sleeveInfo(pieceFor('sleeve_right', elementKit), sleeveRightCanvas),
